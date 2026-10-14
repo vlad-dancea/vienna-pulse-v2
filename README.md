@@ -1,5 +1,7 @@
 # Vienna Pulse
 
+[![backend](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/backend.yml/badge.svg)](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/backend.yml)
+
 A live map of the Vienna public transport network, built on the Wiener Linien GTFS feed.
 
 | Folder | What it is |
