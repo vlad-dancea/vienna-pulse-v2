@@ -4,7 +4,7 @@ A live map of the Vienna public transport network, built on the Wiener Linien GT
 
 | Folder | What it is |
 | --- | --- |
-| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): will import the GTFS feed and serve the timetable |
+| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): downloads and reads the GTFS feed every morning; will store it and serve the timetable |
 | `vienna-pulse-frontend` | The map (not started yet) |
 
 ## Run
