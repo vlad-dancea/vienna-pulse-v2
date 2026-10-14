@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * Shared CSV rules for the files inside a GTFS ZIP. Wiener Linien writes UTF-8 with a byte order
  * mark and quotes every field, and some names contain commas.
  */
-final class FeedCsv {
+public final class FeedCsv {
     private FeedCsv() {}
 
     static CsvReader<NamedCsvRecord> open(ZipFile feed, String file) throws IOException {
@@ -25,14 +25,14 @@ final class FeedCsv {
     }
 
     /** Strips surrounding whitespace. GTFS treats a missing column and an empty field the same way. */
-    static @Nullable String optional(NamedCsvRecord row, String field) {
+    public static @Nullable String optional(NamedCsvRecord row, String field) {
         return row.findField(field)
                 .map(String::strip)
                 .filter(value -> !value.isEmpty())
                 .orElse(null);
     }
 
-    static String required(NamedCsvRecord row, String field) {
+    public static String required(NamedCsvRecord row, String field) {
         var value = optional(row, field);
         if (value == null) {
             throw new IllegalArgumentException("missing " + field);

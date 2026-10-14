@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.ingestor;
+package com.vladdancea.viennapulse.importer.ingestor.route;
 
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;

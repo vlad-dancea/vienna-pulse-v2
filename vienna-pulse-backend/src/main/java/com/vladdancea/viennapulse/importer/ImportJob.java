@@ -1,7 +1,7 @@
 package com.vladdancea.viennapulse.importer;
 
 import com.vladdancea.viennapulse.importer.ingestor.FeedFormatException;
-import com.vladdancea.viennapulse.importer.ingestor.RouteReader;
+import com.vladdancea.viennapulse.importer.ingestor.route.RouteReader;
 import com.vladdancea.viennapulse.importer.zip.FeedDownloader;
 import com.vladdancea.viennapulse.importer.zip.FeedValidator;
 import java.io.IOException;
