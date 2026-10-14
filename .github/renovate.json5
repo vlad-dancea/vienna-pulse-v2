@@ -1,0 +1,55 @@
+// Renovate keeps every pinned version in the repository current: the GitHub Actions in the
+// workflows, the Gradle plugins, libraries and wrapper, and the JDK pinned in mise.toml. It
+// proposes each update as a pull request, so CI proves the update builds before it is merged.
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  // The Renovate maintainers' recommended setup. Among other things it pins GitHub Actions
+  // to commit SHAs and keeps them pinned, and opens a Dependency Dashboard issue that lists
+  // every pending update.
+  extends: ['config:best-practices'],
+
+  // Updates arrive in one weekly batch instead of whenever something is released.
+  timezone: 'Europe/Vienna',
+  schedule: ['* 0-8 * * 1'],
+
+  // A release is proposed only once it is three days old. A compromised or broken release
+  // is usually found and pulled within that time.
+  minimumReleaseAge: '3 days',
+  // Without this, Renovate opens the pull request right away and only marks it as pending.
+  internalChecksFilter: 'strict',
+
+  packageRules: [
+    {
+      // Minor and patch updates rarely need individual attention, so they share one pull
+      // request. Major updates stay separate: they can break things and deserve a look.
+      groupName: 'all non-major dependencies',
+      matchUpdateTypes: ['minor', 'patch', 'digest'],
+    },
+    {
+      // The backend stays on Java 25, the current LTS release. Moving to the next LTS also
+      // means changing the Gradle toolchain, so it is a deliberate change, not a routine bump.
+      matchManagers: ['mise'],
+      matchDepNames: ['java'],
+      matchUpdateTypes: ['major'],
+      enabled: false,
+    },
+    {
+      // The JDK release list has no publish dates, so the three-day wait above could never
+      // end. JDK patch releases are security fixes, which should land promptly anyway.
+      matchDatasources: ['java-version'],
+      minimumReleaseAge: null,
+    },
+  ],
+
+  customManagers: [
+    {
+      // Spotless takes the palantir-java-format version as a plain string, which Renovate's
+      // Gradle support does not recognise as a dependency.
+      customType: 'regex',
+      managerFilePatterns: ['/(^|/)build\\.gradle\\.kts$/'],
+      matchStrings: ['palantirJavaFormat\\("(?<currentValue>[^"]+)"\\)'],
+      depNameTemplate: 'com.palantir.javaformat:palantir-java-format',
+      datasourceTemplate: 'maven',
+    },
+  ],
+}
