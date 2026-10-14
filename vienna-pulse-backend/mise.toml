@@ -1,11 +1,15 @@
 # Java comes from the repository root mise.toml. Tasks run in this folder.
 
+[tasks.format]
+description = "Format all Java sources (palantir-java-format via Spotless)"
+run = "./gradlew spotlessApply --console=plain"
+
 [tasks.test]
 description = "Run the tests"
 run = "./gradlew test --console=plain"
 
 [tasks.check]
-description = "Everything CI checks: compilation and tests"
+description = "Everything CI checks: formatting, compilation and tests"
 run = "./gradlew check --console=plain"
 
 [tasks.dev]

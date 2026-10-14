@@ -1,0 +1,18 @@
+{
+  "languages": {
+    "Java": {
+      "format_on_save": "on",
+      "formatter": {
+        "external": {
+          "command": "sh",
+          "arguments": [
+            "-c",
+            "d=$(dirname \"$1\"); until [ -x \"$d/mise-tasks/format/stdin\" ] || [ \"$d\" = / ]; do d=$(dirname \"$d\"); done; exec \"$d/mise-tasks/format/stdin\" \"$1\"",
+            "sh",
+            "{buffer_path}"
+          ]
+        }
+      }
+    }
+  }
+}

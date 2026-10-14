@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#MISE description="Format one Java file from stdin to stdout with the project's Spotless config"
+#MISE hide=true
+#USAGE arg "<file>" help="Path of the file being formatted, so Spotless picks the right rules"
+#
+# Editors call this on save (see .zed/settings.json). Spotless's IDE hook prints nothing when
+# the input is already formatted, and an editor would then replace the buffer with an empty
+# file, so this script returns the input unchanged in that case.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+input="$(mktemp)" output="$(mktemp)" status="$(mktemp)"
+trap 'rm -f "$input" "$output" "$status"' EXIT
+
+cat >"$input"
+"$root/gradlew" -p "$root" spotlessApply \
+    -PspotlessIdeHook="$(realpath "$1")" -PspotlessIdeHookUseStdIn -PspotlessIdeHookUseStdOut \
+    --quiet --console=plain <"$input" >"$output" 2>"$status" || true
+
+if grep -qx "IS DIRTY" "$status"; then
+    cat "$output"
+elif grep -qx "IS CLEAN" "$status"; then
+    cat "$input"
+else
+    cat "$status" >&2
+    exit 1
+fi

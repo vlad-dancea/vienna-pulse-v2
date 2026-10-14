@@ -14,6 +14,10 @@ depends = ["//vienna-pulse-backend:check"]
 description = "Run the tests of every project"
 depends = ["//vienna-pulse-backend:test"]
 
+[tasks.format]
+description = "Format the sources of every project"
+depends = ["//vienna-pulse-backend:format"]
+
 [tasks.dev]
 description = "Run every project in development mode"
 depends = ["//vienna-pulse-backend:dev"]
