@@ -7,7 +7,7 @@
 /// 1. [com.vladdancea.viennapulse.importer.zip] downloads the feed and checks that every file we
 ///    need is there.
 /// 2. [com.vladdancea.viennapulse.importer.ingestor] parses each file into records, with one
-///    subpackage per GTFS file. Only `routes.txt` is read so far.
+///    subpackage per GTFS file. Currently reads `routes.txt` and `stops.txt`.
 ///
 /// Storing the records is not implemented yet.
 @NullMarked

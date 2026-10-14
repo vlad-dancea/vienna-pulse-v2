@@ -2,6 +2,7 @@ package com.vladdancea.viennapulse.importer;
 
 import com.vladdancea.viennapulse.importer.ingestor.FeedFormatException;
 import com.vladdancea.viennapulse.importer.ingestor.route.RouteReader;
+import com.vladdancea.viennapulse.importer.ingestor.stop.StopReader;
 import com.vladdancea.viennapulse.importer.zip.FeedDownloader;
 import com.vladdancea.viennapulse.importer.zip.FeedValidator;
 import java.io.IOException;
@@ -24,6 +25,7 @@ public class ImportJob {
     private final FeedDownloader downloader;
     private final FeedValidator validator;
     private final RouteReader routeReader;
+    private final StopReader stopReader;
 
     @Scheduled(cron = "${pulse.importer.cron}", zone = "Europe/Vienna")
     public void run() {
@@ -52,6 +54,8 @@ public class ImportJob {
         try (var zip = new ZipFile(feed.toFile())) {
             var routes = routeReader.read(zip);
             log.info("Read {} routes from {}", routes.size(), feed);
+            var stops = stopReader.read(zip);
+            log.info("Read {} stops from {}", stops.size(), feed);
         } catch (IOException | FeedFormatException exception) {
             discard(feed, exception);
             throw exception;
