@@ -12,6 +12,23 @@ run = "./gradlew test --console=plain"
 description = "Everything CI checks: formatting, compiler lint, Error Prone, NullAway, tests"
 run = "./gradlew check --console=plain"
 
-[tasks.dev]
-description = "Run the app"
+[tasks.compile]
+description = "Compile main classes and resources"
+run = "./gradlew classes --console=plain"
+
+# DevTools restarts the app when build/classes changes, but nothing writes there while
+# bootRun is running. `dev` runs both Gradle builds in parallel: one serves the app, the
+# other recompiles on every save. Both wait for one shared compile so they never race.
+[tasks."dev:app"]
+hide = true
+depends = ["compile"]
 run = "./gradlew bootRun --console=plain"
+
+[tasks."dev:watch"]
+hide = true
+depends = ["compile"]
+run = "./gradlew classes --continuous --console=plain --quiet"
+
+[tasks.dev]
+description = "Run the app and restart it after every code change (Spring Boot DevTools)"
+depends = ["dev:app", "dev:watch"]

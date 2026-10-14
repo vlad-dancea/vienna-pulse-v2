@@ -14,6 +14,6 @@ versions for every project, and each project's `mise.toml` defines its own tasks
 
 ```bash
 mise trust --all
-mise run dev     # backend at http://localhost:8080
+mise run dev     # backend at http://localhost:8080, restarts on every save
 mise run check   # everything CI checks, in every project
 ```
