@@ -1,0 +1,55 @@
+# Continuous integration for the Spring Boot backend.
+#
+# Runs the backend's `check` task, the same one developers run before pushing: formatting,
+# compilation with every javac warning treated as an error, Error Prone, NullAway, doclint and
+# the tests. mise installs the JDK pinned in the repository's mise.toml, so CI builds with
+# exactly the toolchain used locally.
+#
+# The repository is a monorepo, and each project gets its own workflow that runs only when
+# that project changes. A frontend change never waits for the backend to build.
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths: &backend-paths
+      - vienna-pulse-backend/**
+      # The root mise.toml pins the JDK, so changing it can break the build.
+      - mise.toml
+      - .github/workflows/backend.yml
+  pull_request:
+    paths: *backend-paths
+
+# Only the newest commit of a branch or pull request matters, so a new push cancels the
+# run before it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the job only reads the repository.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # A hung build fails after 20 minutes instead of GitHub's 6-hour default.
+    timeout-minutes: 20
+    steps:
+      # Actions are pinned to a full commit SHA: a tag can be moved to different code, a
+      # commit cannot. The trailing comment names the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No later step pushes, so the token is not left behind in .git/config.
+          persist-credentials: false
+
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+
+      # Caches Gradle dependencies between runs and verifies the checksum of the
+      # committed Gradle wrapper jar.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # The open-source (MIT) cache provider, instead of the proprietary default.
+          cache-provider: basic
+
+      - run: mise run //vienna-pulse-backend:check
