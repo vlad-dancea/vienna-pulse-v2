@@ -12,7 +12,9 @@ A live map of the Vienna public transport network, built on the Wiener Linien GT
 ## Run
 
 The toolchain is managed by [mise](https://mise.jdx.dev): the root `mise.toml` pins the tool
-versions for every project, and each project's `mise.toml` defines its own tasks.
+versions for every project, and each project's `mise.toml` defines its own tasks. The backend
+also needs [Docker](https://docs.docker.com/engine/install/): it starts its PostgreSQL database in
+a container.
 
 ```bash
 mise trust --all
