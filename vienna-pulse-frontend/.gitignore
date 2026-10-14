@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Angular build output and cache
+.angular/
+dist/
+out-tsc/
+
+# Test output
+coverage/
+__screenshots__/
+
+# Tool logs
+*.log

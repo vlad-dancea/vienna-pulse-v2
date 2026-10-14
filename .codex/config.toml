@@ -1,0 +1,3 @@
+[mcp_servers.angular-cli]
+command = "mise"
+args = ["run", "//vienna-pulse-frontend:mcp"]

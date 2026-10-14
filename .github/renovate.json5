@@ -1,5 +1,5 @@
 // Renovate keeps every pinned version in the repository current: the GitHub Actions in the
-// workflows, the Gradle plugins, libraries and wrapper, and the JDK pinned in mise.toml. It
+// workflows, Gradle plugins, libraries and wrapper, frontend packages, and tools in mise.toml. It
 // proposes each update as a pull request, so CI proves the update builds before it is merged.
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
@@ -30,6 +30,14 @@
       // means changing the Gradle toolchain, so it is a deliberate change, not a routine bump.
       matchManagers: ['mise'],
       matchDepNames: ['java'],
+      matchUpdateTypes: ['major'],
+      enabled: false,
+    },
+    {
+      // Node stays on the current LTS line, just as Java does. Changing runtime majors
+      // is a deliberate choice even when Angular supports a newer Current release.
+      matchManagers: ['mise'],
+      matchDepNames: ['node'],
       matchUpdateTypes: ['major'],
       enabled: false,
     },

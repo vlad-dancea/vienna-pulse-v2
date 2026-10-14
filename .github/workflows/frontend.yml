@@ -1,0 +1,49 @@
+# Continuous integration for the Angular frontend.
+#
+# Runs the same check task used locally: formatting, typed lint, template accessibility,
+# the production build and tests. mise installs the pinned tools, and pnpm installs the
+# committed lockfile, so CI uses the same toolchain and dependencies as development.
+#
+# The repository is a monorepo, and each project gets its own workflow that runs only when
+# that project changes. A backend change never waits for the backend to build.
+name: frontend
+
+on:
+  push:
+    branches: [main]
+    paths: &frontend-paths
+      - vienna-pulse-frontend/**
+      - mise.toml
+      # The frontend inherits the repository's whitespace and line-ending rules.
+      - .editorconfig
+      - .gitattributes
+      - .github/workflows/frontend.yml
+  pull_request:
+    paths: *frontend-paths
+
+# A newer push makes the previous check obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # This job needs no JDK, even though the monorepo pins one at the root.
+      MISE_ENABLE_TOOLS: node,pnpm
+    steps:
+      # Full commit SHAs keep a moved release tag from changing the code CI runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache_key_prefix: mise-frontend
+
+      - run: mise run //vienna-pulse-frontend:check

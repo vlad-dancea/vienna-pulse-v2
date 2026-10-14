@@ -1,0 +1,10 @@
+# pnpm requires an explicit decision for dependency install scripts. These native
+# packages ship platform binaries separately, so their install-time builds are unnecessary.
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+  lmdb: false
+  msgpackr-extract: false
+
+# Keep version changes visible in package.json as well as the lockfile, as in Gradle.
+saveExact: true

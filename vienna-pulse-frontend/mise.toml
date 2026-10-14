@@ -1,0 +1,48 @@
+# Node and pnpm come from the repository root mise.toml. Tasks run in this folder.
+
+# The lockfile is used locally and in CI, so a fresh clone needs no separate setup.
+[tasks.install]
+hide = true
+run = "pnpm install --frozen-lockfile"
+
+[tasks.dev]
+description = "Run the Angular development server"
+depends = ["install"]
+run = "pnpm start"
+
+[tasks.build]
+description = "Build the frontend for production"
+depends = ["install"]
+run = "pnpm build"
+
+[tasks.test]
+description = "Run the unit tests once"
+depends = ["install"]
+run = "pnpm test --watch=false"
+
+[tasks.lint]
+description = "Check TypeScript and Angular templates with type-aware ESLint"
+depends = ["install"]
+run = "pnpm exec ng lint --max-warnings=0"
+
+[tasks.format]
+description = "Format frontend sources and configuration with Prettier"
+depends = ["install"]
+run = "pnpm exec prettier --write ."
+
+[tasks."format:check"]
+description = "Check frontend formatting with Prettier"
+depends = ["install"]
+run = "pnpm exec prettier --check ."
+
+[tasks.check]
+description = "Everything CI checks: formatting, typed lint, template accessibility, production build, tests"
+depends = ["format:check", "lint", "build", "test"]
+
+# A named monorepo task resolves the pinned local CLI from either project or the
+# repository root. MCP uses stdout for messages, so mise must not write task logs there.
+[tasks.mcp]
+hide = true
+quiet = true
+raw = true
+run = "pnpm exec ng mcp"

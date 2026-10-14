@@ -1,0 +1,4 @@
+# Inherit the repository's encoding, line endings and whitespace rules. Frontend code
+# uses two spaces, matching Angular and Prettier.
+[*.{ts,js,mjs,html,css}]
+indent_size = 2
