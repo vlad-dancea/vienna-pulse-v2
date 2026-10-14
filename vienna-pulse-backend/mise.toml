@@ -1,0 +1,13 @@
+# Java comes from the repository root mise.toml. Tasks run in this folder.
+
+[tasks.test]
+description = "Run the tests"
+run = "./gradlew test --console=plain"
+
+[tasks.check]
+description = "Everything CI checks: compilation and tests"
+run = "./gradlew check --console=plain"
+
+[tasks.dev]
+description = "Run the app"
+run = "./gradlew bootRun --console=plain"

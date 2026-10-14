@@ -1,0 +1,19 @@
+monorepo_root = true
+
+[monorepo]
+config_roots = ["vienna-pulse-backend"]
+
+[tools]
+java = "temurin-25.0.4+101.0.LTS"
+
+[tasks.check]
+description = "Everything CI checks, in every project"
+depends = ["//vienna-pulse-backend:check"]
+
+[tasks.test]
+description = "Run the tests of every project"
+depends = ["//vienna-pulse-backend:test"]
+
+[tasks.dev]
+description = "Run every project in development mode"
+depends = ["//vienna-pulse-backend:dev"]

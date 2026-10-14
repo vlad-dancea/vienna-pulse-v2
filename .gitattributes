@@ -1,0 +1,5 @@
+# Store text files with LF and check them out with LF on every OS: shell scripts such as
+# gradlew break on CRLF. Windows batch files are the exception.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary

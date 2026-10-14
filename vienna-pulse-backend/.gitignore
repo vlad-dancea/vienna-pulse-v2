@@ -1,0 +1,6 @@
+# Gradle
+.gradle/
+build/
+
+# Eclipse and VS Code Java compile here
+bin/
