@@ -47,6 +47,10 @@ spotless {
     }
 }
 
+tasks.javadoc {
+    (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:all,-missing", true)
+}
+
 tasks.test {
     useJUnitPlatform()
 }
