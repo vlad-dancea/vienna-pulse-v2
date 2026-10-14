@@ -3,7 +3,8 @@ package com.vladdancea.viennapulse.importer.ingestor.route;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
-/** One row of {@code routes.txt}. */
+/// One row of `routes.txt`. The constructor rejects a row that breaks the GTFS rules with an
+/// [IllegalArgumentException].
 public record Route(
         String id,
         @Nullable String agencyId,

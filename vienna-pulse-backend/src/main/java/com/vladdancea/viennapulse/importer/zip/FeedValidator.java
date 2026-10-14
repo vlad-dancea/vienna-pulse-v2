@@ -7,6 +7,7 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import org.springframework.stereotype.Component;
 
+/// Checks that a downloaded feed contains every file our importer needs.
 @Component
 public class FeedValidator {
     private static final List<String> REQUIRED_FILES = List.of(
@@ -19,6 +20,7 @@ public class FeedValidator {
             "calendar.txt",
             "calendar_dates.txt");
 
+    /// Throws [ZipException] naming the first required file that is missing or empty.
     public void validate(Path file) throws IOException {
         try (var zip = new ZipFile(file.toFile())) {
             for (var name : REQUIRED_FILES) {

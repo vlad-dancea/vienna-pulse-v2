@@ -3,7 +3,8 @@ package com.vladdancea.viennapulse.importer.ingestor.route;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 
-/** The basic GTFS route types. */
+/// The basic GTFS route types. Extended types (100 to 1700) are not supported,
+/// Wiener Linien only uses tram, subway and bus.
 @RequiredArgsConstructor
 public enum RouteType {
     TRAM(0),

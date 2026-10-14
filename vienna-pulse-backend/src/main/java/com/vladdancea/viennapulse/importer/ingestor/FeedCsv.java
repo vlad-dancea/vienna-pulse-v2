@@ -7,10 +7,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Shared CSV rules for the files inside a GTFS ZIP. Wiener Linien writes UTF-8 with a byte order
- * mark and quotes every field, and some names contain commas.
- */
+/// Shared CSV rules for the files inside a GTFS ZIP.
+/// Wiener Linien writes UTF-8 with a byte order mark and quotes every field, and some names contain commas.
 public final class FeedCsv {
     private FeedCsv() {}
 
@@ -24,7 +22,8 @@ public final class FeedCsv {
                 .ofNamedCsvRecord(feed.getInputStream(entry), StandardCharsets.UTF_8);
     }
 
-    /** Strips surrounding whitespace. GTFS treats a missing column and an empty field the same way. */
+    /// The field without surrounding whitespace, or `null` if the column is missing or the field is empty.
+    /// GTFS treats both the same way.
     public static @Nullable String optional(NamedCsvRecord row, String field) {
         return row.findField(field)
                 .map(String::strip)
@@ -32,6 +31,8 @@ public final class FeedCsv {
                 .orElse(null);
     }
 
+    /// Like [#optional(NamedCsvRecord, String)],
+    /// but throws [IllegalArgumentException] when there is no value.
     public static String required(NamedCsvRecord row, String field) {
         var value = optional(row, field);
         if (value == null) {

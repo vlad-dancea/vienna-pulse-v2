@@ -33,7 +33,7 @@ dependencies {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.compilerArgs.addAll(listOf("-Xlint:all,-serial,-processing", "-Werror"))
+    options.compilerArgs.addAll(listOf("-Xlint:all,-serial,-processing", "-Xdoclint:all,-missing", "-Werror"))
     options.errorprone {
         check("NullAway", CheckSeverity.ERROR)
         option("NullAway:OnlyNullMarked", "true")

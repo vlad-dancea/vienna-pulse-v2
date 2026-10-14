@@ -2,7 +2,7 @@ package com.vladdancea.viennapulse.importer.ingestor;
 
 import java.util.Objects;
 
-/** A feed file whose content breaks the GTFS rules, with the file and line where it happened. */
+/// A feed file whose content breaks the GTFS rules, with the file and line where it happened.
 public class FeedFormatException extends RuntimeException {
     FeedFormatException(String message) {
         super(message);

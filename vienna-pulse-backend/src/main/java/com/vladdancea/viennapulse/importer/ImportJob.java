@@ -14,6 +14,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
+/// Imports the GTFS feed on the `pulse.importer.cron` schedule:
+/// download, validate, then read. Each failure is logged once and a rejected feed is deleted,
+/// an accepted feed stays in the temporary directory.
 @Service
 @Slf4j
 @RequiredArgsConstructor

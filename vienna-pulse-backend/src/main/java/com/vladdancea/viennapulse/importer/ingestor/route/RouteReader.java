@@ -7,6 +7,7 @@ import com.vladdancea.viennapulse.importer.ingestor.FeedFileReader;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import org.springframework.stereotype.Component;
 
+/// Reads `routes.txt` into [Route] records.
 @Component
 public class RouteReader implements FeedFileReader<Route> {
     @Override
