@@ -9,7 +9,7 @@ description = "Run the tests"
 run = "./gradlew test --console=plain"
 
 [tasks.check]
-description = "Everything CI checks: formatting, compilation and tests"
+description = "Everything CI checks: formatting, compiler lint, Error Prone, NullAway, tests"
 run = "./gradlew check --console=plain"
 
 [tasks.dev]
