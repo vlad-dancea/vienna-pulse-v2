@@ -3,7 +3,6 @@ package com.vladdancea.viennapulse.importer.zip;
 import com.vladdancea.viennapulse.importer.ImporterProperties;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +19,9 @@ public class FeedDownloader {
     private final ImporterProperties properties;
     private final RestClient.Builder clientBuilder;
 
-    /// Downloads the feed and returns the file, which the caller must delete when done. Throws
+    /// Downloads the feed into a temporary file, which closing the returned feed deletes. Throws
     /// [RestClientException] if the request fails or the response is not 2xx.
-    public Path download() {
+    public DownloadedFeed download() {
         log.info("Starting download process from {}", properties.feedUrl());
         return clientBuilder.build().get().uri(properties.feedUrl()).exchange((request, response) -> {
             if (!response.getStatusCode().is2xxSuccessful()) {
@@ -34,7 +33,7 @@ public class FeedDownloader {
             try {
                 var bytes = Files.copy(response.getBody(), file, StandardCopyOption.REPLACE_EXISTING);
                 log.info("Downloaded {} bytes to {}", bytes, file);
-                return file;
+                return new DownloadedFeed(file);
             } catch (IOException | RuntimeException exception) {
                 try {
                     Files.deleteIfExists(file);
