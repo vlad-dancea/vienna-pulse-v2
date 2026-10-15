@@ -25,15 +25,21 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("de.siegmar:fastcsv:4.4.0")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")
+    // The PostgreSQL driver is annotated with these but only ships them at runtime, and javac's
+    // classfile lint fails the build when it cannot read them.
+    compileOnly("org.checkerframework:checker-qual:3.55.1")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     errorprone("com.google.errorprone:error_prone_core:2.50.0")
     errorprone("com.uber.nullaway:nullaway:0.14.2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-jdbc-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
