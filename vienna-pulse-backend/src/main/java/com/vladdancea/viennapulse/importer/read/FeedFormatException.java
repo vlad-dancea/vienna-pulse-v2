@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.ingestor;
+package com.vladdancea.viennapulse.importer.read;
 
 import java.util.Objects;
 

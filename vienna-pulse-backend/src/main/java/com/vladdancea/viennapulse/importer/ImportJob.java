@@ -1,13 +1,13 @@
 package com.vladdancea.viennapulse.importer;
 
-import com.vladdancea.viennapulse.importer.ingestor.FeedFormatException;
-import com.vladdancea.viennapulse.importer.ingestor.route.Route;
-import com.vladdancea.viennapulse.importer.ingestor.route.RouteReader;
-import com.vladdancea.viennapulse.importer.ingestor.stop.Stop;
-import com.vladdancea.viennapulse.importer.ingestor.stop.StopReader;
+import com.vladdancea.viennapulse.importer.download.FeedDownloader;
+import com.vladdancea.viennapulse.importer.download.FeedValidator;
+import com.vladdancea.viennapulse.importer.read.FeedFormatException;
+import com.vladdancea.viennapulse.importer.read.route.Route;
+import com.vladdancea.viennapulse.importer.read.route.RouteReader;
+import com.vladdancea.viennapulse.importer.read.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.stop.StopReader;
 import com.vladdancea.viennapulse.importer.store.Store;
-import com.vladdancea.viennapulse.importer.zip.FeedDownloader;
-import com.vladdancea.viennapulse.importer.zip.FeedValidator;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
@@ -36,17 +36,17 @@ public class ImportJob {
         log.info("Feed import triggered");
         try (var feed = downloader.download()) {
             validator.validate(feed.path());
-            ingest(feed.path());
+            replaceTimetable(feed.path());
         } catch (RestClientException exception) {
             log.error("Feed download failed", exception);
         } catch (IOException | FeedFormatException exception) {
-            log.error("Feed ingestion failed", exception);
+            log.error("Feed import failed", exception);
         } catch (DataAccessException exception) {
             log.error("Storing the timetable failed", exception);
         }
     }
 
-    private void ingest(Path feed) throws IOException {
+    private void replaceTimetable(Path feed) throws IOException {
         try (var zip = new ZipFile(feed.toFile())) {
             store.replace(staging -> {
                 staging.copy("routes", Route.class, routeReader.read(zip).values());

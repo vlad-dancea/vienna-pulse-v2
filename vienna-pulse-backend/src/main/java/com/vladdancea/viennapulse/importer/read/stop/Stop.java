@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.ingestor.stop;
+package com.vladdancea.viennapulse.importer.read.stop;
 
 import org.jspecify.annotations.Nullable;
 

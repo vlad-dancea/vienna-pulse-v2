@@ -1,10 +1,10 @@
-package com.vladdancea.viennapulse.importer.ingestor.stop;
+package com.vladdancea.viennapulse.importer.read.stop;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.vladdancea.viennapulse.importer.ingestor.FeedFormatException;
-import com.vladdancea.viennapulse.importer.ingestor.TestFeed;
+import com.vladdancea.viennapulse.importer.read.FeedFormatException;
+import com.vladdancea.viennapulse.importer.read.TestFeed;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

@@ -1,9 +1,9 @@
-package com.vladdancea.viennapulse.importer.ingestor.route;
+package com.vladdancea.viennapulse.importer.read.route;
 
-import static com.vladdancea.viennapulse.importer.ingestor.FeedCsv.optional;
-import static com.vladdancea.viennapulse.importer.ingestor.FeedCsv.required;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.optional;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.required;
 
-import com.vladdancea.viennapulse.importer.ingestor.FeedFileReader;
+import com.vladdancea.viennapulse.importer.read.FeedFileReader;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import org.springframework.stereotype.Component;
 

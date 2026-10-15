@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.ingestor;
+package com.vladdancea.viennapulse.importer.read;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -8,7 +8,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-/// Writes a GTFS ZIP with a single file, for reader tests.write
+/// Writes a GTFS ZIP with a single file, for reader tests.
 public final class TestFeed {
     private TestFeed() {}
 

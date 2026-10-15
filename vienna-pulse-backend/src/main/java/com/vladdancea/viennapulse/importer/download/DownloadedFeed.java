@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.zip;
+package com.vladdancea.viennapulse.importer.download;
 
 import java.io.IOException;
 import java.nio.file.Files;

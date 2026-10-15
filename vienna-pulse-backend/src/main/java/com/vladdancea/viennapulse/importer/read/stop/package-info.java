@@ -1,4 +1,4 @@
 @NullMarked
-package com.vladdancea.viennapulse.importer.ingestor;
+package com.vladdancea.viennapulse.importer.read.stop;
 
 import org.jspecify.annotations.NullMarked;

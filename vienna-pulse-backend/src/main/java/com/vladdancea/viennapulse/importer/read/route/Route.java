@@ -1,4 +1,4 @@
-package com.vladdancea.viennapulse.importer.ingestor.route;
+package com.vladdancea.viennapulse.importer.read.route;
 
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;

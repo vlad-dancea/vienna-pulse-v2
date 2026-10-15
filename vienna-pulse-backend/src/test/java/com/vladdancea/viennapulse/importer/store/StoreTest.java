@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
-import com.vladdancea.viennapulse.importer.ingestor.route.Route;
-import com.vladdancea.viennapulse.importer.ingestor.route.RouteType;
-import com.vladdancea.viennapulse.importer.ingestor.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.route.Route;
+import com.vladdancea.viennapulse.importer.read.route.RouteType;
+import com.vladdancea.viennapulse.importer.read.stop.Stop;
 import java.io.IOException;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
