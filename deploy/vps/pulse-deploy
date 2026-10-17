@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Deploys one backend image on the production server, and rolls back if it never gets healthy.
+#
+# Installed as /usr/local/sbin/pulse-deploy (root). GitHub Actions reaches it through the deploy
+# user's SSH key, which can run this script and nothing else (see setup-deploy-user.sh).
+# Input: SSH_ORIGINAL_COMMAND="deploy <commit sha> <image digest>"
+set -euo pipefail
+
+readonly REPO=vlad-dancea/vienna-pulse-v2
+readonly IMAGE=ghcr.io/vlad-dancea/vienna-pulse-v2-backend
+readonly DIR=/opt/vienna-pulse
+
+log() { printf '[%s] %s\n' "$(date -Is)" "$*"; }
+fail() {
+  log "ERROR: $*" >&2
+  exit 1
+}
+
+# The command comes from the network, so it must match exactly before any of it is used.
+[[ ${SSH_ORIGINAL_COMMAND:-} =~ ^deploy\ ([0-9a-f]{40})\ (sha256:[0-9a-f]{64})$ ]] ||
+  { echo "usage: deploy <commit sha> <image digest>" >&2; exit 2; }
+sha=${BASH_REMATCH[1]}
+digest=${BASH_REMATCH[2]}
+
+# A deploy that stops halfway leaves the stack in between, so it carries on when the SSH
+# connection drops: it ignores the hangup, and tee -p keeps writing the log file after the
+# connection is gone instead of failing the next write.
+trap '' HUP
+exec > >(tee -p -a /var/log/pulse-deploy.log) 2>&1
+
+exec 9>/run/lock/pulse-deploy.lock
+flock --wait 600 9 || fail "another deploy is still running"
+
+# Forks share commits with the repository, so a commit sha alone proves nothing. Only commits
+# that are part of main are deployed.
+status=$(curl -fsS --retry 3 "https://api.github.com/repos/$REPO/compare/main...$sha" | jq -r .status) ||
+  fail "could not check $sha against main"
+[[ $status == behind || $status == identical ]] || fail "$sha is not on main (status: $status)"
+
+cd "$DIR"
+log "deploying $sha ($digest)"
+
+curl -fsS --retry 3 -o compose.yaml.new "https://raw.githubusercontent.com/$REPO/$sha/deploy/compose.yaml" ||
+  fail "could not fetch deploy/compose.yaml at $sha"
+# .env holds which image runs, nothing secret.
+printf 'BACKEND_TAG=%s\nBACKEND_DIGEST=%s\n' "$sha" "$digest" >.env.new
+
+compose_new=(docker compose --file compose.yaml.new --env-file .env.new)
+"${compose_new[@]}" config --quiet || fail "compose.yaml at $sha is invalid"
+# Pulling first keeps the download out of the downtime.
+"${compose_new[@]}" pull --quiet || fail "could not pull the images of $sha"
+
+had_previous=false
+if [[ -f compose.yaml && -f .env ]]; then
+  cp compose.yaml compose.yaml.prev
+  cp .env .env.prev
+  had_previous=true
+fi
+mv compose.yaml.new compose.yaml
+mv .env.new .env
+
+# --wait returns once every container with a healthcheck is healthy, and fails if one is not
+# within the timeout.
+if docker compose up --detach --remove-orphans --wait --wait-timeout 180; then
+  echo "$(date -Is) $sha $digest" >>deploys.log
+  # The previous image stays for a quick rollback. Older ones go.
+  keep=$(sed -n 's/^BACKEND_DIGEST=//p' .env.prev 2>/dev/null || true)
+  docker image ls --digests --format '{{.Digest}}' "$IMAGE" |
+    grep -vx -e "$digest" -e "${keep:-none}" -e '<none>' |
+    xargs -r -I{} docker image rm "$IMAGE@{}" >/dev/null || true
+  log "deployed $sha, healthy"
+  exit 0
+fi
+
+log "$sha did not get healthy, last backend logs:"
+docker compose logs --tail 80 backend || true
+if [[ $had_previous == true ]]; then
+  log "rolling back to $(sed -n 's/^BACKEND_TAG=//p' .env.prev)"
+  mv compose.yaml.prev compose.yaml
+  mv .env.prev .env
+  docker compose up --detach --remove-orphans --wait --wait-timeout 180 || log "the rollback did not get healthy either"
+else
+  # Nothing to go back to. A stopped backend beats one that keeps restarting.
+  docker compose stop backend || true
+fi
+fail "deploy of $sha failed"
