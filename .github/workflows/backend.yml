@@ -138,3 +138,61 @@ jobs:
           push-to-registry: true
           # Storage records exist only for organisation repositories.
           create-storage-record: false
+
+  # Deploys main to the production server. For the length of the job, the runner joins the
+  # tailnet as a device tagged tag:ci, which may reach the server's SSH port and nothing else.
+  # There, the deploy user's key can only run the deploy script (deploy/vps/pulse-deploy).
+  deploy:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://pulse.vladdancea.com/api/stops
+    # A deploy never cancels another one halfway. A newer one waits its turn.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write # log in to Tailscale with GitHub's identity token instead of a stored secret
+    steps:
+      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          # Identify the federated identity in Tailscale. Neither is a secret.
+          oauth-client-id: ${{ vars.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ vars.VPS_HOST }}
+          # Nothing cached by an earlier run takes part in a deploy.
+          use-cache: false
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ vars.VPS_KNOWN_HOSTS }}
+          HOST: ${{ vars.VPS_HOST }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 \
+            "deploy@$HOST" "deploy $GITHUB_SHA $DIGEST"
+
+      # Through Cloudflare and the tunnel, as a visitor would. A new database imports the feed
+      # in the background after startup, so the stops can take a minute to appear.
+      - name: Smoke test
+        run: |
+          for attempt in $(seq 24); do
+            if count=$(curl --fail --silent --show-error --compressed \
+                https://pulse.vladdancea.com/api/stops | jq '.features | length') && ((count > 0)); then
+              echo "The API serves $count stops"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The API serves no stops through Cloudflare"
+          exit 1
