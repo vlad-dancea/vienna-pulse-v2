@@ -42,6 +42,20 @@
       enabled: false,
     },
     {
+      // Temurin image tags read 25.0.4.1_1-jre-resolute: the JDK version, the image build, then
+      // the variant, which must never change in an update.
+      matchDatasources: ['docker'],
+      matchPackageNames: ['eclipse-temurin'],
+      versioning: 'regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:\\.(?<build>\\d+))?_(?<revision>\\d+)-(?<compatibility>.+)$',
+    },
+    {
+      // The backend image runs the JDK that mise.toml pins, so it stays on Java 25 just as well.
+      matchDatasources: ['docker'],
+      matchPackageNames: ['eclipse-temurin'],
+      matchUpdateTypes: ['major'],
+      enabled: false,
+    },
+    {
       // The JDK release list has no publish dates, so the three-day wait above could never
       // end. JDK patch releases are security fixes, which should land promptly anyway.
       matchDatasources: ['java-version'],

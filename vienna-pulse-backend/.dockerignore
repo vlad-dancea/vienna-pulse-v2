@@ -1,0 +1,3 @@
+# The image is built from the tested boot jar alone, so nothing else enters the build context.
+*
+!build/libs/vienna-pulse.jar
