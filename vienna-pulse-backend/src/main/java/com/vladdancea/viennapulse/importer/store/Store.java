@@ -46,6 +46,13 @@ public class Store {
         dropPrevious();
     }
 
+    /// Whether the timetable has no stops, as before the first import into a new database.
+    public boolean isEmpty() {
+        return jdbc.sql("SELECT NOT EXISTS (SELECT FROM timetable.stops)")
+                .query(Boolean.class)
+                .single();
+    }
+
     private void swapIn(Load load) {
         var locked = jdbc.sql("SELECT pg_try_advisory_xact_lock(:lock)")
                 .param("lock", IMPORT_LOCK)
