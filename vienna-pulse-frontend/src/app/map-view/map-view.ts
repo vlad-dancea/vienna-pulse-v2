@@ -1,7 +1,7 @@
 import { afterNextRender, Component, DestroyRef, ElementRef, inject } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 
-/** Displays a map of Vienna that fills the screen. */
+/** Displays a full-screen map of Vienna and its public transport stops. */
 @Component({
   selector: 'app-map-view',
   template: '',
@@ -24,6 +24,24 @@ export class MapView {
         style: 'https://tiles.openfreemap.org/styles/positron',
         center: [16.3738, 48.2082],
         zoom: 12,
+      });
+
+      // Layers can only be added once the basemap style has loaded. MapLibre fetches the stops
+      // itself, which is why the backend also answers its plain JSON request with GeoJSON.
+      map.once('load', () => {
+        map.addSource('stops', { type: 'geojson', data: '/api/stops' });
+        map.addLayer({
+          id: 'stops',
+          type: 'circle',
+          source: 'stops',
+          paint: {
+            'circle-color': '#374151',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 1,
+            // Small enough for thousands of stops at city zoom, easy to see on a street.
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 6],
+          },
+        });
       });
 
       // Releases the map's WebGL context and listeners when the view goes away.

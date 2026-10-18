@@ -8,7 +8,7 @@ A live map of the Vienna public transport network, built on the Wiener Linien GT
 | Folder | What it is |
 | --- | --- |
 | [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves the stops as GeoJSON |
-| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna; does not use the backend yet |
+| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with the stops from the backend |
 
 ## Run
 
@@ -38,11 +38,12 @@ dependencies first with `mise run //vienna-pulse-frontend:install`.
 
 ## Map view
 
-The frontend shows a full-screen map of Vienna and nothing else yet: no transit data and no
-calls to the backend. [MapLibre GL JS](https://maplibre.org) draws the map, with
-[OpenFreeMap](https://openfreemap.org)'s light Positron style, which needs no API key. The
-map keeps MapLibre's own mouse, touch and keyboard controls. The whole view is one component,
-[`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+The frontend shows a full-screen map of Vienna with every public transport stop as a dot.
+[MapLibre GL JS](https://maplibre.org) draws the map, with [OpenFreeMap](https://openfreemap.org)'s
+light Positron style, which needs no API key, and loads the stops from the backend's
+`/api/stops` as GeoJSON. In development, the Angular dev server forwards `/api` to the backend
+on port 8080. The map keeps MapLibre's own mouse, touch and keyboard controls. The whole view
+is one component, [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
 ## Deployment
 
