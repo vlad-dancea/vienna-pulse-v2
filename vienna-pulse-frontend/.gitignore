@@ -5,6 +5,9 @@ node_modules/
 .angular/
 dist/
 out-tsc/
+.wrangler/
+.dev.vars*
+.env*
 
 # Test output
 coverage/

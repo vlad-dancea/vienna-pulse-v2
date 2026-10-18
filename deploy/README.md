@@ -1,5 +1,11 @@
 # Production
 
+The frontend is served from Cloudflare Workers Static Assets at `https://pulse.vladdancea.com`.
+The Worker route in [`wrangler.json`](../vienna-pulse-frontend/wrangler.json) runs in front of the
+existing tunnel DNS record. Static files and Angular navigation stay at Cloudflare's edge;
+`/api` and `/api/*` go through the Worker to the tunnel. Explicit API routing prevents a browser
+navigation to an API endpoint from receiving Angular's HTML fallback.
+
 The backend runs on one Hetzner Cloud server (CX23: 2 vCPU, 4 GB RAM, Debian 13, x86_64) as the
 Docker Compose stack in [`compose.yaml`](compose.yaml): the backend, PostgreSQL and a Cloudflare
 tunnel. The server has no open ports to the internet:
@@ -9,6 +15,20 @@ tunnel. The server has no open ports to the internet:
 - Administrators and CI reach SSH over [Tailscale](https://tailscale.com).
 
 ## How a deploy works
+
+Every push to `main` that touches the frontend runs `.github/workflows/frontend.yml`:
+
+1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, typed ESLint, Angular tests,
+   production build, Worker type checking and packaging, and integration tests in Cloudflare's
+   local runtime. The integration tests use a temporary local HTTP origin to verify API
+   forwarding without depending on production.
+2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
+   with the pinned Wrangler CLI. Production deployments run one at a time.
+3. The smoke test checks that the public JavaScript and map worker match the build and that
+   `/api/stops` still serves GeoJSON through the tunnel.
+
+Pull requests run the same checks without deploying. Frontend deployments do not restart the
+backend. PR preview hosting will be added separately.
 
 Every push to `main` that touches the backend runs `.github/workflows/backend.yml`:
 
@@ -27,6 +47,21 @@ a rollback only swaps the image back, so migrations must keep working with the p
 
 ## Day-to-day
 
+From the repository root, with Wrangler authenticated (`mise exec -- pnpm --dir
+vienna-pulse-frontend exec wrangler login`), or with `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_API_TOKEN` in the environment:
+
+```sh
+mise run //vienna-pulse-frontend:check
+mise run //vienna-pulse-frontend:deploy
+mise run //vienna-pulse-frontend:smoke
+```
+
+`deploy` uploads the artifact produced by `check`; it does not rebuild it. Cloudflare deploys
+the Worker and its assets together. To restore a previous frontend version, run `mise exec --
+pnpm --dir vienna-pulse-frontend exec wrangler rollback` and select that version. Worker logs
+are available in the Cloudflare dashboard or through `wrangler tail`.
+
 On the server (`ssh hetzner`), in `/opt/vienna-pulse`:
 
 | Task | Command |
@@ -44,7 +79,27 @@ The server installs Debian security updates by itself and reboots at 03:30 UTC w
 Docker and Tailscale come from their own package repositories and are updated by hand:
 `apt update && apt upgrade`.
 
-## Setting up a new server
+## Setting up frontend hosting
+
+Keep the existing proxied tunnel CNAME for `pulse.vladdancea.com`. Deploy the frontend as a
+Worker **route**, not a Worker Custom Domain: the route's `fetch(request)` follows that CNAME
+to the backend origin. Replacing it with a Custom Domain would remove this origin path.
+
+In GitHub's existing `production` environment (restricted to `main`), configure:
+
+- Variable `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account containing `vladdancea.com`.
+- Secret `CLOUDFLARE_API_TOKEN`: a dedicated token with Account > Workers Scripts > Edit for
+  that account, plus Zone > Workers Routes > Edit and Zone > Zone > Read for `vladdancea.com`.
+
+Create the token from [Cloudflare's API tokens page](https://dash.cloudflare.com/profile/api-tokens).
+The account and zone resource restrictions matter: this token does not need DNS editing,
+tunnel administration or access to other zones. Store the token directly in GitHub, never in
+the repository. Local Wrangler OAuth credentials are separate from the CI token.
+
+Run `check`, `deploy` and `smoke` above for the initial deployment. Subsequent frontend pushes
+to `main` deploy automatically. Cloudflare manages TLS using the hostname's existing setup.
+
+## Setting up a new backend server
 
 These steps rebuild production from nothing. Everything else is in this repository.
 

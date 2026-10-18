@@ -30,7 +30,7 @@ committed pnpm lockfile before running a task.
 To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The frontend checks formatting, typed ESLint rules, template accessibility,
-the production build and Vitest tests.
+the production build, Vitest tests and Cloudflare runtime integration tests.
 
 The repository root includes shared agent instructions and Angular MCP configuration for
 Claude Code, Codex and Agents. The MCP server uses the project's pinned CLI, install
@@ -42,3 +42,10 @@ The frontend displays Vienna with OpenFreeMap's light, neutral Positron style, r
 MapLibre GL JS. No API key is required. Drag the map to pan, use the shared controls to
 change zoom or tilt, or reset to central Vienna. Camera changes are immediate, with no
 added animations or transit overlays.
+
+## Deployment
+
+The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
+Static Assets. Frontend changes to `main` deploy after the checks pass; `/api/*` continues to
+reach the backend on Hetzner through its Cloudflare tunnel. See [`deploy/README.md`](deploy/README.md)
+for credentials, manual deployments and rollback.
