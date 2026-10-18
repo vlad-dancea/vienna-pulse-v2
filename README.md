@@ -8,7 +8,7 @@ A live map of the Vienna public transport network, built on the Wiener Linien GT
 | Folder | What it is |
 | --- | --- |
 | [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): downloads and reads the GTFS feed every morning; will store it and serve the timetable |
-| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a neutral gray OpenFreeMap map of Vienna, with Tailwind CSS |
+| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna; does not use the backend yet |
 
 ## Run
 
@@ -38,10 +38,11 @@ dependencies first with `mise run //vienna-pulse-frontend:install`.
 
 ## Map view
 
-The frontend displays Vienna with OpenFreeMap's light, neutral Positron style, rendered by
-MapLibre GL JS. No API key is required. Drag the map to pan, use the shared controls to
-change zoom or tilt, or reset to central Vienna. Camera changes are immediate, with no
-added animations or transit overlays.
+The frontend shows a full-screen map of Vienna and nothing else yet: no transit data and no
+calls to the backend. [MapLibre GL JS](https://maplibre.org) draws the map, with
+[OpenFreeMap](https://openfreemap.org)'s light Positron style, which needs no API key. The
+map keeps MapLibre's own mouse, touch and keyboard controls. The whole view is one component,
+[`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
 ## Deployment
 

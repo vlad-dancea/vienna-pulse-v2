@@ -1,25 +1,35 @@
-import { Component, signal } from '@angular/core';
-import { VIENNA_CAMERA } from './vienna-map';
-import { MapPane } from './map-pane/map-pane';
+import { afterNextRender, Component, DestroyRef, ElementRef, inject } from '@angular/core';
+import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 
-/** Displays Vienna on a neutral OpenFreeMap basemap. */
+/** Displays a map of Vienna that fills the screen. */
 @Component({
   selector: 'app-map-view',
-  imports: [MapPane],
-  templateUrl: './map-view.html',
+  template: '',
+  host: { class: 'block h-dvh' },
 })
 export class MapView {
-  protected readonly camera = signal(VIENNA_CAMERA);
+  constructor() {
+    const container = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const destroyRef = inject(DestroyRef);
 
-  protected zoomBy(amount: number) {
-    this.camera.update((camera) => ({ ...camera, zoom: Math.max(9, Math.min(18, camera.zoom + amount)) }));
-  }
+    // MapLibre sizes the map from its container, which has a size only once it is rendered.
+    afterNextRender(() => {
+      // MapLibre looks for its worker next to its own script, but Angular bundles that script
+      // into a chunk with another name. angular.json copies the worker to assets/ instead.
+      setWorkerUrl(new URL('assets/maplibre-gl-worker.mjs', document.baseURI).href);
 
-  protected setPitch(pitch: number) {
-    this.camera.update((camera) => ({ ...camera, pitch }));
-  }
+      const map = new MapLibreMap({
+        container,
+        // OpenFreeMap serves OpenStreetMap data without an API key.
+        style: 'https://tiles.openfreemap.org/styles/positron',
+        center: [16.3738, 48.2082],
+        zoom: 12,
+      });
 
-  protected resetView() {
-    this.camera.set(VIENNA_CAMERA);
+      // Releases the map's WebGL context and listeners when the view goes away.
+      destroyRef.onDestroy(() => {
+        map.remove();
+      });
+    });
   }
 }
