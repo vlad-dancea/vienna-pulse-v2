@@ -15,8 +15,9 @@ on:
     branches: [main]
     paths: &backend-paths
       - vienna-pulse-backend/**
-      # The production stack and its deploy script.
+      # The production stack and its deploy script, but not its documentation.
       - deploy/**
+      - "!deploy/**/*.md"
       # The root mise.toml pins the JDK, so changing it can break the build.
       - mise.toml
       - .github/workflows/backend.yml
