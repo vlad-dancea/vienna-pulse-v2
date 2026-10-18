@@ -60,9 +60,15 @@ These steps rebuild production from nothing. Everything else is in this reposito
      > /etc/apt/apt.conf.d/52automatic-reboot
    ```
 
-2. **Tailscale policy.** `tag:ci` may reach `tag:vps` on `tcp:22` and nothing else. A federated
-   identity (issuer GitHub, subject `repo:vlad-dancea/vienna-pulse-v2:environment:production`,
-   scope `auth_keys`, tag `tag:ci`) lets the deploy job join without a stored secret.
+2. **Tailscale policy.** `tag:ci` may reach `tag:vps` on `tcp:22` and nothing else. Tagging an
+   existing machine keeps its key expiry, so disable that on the server's machine page: with the
+   public SSH port closed, an expired key would leave only Hetzner's rescue system. A federated
+   identity (issuer GitHub, scope `auth_keys`, tag `tag:ci`) lets the deploy job join without a
+   stored secret. Its subject is
+   `repo:vlad-dancea@136276333/vienna-pulse-v2@1418750148:environment:production`: this repository
+   uses GitHub's immutable subjects, which name the owner and repository by their numeric IDs, so
+   a repository that later takes the same name cannot match. Tailscale cannot change a
+   credential's subject afterwards; a wrong one has to be revoked and created again.
 
 3. **Cloudflare tunnel.** A remotely managed tunnel with one route, `pulse.vladdancea.com` path
    `^/api/` to `http://backend:8080`, then `http_status:404` for everything else, and a proxied
