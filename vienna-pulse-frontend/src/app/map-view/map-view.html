@@ -1,0 +1,86 @@
+<section class="relative" aria-label="Map">
+  <app-map-pane [camera]="camera()" (cameraChange)="camera.set($event)" />
+  <div
+    class="absolute top-4 right-4 z-10 flex gap-1 rounded-xl bg-zinc-950/90 p-1.5"
+    role="group"
+    aria-label="Map controls"
+  >
+    <button
+      type="button"
+      class="flex size-10 items-center justify-center rounded-lg hover:bg-zinc-800 disabled:text-zinc-500"
+      aria-label="Zoom out"
+      [disabled]="camera().zoom <= 9"
+      (click)="zoomBy(-1)"
+    >
+      <svg
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
+        <path d="M5 12h14" />
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="flex size-10 items-center justify-center rounded-lg hover:bg-zinc-800 disabled:text-zinc-500"
+      aria-label="Zoom in"
+      [disabled]="camera().zoom >= 18"
+      (click)="zoomBy(1)"
+    >
+      <svg
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
+        <path d="M5 12h14M12 5v14" />
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="flex size-10 items-center justify-center rounded-lg hover:bg-zinc-800"
+      aria-label="Toggle map tilt"
+      [class.bg-zinc-800]="camera().pitch === 45"
+      [attr.aria-pressed]="camera().pitch === 45"
+      (click)="setPitch(camera().pitch === 45 ? 0 : 45)"
+    >
+      <svg
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
+        <path d="m12 4 9 8-9 8-9-8 9-8ZM3 16l9 6 9-6" />
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="flex size-10 items-center justify-center rounded-lg hover:bg-zinc-800"
+      aria-label="Reset view"
+      (click)="resetView()"
+    >
+      <svg
+        aria-hidden="true"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
+        <circle cx="12" cy="12" r="6" />
+        <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+      </svg>
+    </button>
+  </div>
+</section>
