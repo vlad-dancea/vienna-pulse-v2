@@ -12,7 +12,8 @@ import org.jspecify.annotations.Nullable;
 public final class FeedCsv {
     private FeedCsv() {}
 
-    static CsvReader<NamedCsvRecord> open(ZipFile feed, String file) throws IOException {
+    /// Opens one CSV entry; closing the reader leaves the ZIP open.
+    public static CsvReader<NamedCsvRecord> open(ZipFile feed, String file) throws IOException {
         var entry = feed.getEntry(file);
         if (entry == null) {
             throw new FeedFormatException("GTFS feed is missing " + file);
