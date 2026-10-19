@@ -25,9 +25,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
 
-# Pull request checks can be replaced; a production deployment must finish.
+# Pull request checks can be replaced; a production deployment must finish. Pull request runs
+# are grouped by number: a merged pull request's closing run reports main as its ref, and must
+# neither cancel main's deployment nor miss the Preview it is about to delete.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
