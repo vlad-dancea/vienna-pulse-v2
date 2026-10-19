@@ -8,7 +8,7 @@ public class FeedFormatException extends RuntimeException {
         super(message);
     }
 
-    FeedFormatException(String message, Throwable cause) {
+    public FeedFormatException(String message, Throwable cause) {
         super(message, cause);
     }
 
@@ -16,7 +16,7 @@ public class FeedFormatException extends RuntimeException {
         return new FeedFormatException("%s line %d: %s".formatted(file, line, problem));
     }
 
-    static FeedFormatException at(String file, long line, Throwable cause) {
+    public static FeedFormatException at(String file, long line, Throwable cause) {
         var problem = Objects.requireNonNullElse(cause.getMessage(), cause.toString());
         return new FeedFormatException("%s line %d: %s".formatted(file, line, problem), cause);
     }
