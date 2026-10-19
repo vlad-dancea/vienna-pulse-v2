@@ -38,7 +38,7 @@ links to it through the `preview` deployment. Each push updates the same Preview
 the pull request deletes it. Pull requests from forks are only checked, because GitHub does not
 give them secrets.
 
-A Preview is a separate copy of the same Worker; production traffic never reaches it.
+A Preview is a separate copy of the same Worker, and production traffic never reaches it.
 
 - `wrangler.json` enables `pulse.vladdancea.com` as a *preview-only* custom domain
   (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
@@ -46,7 +46,7 @@ A Preview is a separate copy of the same Worker; production traffic never reache
   tunnel CNAME.
 - A Preview hostname has no tunnel behind it, so the `previews` block sets `API_ORIGIN` and the
   Worker sends `/api` requests to production. Previews show frontend changes against the
-  production API; backend changes in the same pull request are not part of the Preview.
+  production API. Backend changes in the same pull request are not part of the Preview.
 - Previews are public. `public/_headers` sends `X-Robots-Tag: noindex` on Preview hostnames so
   search engines index production only.
 
