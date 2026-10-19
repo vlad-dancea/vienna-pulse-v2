@@ -13,6 +13,9 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   what ran and any limitations, including changes that no check covers.
 - Stop only processes you started, by the PID you captured. Never `pkill -f` a pattern that
   also appears in your own command line, because it kills your own shell.
+- Run `mise run dev` in one worktree at a time. Its ports are fixed, and every worktree shares
+  one Docker Compose project and database volume, named after the `vienna-pulse-backend` folder.
+  `mise run check` starts its own database with Testcontainers, so it runs in parallel safely.
 - Keep scratch files, downloaded feeds and plans outside the repository, in a `mktemp -d`
   directory, and remove them afterwards.
 
@@ -52,16 +55,21 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
 ## Branches, commits and pull requests
 
 - Commit, push or open a pull request only when asked.
-- Changes reach `main` only through pull requests. Run `git fetch` and start each piece of work
-  on its own branch from `origin/main`, with `git switch -c <branch> origin/main`. To update a
-  local `main`, run `git merge --ff-only origin/main` while it is checked out.
+- Changes reach `main` only through pull requests.
+- Several agents often work in this repository at the same time, so each piece of work gets its
+  own worktree with its own branch from `origin/main`. `t3.json` makes T3 Code create one for
+  every new thread. If you started in such a worktree, work there and keep the branch T3 Code
+  made, because T3 Code tracks the thread by that name. Otherwise run `git fetch` and create one
+  next to the main checkout with `git worktree add -b <branch> <path> origin/main`.
+- Unless the maintainer asks, never switch branches or edit files in the main checkout, the
+  first entry of `git worktree list`. It stays on `main` for the maintainer. To update it, run `git fetch` and
+  `git merge --ff-only origin/main` there.
+- Uncommitted changes, branches and worktrees you did not create belong to another agent or the
+  maintainer. Leave them alone and ask when they are in your way.
 - Name branches `<kind>/<topic>` in lowercase kebab case, such as `docs/agents-guidelines` or
   `ci/frontend-previews`. The kind is `backend`, `frontend`, `ci`, `docs` or `chore`.
 - One pull request covers one concern. Something unrelated found along the way gets its own
   branch and pull request, or a note for later. It never joins the current pull request.
-- To work on two branches at once, use a separate worktree, created with
-  `git worktree add -b <branch> <path> origin/main`, so uncommitted work in the main checkout
-  stays untouched.
 - Commits are small and each one passes `mise run check`. Titles are imperative, in sentence
   case and without a type prefix, such as "Merge each stop's platforms into one point".
   The body explains why the change is needed.
@@ -89,10 +97,10 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   `gh pr merge <number> --squash --subject "<title> (#<number>)" --body-file <file>`, where
   the body follows the commit message rules. GitHub adds the number only to its own default
   title, so the subject carries it. Do not enable auto-merge unless asked.
-- GitHub deletes the remote branch after the merge. Remove a separate worktree with
-  `git worktree remove <path>`, or run `git switch main` if the branch is checked out in the
-  main checkout. Then delete the local branch with `git branch -D <branch>`, because a
-  squash-merged branch never looks merged to git.
+- GitHub deletes the remote branch after the merge. Remove a worktree you created with
+  `git worktree remove <path>`, then delete its local branch with `git branch -D <branch>`,
+  because a squash-merged branch never looks merged to git. Leave a T3 Code worktree and its
+  branch to T3 Code, because the thread still runs in it.
 
 ## Documentation and tests
 
