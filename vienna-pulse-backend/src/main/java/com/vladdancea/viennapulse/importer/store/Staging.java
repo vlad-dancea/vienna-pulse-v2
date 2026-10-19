@@ -41,7 +41,7 @@ public final class Staging {
 
     /// Streams `rows` into `table` with PostgreSQL's `COPY`, one row per record. Each record component
     /// fills the column of the same name in snake case, so `shortName` fills `short_name`. Components
-    /// must be strings, numbers or enums, which are stored by name.
+    /// must be strings, numbers, booleans, [java.time.LocalDate]s or enums, which are stored by name.
     public <T extends Record> void copy(String table, Class<T> type, Rows<T> rows) throws IOException {
         var components = type.getRecordComponents();
         var columns = Arrays.stream(components)

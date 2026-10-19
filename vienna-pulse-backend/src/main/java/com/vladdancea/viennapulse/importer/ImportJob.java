@@ -3,6 +3,10 @@ package com.vladdancea.viennapulse.importer;
 import com.vladdancea.viennapulse.importer.download.FeedDownloader;
 import com.vladdancea.viennapulse.importer.download.FeedValidator;
 import com.vladdancea.viennapulse.importer.read.FeedFormatException;
+import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
+import com.vladdancea.viennapulse.importer.read.calendar.CalendarDateReader;
+import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
+import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendarReader;
 import com.vladdancea.viennapulse.importer.read.route.Route;
 import com.vladdancea.viennapulse.importer.read.route.RouteReader;
 import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
@@ -39,6 +43,8 @@ public class ImportJob {
     private final StopReader stopReader;
     private final ShapeReader shapeReader;
     private final TripReader tripReader;
+    private final ServiceCalendarReader serviceCalendarReader;
+    private final CalendarDateReader calendarDateReader;
     private final Store store;
     private final ImporterProperties properties;
     private final TaskScheduler scheduler;
@@ -77,6 +83,14 @@ public class ImportJob {
                 staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
                 staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
                 staging.copy("trips", Trip.class, trips -> tripReader.read(zip, trips));
+                staging.copy(
+                        "service_calendars",
+                        ServiceCalendar.class,
+                        serviceCalendarReader.read(zip).values()::forEach);
+                staging.copy(
+                        "calendar_dates",
+                        CalendarDate.class,
+                        calendarDateReader.read(zip).values()::forEach);
             });
         }
         log.info("Stored the timetable from {}", feed);
