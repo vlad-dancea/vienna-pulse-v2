@@ -4,14 +4,14 @@
 # the production build and tests. mise installs the pinned tools, and pnpm installs the
 # committed lockfile, so CI uses the same toolchain and dependencies as development.
 #
-# The repository is a monorepo, and each project gets its own workflow that runs only when
-# that project changes. A frontend change never waits for the backend to build.
+# Pull requests always report a required result, while path filtering keeps expensive
+# builds limited to the project that changed. Pushes retain workflow-level path filters.
 name: frontend
 
 on:
   push:
     branches: [main]
-    paths: &frontend-paths
+    paths:
       - vienna-pulse-frontend/**
       - mise.toml
       # The frontend inherits the repository's whitespace and line-ending rules.
@@ -19,7 +19,6 @@ on:
       - .gitattributes
       - .github/workflows/frontend.yml
   pull_request:
-    paths: *frontend-paths
 
 # Pull request checks can be replaced; a production deployment must finish.
 concurrency:
@@ -34,7 +33,38 @@ env:
   MISE_ENABLE_TOOLS: node,pnpm
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.paths.outputs.changed }}
+    steps:
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE_SHA...$HEAD_SHA" -- 'vienna-pulse-frontend' 'mise.toml' '.github/workflows/frontend.yml' '.editorconfig' '.gitattributes'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            # A missing commit or another diff error must never skip validation.
+            if [ "$status" -ne 1 ]; then exit "$status"; fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   check:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -89,3 +119,24 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - run: mise run //vienna-pulse-frontend:smoke
+
+  # This stable check reports even when the project is unchanged, and fails closed when
+  # detection, validation or packaging fails or is cancelled.
+  required:
+    name: frontend-required
+    if: always() && github.event_name == 'pull_request'
+    needs: [changes, check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          DETECTION: ${{ needs.changes.result }}
+          CHANGED: ${{ needs.changes.outputs.changed }}
+          RESULTS: ${{ needs.check.result }}
+        run: |
+          [ "$DETECTION" = success ] || exit 1
+          if [ "$CHANGED" = true ]; then
+            [ "$RESULTS" = success ]
+          else
+            [ "$CHANGED" = false ] && [ "$RESULTS" = skipped ]
+          fi

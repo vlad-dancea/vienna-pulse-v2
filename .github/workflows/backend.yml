@@ -6,14 +6,14 @@
 # exactly the toolchain used locally. The jar that passed then becomes the container image,
 # which main publishes to the GitHub Container Registry.
 #
-# The repository is a monorepo, and each project gets its own workflow that runs only when
-# that project changes. A frontend change never waits for the backend to build.
+# Pull requests always report a required result, while path filtering keeps expensive
+# builds limited to the project that changed. Pushes retain workflow-level path filters.
 name: backend
 
 on:
   push:
     branches: [main]
-    paths: &backend-paths
+    paths:
       - vienna-pulse-backend/**
       # The production stack and its deploy script, but not its documentation.
       - deploy/**
@@ -22,7 +22,6 @@ on:
       - mise.toml
       - .github/workflows/backend.yml
   pull_request:
-    paths: *backend-paths
 
 # Only the newest commit of a pull request matters, so a new push cancels the run before it.
 # Runs on main finish, so that every commit on main is published.
@@ -39,7 +38,38 @@ env:
   PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.paths.outputs.changed }}
+    steps:
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BASE_SHA...$HEAD_SHA" -- 'vienna-pulse-backend' 'mise.toml' '.github/workflows/backend.yml' 'deploy' ':(glob,exclude)deploy/**/*.md'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            # A missing commit or another diff error must never skip validation.
+            if [ "$status" -ne 1 ]; then exit "$status"; fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   check:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     # A hung build fails after 20 minutes instead of GitHub's 6-hour default.
     timeout-minutes: 20
@@ -197,3 +227,24 @@ jobs:
           done
           echo "::error::The API serves no stops through Cloudflare"
           exit 1
+
+  # This stable check reports even when the project is unchanged, and fails closed when
+  # detection, validation or packaging fails or is cancelled.
+  required:
+    name: backend-required
+    if: always() && github.event_name == 'pull_request'
+    needs: [changes, check, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          DETECTION: ${{ needs.changes.result }}
+          CHANGED: ${{ needs.changes.outputs.changed }}
+          RESULTS: ${{ needs.check.result }}:${{ needs.image.result }}
+        run: |
+          [ "$DETECTION" = success ] || exit 1
+          if [ "$CHANGED" = true ]; then
+            [ "$RESULTS" = success:success ]
+          else
+            [ "$CHANGED" = false ] && [ "$RESULTS" = skipped:skipped ]
+          fi
