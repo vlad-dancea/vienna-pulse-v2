@@ -1,0 +1,3 @@
+# Previews are public for review, but search engines must only index production.
+https://:preview.pulse.vladdancea.com/*
+  X-Robots-Tag: noindex

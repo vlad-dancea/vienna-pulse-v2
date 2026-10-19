@@ -33,8 +33,18 @@ description = "Deploy the checked frontend artifact to Cloudflare"
 depends = ["install"]
 run = "pnpm exec wrangler deploy dist/worker/index.js --no-bundle"
 
+[tasks.preview]
+description = "Deploy the checked frontend artifact as a Cloudflare Preview, named with --name"
+depends = ["install"]
+run = "pnpm exec wrangler preview dist/worker/index.js"
+
+[tasks."preview:delete"]
+description = "Delete a Cloudflare Preview, named with --name"
+depends = ["install"]
+run = "pnpm exec wrangler preview delete --skip-confirmation"
+
 [tasks.smoke]
-description = "Verify the deployed frontend, JavaScript, map worker and API through Cloudflare"
+description = "Verify the deployed frontend, JavaScript, map worker and API through Cloudflare (SMOKE_URL picks a Preview)"
 run = "node worker/smoke.mjs"
 
 [tasks.test]

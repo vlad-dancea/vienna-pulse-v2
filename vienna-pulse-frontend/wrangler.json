@@ -9,8 +9,20 @@
     {
       "pattern": "pulse.vladdancea.com/*",
       "zone_name": "vladdancea.com"
+    },
+    {
+      "pattern": "pulse.vladdancea.com",
+      "zone_name": "vladdancea.com",
+      "custom_domain": true,
+      "enabled": false,
+      "previews_enabled": true
     }
   ],
+  "previews": {
+    "vars": {
+      "API_ORIGIN": "https://pulse.vladdancea.com"
+    }
+  },
   "assets": {
     "directory": "./dist/vienna-pulse-frontend/browser",
     "not_found_handling": "single-page-application",

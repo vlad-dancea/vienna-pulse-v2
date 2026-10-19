@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { setTimeout } from 'node:timers/promises';
 
-const base = 'https://pulse.vladdancea.com';
+const production = 'https://pulse.vladdancea.com';
+// Previews pass their own URL; the default checks production.
+const base = process.env.SMOKE_URL ?? production;
 const directory = 'dist/vienna-pulse-frontend/browser';
 const index = await readFile(`${directory}/index.html`, 'utf8');
 const assets = (await readdir(directory)).filter((file) => /\.(js|css)$/.test(file));
@@ -15,6 +17,8 @@ for (let attempt = 1; ; attempt++) {
       assert.equal(response.status, 200, `${path} status`);
       const contentType = path === '/' ? /text\/html/ : path.endsWith('.css') ? /text\/css/ : /javascript/;
       assert.match(response.headers.get('Content-Type'), contentType);
+      // Only production may be indexed by search engines.
+      assert.equal(response.headers.get('X-Robots-Tag'), base === production ? null : 'noindex', `${path} indexing`);
       assert.equal(await response.text(), path === '/' ? index : await readFile(`${directory}${path}`, 'utf8'));
     }
     const response = await fetch(`${base}/api/stops`, {
