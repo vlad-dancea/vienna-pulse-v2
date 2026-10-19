@@ -5,6 +5,8 @@ import com.vladdancea.viennapulse.importer.download.FeedValidator;
 import com.vladdancea.viennapulse.importer.read.FeedFormatException;
 import com.vladdancea.viennapulse.importer.read.route.Route;
 import com.vladdancea.viennapulse.importer.read.route.RouteReader;
+import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
+import com.vladdancea.viennapulse.importer.read.shape.ShapeReader;
 import com.vladdancea.viennapulse.importer.read.stop.Stop;
 import com.vladdancea.viennapulse.importer.read.stop.StopReader;
 import com.vladdancea.viennapulse.importer.store.Store;
@@ -33,6 +35,7 @@ public class ImportJob {
     private final FeedValidator validator;
     private final RouteReader routeReader;
     private final StopReader stopReader;
+    private final ShapeReader shapeReader;
     private final Store store;
     private final ImporterProperties properties;
     private final TaskScheduler scheduler;
@@ -69,6 +72,7 @@ public class ImportJob {
             store.replace(staging -> {
                 staging.copy("routes", Route.class, routeReader.read(zip).values()::forEach);
                 staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
+                staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
             });
         }
         log.info("Stored the timetable from {}", feed);
