@@ -4,6 +4,9 @@ import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
 
@@ -40,5 +43,15 @@ public final class FeedCsv {
             throw new IllegalArgumentException("missing " + field);
         }
         return value;
+    }
+
+    /// Like [#required(NamedCsvRecord, String)], for a GTFS date such as `20261212`.
+    public static LocalDate date(NamedCsvRecord row, String field) {
+        var value = required(row, field);
+        try {
+            return LocalDate.parse(value, DateTimeFormatter.BASIC_ISO_DATE);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(field + " " + value + " is not a date in YYYYMMDD form", exception);
+        }
     }
 }
