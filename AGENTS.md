@@ -9,7 +9,8 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   and `mise run check` at the repository root, or `mise run //project-name:task` for one project.
 - The root `mise.toml` pins the tools, and each project's `mise.toml` defines its tasks.
 - Use pnpm for frontend dependencies and commit its lockfile. Keep direct dependencies pinned.
-- Run `mise run check` after changes and report exactly what ran and any limitations.
+- Run `mise run check` after changing a project, the tool pins or a workflow. Report exactly
+  what ran and any limitations, including changes that no check covers.
 - Stop only processes you started, by the PID you captured. Never `pkill -f` a pattern that
   also appears in your own command line, because it kills your own shell.
 - Keep scratch files, downloaded feeds and plans outside the repository, in a `mktemp -d`
@@ -29,7 +30,9 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   through Cloudflare. The frontend deploys the checked build to Cloudflare and runs its
   `smoke` task.
 - CI runs the same mise tasks as local development, so a passing `mise run check` should mean
-  passing CI. When CI fails where the local check passed, find the difference before retrying.
+  passing `check` jobs. The backend workflow also packages the jar and builds the image, which
+  the local check does not. When CI fails where the local check passed, find the difference
+  before retrying.
 - Keep it that way when editing workflows: one workflow per project, CI steps that call mise
   tasks, read-only default permissions and actions pinned to full commit SHAs with the release
   in a trailing comment.
