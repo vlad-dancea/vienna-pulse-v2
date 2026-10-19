@@ -8,6 +8,7 @@ import com.vladdancea.viennapulse.importer.read.route.Route;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
 import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
 import com.vladdancea.viennapulse.importer.read.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.trip.Trip;
 import java.io.IOException;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +32,7 @@ class StoreTest {
     private static final List<ShapePoint> SHAPE_POINTS_BEFORE = List.of(
             new ShapePoint("U1.1.H", 48.17417, 16.41447, 1, 0.0),
             new ShapePoint("U1.1.H", 48.17530, 16.41325, 2, 152.75));
+    private static final List<Trip> TRIPS_BEFORE = List.of(new Trip("1.T0.U1.1.H", "U1", "T0", "U1.1.H", "Oberlaa", 0));
 
     // Commas, quotes and nulls must survive the trip through COPY.
     private static final List<Route> ROUTES_AFTER = List.of(
@@ -41,6 +43,9 @@ class StoreTest {
             new ShapePoint("D.1.H", 48.25638, 16.36195, 1, null),
             new ShapePoint("D.1.H", 48.25551, 16.36277, 2, null),
             new ShapePoint("U2.1.H", 48.21950, 16.39278, 1, 0.0));
+    private static final List<Trip> TRIPS_AFTER = List.of(
+            new Trip("1.T0.D.1.H", "D", "T0", null, null, null),
+            new Trip("2.T2.U2.1.H", "U2", "T2", "U2.1.H", "Seestadt", 1));
 
     @Autowired
     Store store;
@@ -50,17 +55,18 @@ class StoreTest {
 
     @Test
     void replacesTheWholeTimetable() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE);
-        load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER);
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE);
+        load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER, TRIPS_AFTER);
 
         assertThat(routes()).isEqualTo(ROUTES_AFTER);
         assertThat(stops()).isEqualTo(STOPS_AFTER);
         assertThat(shapePoints()).isEqualTo(SHAPE_POINTS_AFTER);
+        assertThat(trips()).isEqualTo(TRIPS_AFTER);
     }
 
     @Test
     void keepsThePreviousTimetableWhenTheLoadFails() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE);
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE);
 
         assertThatThrownBy(() -> store.replace(staging -> {
                     staging.copy("routes", Route.class, ROUTES_AFTER::forEach);
@@ -72,40 +78,58 @@ class StoreTest {
         assertThat(routes()).isEqualTo(ROUTES_BEFORE);
         assertThat(stops()).isEqualTo(STOPS_BEFORE);
         assertThat(shapePoints()).isEqualTo(SHAPE_POINTS_BEFORE);
+        assertThat(trips()).isEqualTo(TRIPS_BEFORE);
         assertThat(schemas()).containsExactly("timetable");
     }
 
     // The reader leaves checks across rows to whoever groups the points, which is the primary key.
     @Test
     void rejectsAShapeThatRepeatsASequenceNumber() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE);
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE);
         var repeated = List.of(
                 new ShapePoint("D.1.H", 48.25638, 16.36195, 1, null),
                 new ShapePoint("D.1.H", 48.25551, 16.36277, 1, null));
 
-        assertThatThrownBy(() -> load(ROUTES_AFTER, STOPS_AFTER, repeated))
+        assertThatThrownBy(() -> load(ROUTES_AFTER, STOPS_AFTER, repeated, TRIPS_AFTER))
                 .isInstanceOf(UncategorizedSQLException.class)
                 .hasMessageContaining("Key (shape_id, sequence)=(D.1.H, 1) already exists.");
 
         assertThat(shapePoints()).isEqualTo(SHAPE_POINTS_BEFORE);
     }
 
+    // The trip reader streams and cannot see a repeated id, so the primary key has to.
+    @Test
+    void rejectsATripThatRepeatsAnId() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE);
+        var repeated = List.of(
+                new Trip("1.T0.D.1.H", "D", "T0", null, null, null),
+                new Trip("1.T0.D.1.H", "D", "T2", null, null, null));
+
+        assertThatThrownBy(() -> load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER, repeated))
+                .isInstanceOf(UncategorizedSQLException.class)
+                .hasMessageContaining("Key (id)=(1.T0.D.1.H) already exists.");
+
+        assertThat(trips()).isEqualTo(TRIPS_BEFORE);
+    }
+
     @Test
     void rejectsALoadThatSkipsATable() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE);
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE);
 
         assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("The import loaded nothing into [shape_points, stops]");
+                .hasMessage("The import loaded nothing into [shape_points, stops, trips]");
 
         assertThat(routes()).isEqualTo(ROUTES_BEFORE);
     }
 
-    private void load(List<Route> routes, List<Stop> stops, List<ShapePoint> shapePoints) throws IOException {
+    private void load(List<Route> routes, List<Stop> stops, List<ShapePoint> shapePoints, List<Trip> trips)
+            throws IOException {
         store.replace(staging -> {
             staging.copy("routes", Route.class, routes::forEach);
             staging.copy("stops", Stop.class, stops::forEach);
             staging.copy("shape_points", ShapePoint.class, shapePoints::forEach);
+            staging.copy("trips", Trip.class, trips::forEach);
         });
     }
 
@@ -124,6 +148,12 @@ class StoreTest {
     private List<@Nullable ShapePoint> shapePoints() {
         return jdbc.sql("SELECT * FROM timetable.shape_points ORDER BY shape_id, sequence")
                 .query(ShapePoint.class)
+                .list();
+    }
+
+    private List<@Nullable Trip> trips() {
+        return jdbc.sql("SELECT * FROM timetable.trips ORDER BY id")
+                .query(Trip.class)
                 .list();
     }
 

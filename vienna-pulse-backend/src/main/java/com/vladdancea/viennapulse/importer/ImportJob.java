@@ -9,6 +9,8 @@ import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
 import com.vladdancea.viennapulse.importer.read.shape.ShapeReader;
 import com.vladdancea.viennapulse.importer.read.stop.Stop;
 import com.vladdancea.viennapulse.importer.read.stop.StopReader;
+import com.vladdancea.viennapulse.importer.read.trip.Trip;
+import com.vladdancea.viennapulse.importer.read.trip.TripReader;
 import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -36,6 +38,7 @@ public class ImportJob {
     private final RouteReader routeReader;
     private final StopReader stopReader;
     private final ShapeReader shapeReader;
+    private final TripReader tripReader;
     private final Store store;
     private final ImporterProperties properties;
     private final TaskScheduler scheduler;
@@ -73,6 +76,7 @@ public class ImportJob {
                 staging.copy("routes", Route.class, routeReader.read(zip).values()::forEach);
                 staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
                 staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
+                staging.copy("trips", Trip.class, trips -> tripReader.read(zip, trips));
             });
         }
         log.info("Stored the timetable from {}", feed);
