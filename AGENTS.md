@@ -89,8 +89,9 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   `gh pr merge <number> --squash --subject "<title> (#<number>)" --body-file <file>`, where
   the body follows the commit message rules. GitHub adds the number only to its own default
   title, so the subject carries it. Do not enable auto-merge unless asked.
-- GitHub deletes the remote branch after the merge. Remove the worktree with
-  `git worktree remove <path>` and the local branch with `git branch -D <branch>`, because a
+- GitHub deletes the remote branch after the merge. Remove a separate worktree with
+  `git worktree remove <path>`, or run `git switch main` if the branch is checked out in the
+  main checkout. Then delete the local branch with `git branch -D <branch>`, because a
   squash-merged branch never looks merged to git.
 
 ## Documentation and tests
