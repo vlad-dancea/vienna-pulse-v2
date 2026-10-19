@@ -67,8 +67,8 @@ public class ImportJob {
     private void replaceTimetable(Path feed) throws IOException {
         try (var zip = new ZipFile(feed.toFile())) {
             store.replace(staging -> {
-                staging.copy("routes", Route.class, routeReader.read(zip).values());
-                staging.copy("stops", Stop.class, stopReader.read(zip).values());
+                staging.copy("routes", Route.class, routeReader.read(zip).values()::forEach);
+                staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
             });
         }
         log.info("Stored the timetable from {}", feed);

@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -31,10 +32,17 @@ public final class Staging {
         this.dataSource = dataSource;
     }
 
+    /// Hands records to a consumer one at a time, so a file too large for memory can stream straight
+    /// into its table. A list passes its `forEach`.
+    @FunctionalInterface
+    public interface Rows<T> {
+        void forEach(Consumer<T> row) throws IOException;
+    }
+
     /// Streams `rows` into `table` with PostgreSQL's `COPY`, one row per record. Each record component
     /// fills the column of the same name in snake case, so `shortName` fills `short_name`. Components
     /// must be strings, numbers or enums, which are stored by name.
-    public <T extends Record> void copy(String table, Class<T> type, Iterable<? extends T> rows) throws IOException {
+    public <T extends Record> void copy(String table, Class<T> type, Rows<T> rows) throws IOException {
         var components = type.getRecordComponents();
         var columns = Arrays.stream(components)
                 .map(component -> quoted(snakeCase(component.getName())))
@@ -66,7 +74,7 @@ public final class Staging {
         return Set.copyOf(loadedTables);
     }
 
-    private static void write(PGCopyOutputStream copy, RecordComponent[] components, Iterable<? extends Record> rows)
+    private static <T extends Record> void write(PGCopyOutputStream copy, RecordComponent[] components, Rows<T> rows)
             throws IOException {
         // Quoting empty strings keeps them apart from unquoted empty fields, which COPY reads as null.
         var csv = CsvWriter.builder()
@@ -74,12 +82,12 @@ public final class Staging {
                 .lineDelimiter(LineDelimiter.LF)
                 .build(copy, UTF_8);
         var values = new @Nullable String[components.length];
-        for (var row : rows) {
+        rows.forEach(row -> {
             for (int i = 0; i < components.length; i++) {
                 values[i] = text(valueOf(components[i], row));
             }
             csv.writeRecord(values);
-        }
+        });
         csv.flush();
     }
 

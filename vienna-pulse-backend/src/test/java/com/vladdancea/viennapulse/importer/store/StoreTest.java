@@ -53,7 +53,7 @@ class StoreTest {
         load(ROUTES_BEFORE, STOPS_BEFORE);
 
         assertThatThrownBy(() -> store.replace(staging -> {
-                    staging.copy("routes", Route.class, ROUTES_AFTER);
+                    staging.copy("routes", Route.class, ROUTES_AFTER::forEach);
                     throw new IOException("feed cut off");
                 }))
                 .isInstanceOf(IOException.class)
@@ -68,7 +68,7 @@ class StoreTest {
     void rejectsALoadThatSkipsATable() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE);
 
-        assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER)))
+        assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("The import loaded nothing into [stops]");
 
@@ -77,8 +77,8 @@ class StoreTest {
 
     private void load(List<Route> routes, List<Stop> stops) throws IOException {
         store.replace(staging -> {
-            staging.copy("routes", Route.class, routes);
-            staging.copy("stops", Stop.class, stops);
+            staging.copy("routes", Route.class, routes::forEach);
+            staging.copy("stops", Stop.class, stops::forEach);
         });
     }
 
