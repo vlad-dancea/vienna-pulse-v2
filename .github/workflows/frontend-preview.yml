@@ -1,0 +1,151 @@
+# Pull request Previews for the Angular frontend.
+#
+# The frontend workflow checks a pull request with the pull request's own code and no secrets.
+# This workflow deploys that checked build as a Cloudflare Worker Preview at
+# https://pr-<number>.pulse.vladdancea.com and deletes it when the pull request closes.
+#
+# Both triggers run this file and the repository as they are on main, never a pull request's
+# version. The pull request's build is only uploaded as data, with main's Wrangler and
+# configuration, so the Cloudflare token never reaches code that has not been merged. The
+# preview environment admits only main, so a pull request cannot read the token through a
+# workflow of its own either.
+name: frontend-preview
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] the pull request's build is only data
+    workflows: [frontend]
+    types: [completed]
+  pull_request_target: # zizmor: ignore[dangerous-triggers] checks out main, never the pull request
+    types: [closed]
+
+# Runs for one pull request queue in order, so a closing run waits for a running deployment
+# instead of racing it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Root tool pins also include the JDK; these jobs only need Node and pnpm.
+  MISE_ENABLE_TOOLS: node,pnpm
+
+jobs:
+  target:
+    # GitHub lists the pull request of a run only for branches in this repository, so forks
+    # get no Preview.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: read
+    outputs:
+      deploy: ${{ steps.target.outputs.deploy }}
+    steps:
+      # A closed pull request or an outdated commit must not get a Preview, and a pull request
+      # that did not change the frontend has no build to deploy.
+      - id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          state="$(gh pr view "$NUMBER" --repo "$REPOSITORY" --json state,headRefOid --jq '.state + " " + .headRefOid')"
+          builds="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/artifacts" --jq '[.artifacts[] | select(.name == "frontend-dist")] | length')"
+          if [ "$state" = "OPEN $HEAD_SHA" ] && [ "$builds" = 1 ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Preview: pull request #$NUMBER is '$state', and run $RUN_ID has $builds frontend builds."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: target
+    if: needs.target.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
+    environment:
+      name: preview
+      url: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.pulse.vladdancea.com
+    env:
+      NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+      PREVIEW_URL: https://pr-${{ github.event.workflow_run.pull_requests[0].number }}.pulse.vladdancea.com
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A job holding the token restores no caches, which pull request runs also write.
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: frontend-dist
+          path: vienna-pulse-frontend/dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - run: mise run //vienna-pulse-frontend:preview --name "pr-$NUMBER"
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - run: mise run //vienna-pulse-frontend:smoke
+        env:
+          SMOKE_URL: ${{ env.PREVIEW_URL }}
+
+      # The deployment belongs to main's run, so a commit status links the Preview from the
+      # pull request instead.
+      - if: success() || failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STATE: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$STATE" = success ]; then url="$PREVIEW_URL" description="Preview deployed"; else url="$RUN_URL" description="Preview failed"; fi
+          gh api "repos/$REPOSITORY/statuses/$HEAD_SHA" -f state="$STATE" -f context=frontend-preview \
+            -f target_url="$url" -f description="$description" > /dev/null
+
+  cleanup:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: preview
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: false
+
+      # A pull request that never changed the frontend has no Preview to delete.
+      - run: |
+          if ! output="$(mise run //vienna-pulse-frontend:preview:delete --name "pr-$NUMBER" 2>&1)"; then
+            printf '%s\n' "$output"
+            grep -qF '[code: 10025]' <<< "$output" # Preview not found
+          fi
+        env:
+          NUMBER: ${{ github.event.pull_request.number }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

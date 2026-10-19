@@ -27,31 +27,8 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
 3. The smoke test checks that the public JavaScript and map worker match the build and that
    `/api/stops` still serves GeoJSON through the tunnel.
 
-Frontend deployments do not restart the backend.
-
-## Pull request previews
-
-A pull request that changes the frontend runs the same checks. If its branch is in this
-repository, the checked artifact is also deployed as a [Cloudflare Worker Preview](https://developers.cloudflare.com/workers/previews/)
-at `https://pr-<number>.pulse.vladdancea.com`, and the smoke test runs against it. The pull request
-links to it through the `preview` deployment. Each push updates the same Preview, and closing
-the pull request deletes it. Pull requests from forks are only checked, because GitHub does not
-give them secrets.
-
-A Preview is a separate copy of the same Worker, and production traffic never reaches it.
-
-- `wrangler.json` enables `pulse.vladdancea.com` as a *preview-only* custom domain
-  (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
-  with its own wildcard certificate, while the hostname itself keeps the production route and the
-  tunnel CNAME.
-- A Preview hostname has no tunnel behind it, so the `previews` block sets `API_ORIGIN` and the
-  Worker sends `/api` requests to production. Previews show frontend changes against the
-  production API. Backend changes in the same pull request are not part of the Preview.
-- Previews are public. `public/_headers` sends `X-Robots-Tag: noindex` on Preview hostnames so
-  search engines index production only.
-
-Worker Previews are in open beta. Cloudflare keeps at most 100 Previews per Worker on the
-free plan and removes the least recently deployed one beyond that.
+Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
+production deployment. Frontend deployments do not restart the backend.
 
 Every push to `main` that touches the backend runs `.github/workflows/backend.yml`:
 
@@ -67,6 +44,37 @@ Every push to `main` that touches the backend runs `.github/workflows/backend.ym
 
 A deploy interrupts the API for about ten seconds, while the new backend starts. Database migrations run when the backend starts, and
 a rollback only swaps the image back, so migrations must keep working with the previous release.
+
+## Pull request previews
+
+A pull request that changes the frontend runs the same checks. If its branch is in this
+repository, its checked build is also deployed as a [Cloudflare Worker Preview](https://developers.cloudflare.com/workers/previews/)
+at `https://pr-<number>.pulse.vladdancea.com`, and the smoke test runs against it. A
+`frontend-preview` status on the pull request's commit links to it. Each push updates the same
+Preview, and closing the pull request deletes it. Pull requests from forks are only checked.
+
+The Cloudflare token never reaches code from a pull request. `frontend.yml` checks the pull
+request with its own code and no secrets, and uploads the build. `frontend-preview.yml` starts
+when that run finishes (`workflow_run`) or when the pull request closes (`pull_request_target`).
+GitHub runs both triggers from `main`'s copy of the workflow and repository, so the build is
+uploaded as data with `main`'s Wrangler and configuration. The `preview` environment admits only
+`main`, so a pull request cannot read the token through a workflow of its own either. A change
+to `frontend-preview.yml` therefore takes effect only after it is merged.
+
+A Preview is a separate copy of the same Worker, and production traffic never reaches it.
+
+- `wrangler.json` enables `pulse.vladdancea.com` as a *preview-only* custom domain
+  (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
+  with its own wildcard certificate, while the hostname itself keeps the production route and the
+  tunnel CNAME.
+- A Preview hostname has no tunnel behind it, so the `previews` block sets `API_ORIGIN` and the
+  Worker sends `/api` requests to production. Previews show frontend changes against the
+  production API. Backend changes in the same pull request are not part of the Preview.
+- Previews are public. `public/_headers` sends `X-Robots-Tag: noindex` on Preview hostnames so
+  search engines index production only.
+
+Worker Previews are in open beta. Cloudflare keeps at most 100 Previews per Worker on the
+free plan and removes the least recently deployed one beyond that.
 
 ## Day-to-day
 
@@ -127,12 +135,13 @@ The account and zone resource restrictions matter: this token does not need DNS 
 tunnel administration or access to other zones. Store the token directly in GitHub, never in
 the repository. Local Wrangler OAuth credentials are separate from the CI token.
 
-For pull request previews, create a GitHub environment `preview` with no branch restriction:
+For pull request previews, create a GitHub environment `preview` whose deployment branches are
+limited to `main`:
 
 - Variable `CLOUDFLARE_ACCOUNT_ID`: the same account.
 - Secret `CLOUDFLARE_API_TOKEN`: a separate token with only Account > Workers Scripts > Edit for
-  that account. Pull request branches can use it, so it must not reach DNS or other zones.
-  Cloudflare cannot limit a token to Previews, so it could still change any Worker in the account.
+  that account. Cloudflare cannot limit a token to Previews, so it could still change any Worker
+  in the account, which is why only workflows running on `main` may read it.
 
 Run `check`, `deploy` and `smoke` above for the initial deployment. Subsequent frontend pushes
 to `main` deploy automatically. Cloudflare manages TLS using the hostname's existing setup.
