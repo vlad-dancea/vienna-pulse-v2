@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit reviews every pull request and comments on it, nothing more. It never commits:
+# the history is curated by hand, so a fix it suggests is applied by a person or not at all.
+# Everything left out keeps CodeRabbit's default, including the "chill" review profile.
+# AGENTS.md is read as the code guidelines without being listed here.
+
+reviews:
+  finishing_touches:
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+    # These two open pull requests with generated docstrings and tests, which would
+    # contradict the documentation and testing rules in AGENTS.md.
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+  pre_merge_checks:
+    # The default check wants 80% of functions documented, but AGENTS.md documents
+    # methods only when the signature hides something.
+    docstrings:
+      mode: "off"
+
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      # AGENTS.md sends Angular work to this skill. CodeRabbit does not follow that link,
+      # so the skill is listed for the frontend explicitly.
+      - files: ".agents/skills/angular-developer/SKILL.md"
+        applyTo: "vienna-pulse-frontend/**"
