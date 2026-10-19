@@ -29,13 +29,18 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   Container Registry, deploys it to the server over Tailscale and smoke tests `/api/stops`
   through Cloudflare. The frontend deploys the checked build to Cloudflare and runs its
   `smoke` task.
+- `.github/workflows/frontend-preview.yml` deploys a pull request's checked frontend build as a
+  Cloudflare Preview at `pr-<number>.pulse.vladdancea.com` and deletes it when the pull request
+  closes. It runs from `main` and holds the Cloudflare token, so it must never check out or run
+  code from a pull request. Changes to it take effect only after merging.
 - CI runs the same mise tasks as local development, so a passing `mise run check` should mean
   passing `check` jobs. The backend workflow also packages the jar and builds the image, which
   the local check does not. When CI fails where the local check passed, find the difference
   before retrying.
-- Keep it that way when editing workflows: one workflow per project, CI steps that call mise
-  tasks, read-only default permissions and actions pinned to full commit SHAs with the release
-  in a trailing comment.
+- Keep it that way when editing workflows: one workflow per project (plus the frontend's
+  preview workflow, which must be separate to run from `main`), CI steps that call mise tasks,
+  read-only default permissions and actions pinned to full commit SHAs with the release in a
+  trailing comment.
 - Renovate opens dependency pull requests every Monday morning, Vienna time, for releases at
   least three days old. Minor and patch updates share one pull request. Java and Node major
   updates are disabled on purpose.

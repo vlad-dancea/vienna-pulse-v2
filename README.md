@@ -48,6 +48,7 @@ is one component, [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-vie
 ## Deployment
 
 The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
-Static Assets. Frontend changes to `main` deploy after the checks pass; `/api/*` continues to
-reach the backend on Hetzner through its Cloudflare tunnel. See [`deploy/README.md`](deploy/README.md)
-for credentials, manual deployments and rollback.
+Static Assets. Frontend changes to `main` deploy after the checks pass, and each pull request
+that changes the frontend gets a preview at `pr-<number>.pulse.vladdancea.com`. `/api/*` continues
+to reach the backend on Hetzner through its Cloudflare tunnel. See [`deploy/README.md`](deploy/README.md)
+for credentials, previews, manual deployments and rollback.

@@ -23,27 +23,27 @@ const origin = createServer(async (request, response) => {
   );
 });
 let server;
+let preview;
+
+/** Runs the packaged Worker against a local stand-in for the tunnel origin. */
+function harness(settings) {
+  return createTestHarness({
+    workers: [{ config: { ...config, main: 'dist/worker/index.js', no_bundle: true, ...settings } }],
+  });
+}
 
 before(async () => {
   origin.listen(0, '127.0.0.1');
   await once(origin, 'listening');
-  server = createTestHarness({
-    workers: [
-      {
-        config: {
-          ...config,
-          main: 'dist/worker/index.js',
-          no_bundle: true,
-          dev: { host: `127.0.0.1:${origin.address().port}`, upstream_protocol: 'http' },
-        },
-      },
-    ],
-  });
-  await server.listen();
+  const backend = `127.0.0.1:${origin.address().port}`;
+  server = harness({ dev: { host: backend, upstream_protocol: 'http' } });
+  // The Preview's own host has nothing listening, so only API_ORIGIN can reach the backend.
+  preview = harness({ vars: { API_ORIGIN: `http://${backend}` }, dev: { host: '127.0.0.1:9' } });
+  await Promise.all([server.listen(), preview.listen()]);
 });
 
 after(async () => {
-  await server?.close();
+  await Promise.all([server?.close(), preview?.close()]);
   await new Promise((resolve, reject) => origin.close((error) => (error ? reject(error) : resolve())));
 });
 
@@ -81,6 +81,21 @@ test('preserves API paths, query strings, methods, bodies and backend errors ins
   assert.deepEqual(await response.json(), {
     method: 'POST',
     path: '/api/stops?line=U2',
+    body: 'request body',
+    accept: 'application/json',
+  });
+});
+
+test('sends Preview API requests to the production origin', async () => {
+  const response = await preview.fetch('/api/stops?line=U1', {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body: 'request body',
+  });
+  assert.equal(response.headers.get('X-Origin'), 'backend');
+  assert.deepEqual(await response.json(), {
+    method: 'POST',
+    path: '/api/stops?line=U1',
     body: 'request body',
     accept: 'application/json',
   });

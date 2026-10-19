@@ -6,6 +6,10 @@
 #
 # Pull requests always report a required result, while path filtering keeps expensive
 # builds limited to the project that changed. Pushes retain workflow-level path filters.
+#
+# A pull request from this repository keeps its checked build as an artifact, which
+# frontend-preview.yml deploys as a Preview. This workflow never holds a Cloudflare token
+# on pull requests, because it runs the pull request's own code.
 name: frontend
 
 on:
@@ -79,7 +83,9 @@ jobs:
 
       - run: mise run //vienna-pulse-frontend:check
 
-      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-dist
