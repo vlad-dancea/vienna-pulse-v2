@@ -6,6 +6,9 @@
 # AGENTS.md is read as the code guidelines without being listed here.
 
 reviews:
+  # By default the summary is written into the pull request description, which belongs
+  # to its author.
+  high_level_summary_in_walkthrough: true
   finishing_touches:
     autofix:
       enabled: false
