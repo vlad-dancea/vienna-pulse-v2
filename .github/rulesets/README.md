@@ -10,6 +10,10 @@ with `main`. All review conversations must be resolved. Force pushes, deletion
 and merge commits are blocked. No user, administrator or app has bypass permission.
 Squash and rebase merges preserve the linear history.
 
+Two repository settings sit outside the ruleset. Merge commits are disabled, so the
+merge button offers only the methods the ruleset accepts, and GitHub deletes a pull
+request's branch once it is merged.
+
 This repository currently has one maintainer, so the ruleset requires no approving
 human review: GitHub does not let pull request authors approve their own changes.
 When a second reviewer is available, set `required_approving_review_count` to `1`
