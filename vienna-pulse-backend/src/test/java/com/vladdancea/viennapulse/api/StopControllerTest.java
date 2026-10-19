@@ -72,6 +72,32 @@ class StopControllerTest {
     }
 
     @Test
+    void mergesThePlatformsOfAStopIntoOnePointInTheirMiddle() {
+        // Ids and names from the feed; coordinates whose averages are exact in floating point.
+        addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
+        addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
+        addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
+        addStop("at:49:1320:0:1", "Stephansplatz", 48.20845, 16.37212);
+
+        client.get()
+                .uri("/api/stops")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json("""
+                        {"type": "FeatureCollection", "features": [
+                          {"type": "Feature", "id": "at:49:1320",
+                           "geometry": {"type": "Point", "coordinates": [16.37212, 48.20845]},
+                           "properties": {"name": "Stephansplatz"}},
+                          {"type": "Feature", "id": "at:49:1349",
+                           "geometry": {"type": "Point", "coordinates": [16.5, 48.5]},
+                           "properties": {"name": "Hauptbahnhof"}}
+                        ]}
+                        """, JsonCompareMode.STRICT);
+    }
+
+    @Test
     void servesPlainJsonToClientsThatOnlyAcceptIt() {
         addStop("s1", "Karlsplatz", 48.20024, 16.36951);
 
