@@ -51,9 +51,9 @@ when the stops request fails.
 
 Stop modes come from `stop_times.txt`, trips and routes. The importer stores every stop time and
 classifies every platform before swapping the timetable into place. An existing database starts a
-new import after a schema upgrade adds stop modes or stop times. While the backend is upgrading or
-importing for the first time, the frontend keeps available stops visible and rechecks once a minute
-until classifications arrive.
+new import after a schema upgrade adds stop modes, stop times or trip spans. While the backend is
+upgrading or importing for the first time, the frontend keeps available stops visible and rechecks
+once a minute until classifications arrive.
 
 The backend also serves a stop's next 20 departures from the stored stop times at
 `/api/stops/{id}/departures`, with the merged stop id the map uses, such as `at:49:1320`. Each
