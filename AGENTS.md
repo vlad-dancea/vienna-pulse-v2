@@ -55,7 +55,8 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
 
 ## Branches, commits and pull requests
 
-- Commit, push or open a pull request only when asked.
+- Commit, push or open a pull request only when asked. "Full stop" and "full send" ask for it
+  and are skills in `.agents/skills/`, as is "sol loop", a review by a second model.
 - Changes reach `main` only through pull requests.
 - Several agents often work in this repository at the same time, so each piece of work gets its
   own worktree with its own branch from `origin/main`. `t3.json` makes T3 Code create one for
