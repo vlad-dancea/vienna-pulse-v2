@@ -20,14 +20,7 @@ export class MapView {
   protected readonly selectedMode = signal('all');
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
-  private readonly status = viewChild.required<ElementRef<HTMLElement>>('status');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
-
-  protected retryRoutes() {
-    // The retry button disappears after success, so keep keyboard focus on the status instead.
-    this.status().nativeElement.focus();
-    this.lines.routes.reload();
-  }
 
   constructor() {
     const destroyRef = inject(DestroyRef);
