@@ -44,9 +44,15 @@ map. [MapLibre GL JS](https://maplibre.org) draws the map with
 from `/api/stops` and routes from `/api/lines`, using today's service date in Vienna. The date
 updates within a minute of midnight and when a suspended tab resumes. Lines use
 the feed's colors, with fallback colors when none are supplied, and show their names at closer
-zoom levels. The All, U-Bahn, Tram and Bus controls filter routes while every stop stays visible.
-These are timetable routes, without live vehicle positions. Loading, empty and unavailable
-responses appear in the map panel, with a retry button when the request fails.
+zoom levels. The All, U-Bahn, Tram and Bus controls filter routes and stops. Interchanges remain
+visible for every mode that serves them. Stop modes cover the full imported timetable, while
+routes run on today's service date. These are timetable routes, without live vehicle positions. Stop loading and upgrade status appear in the map panel only while needed, with a retry button
+when the stops request fails.
+
+Stop modes come from `stop_times.txt`, trips and routes. The importer classifies every platform
+before swapping the timetable into place. An existing database starts a new import after the
+stop-mode schema upgrade. While the backend is upgrading or importing for the first time, the
+frontend keeps available stops visible and rechecks once a minute until classifications arrive.
 
 In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
 MapLibre's own mouse, touch and keyboard controls. The view is in

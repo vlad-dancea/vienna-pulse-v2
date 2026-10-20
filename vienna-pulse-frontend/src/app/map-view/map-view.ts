@@ -1,8 +1,19 @@
-import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  DestroyRef,
+  DOCUMENT,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { addDistricts } from './districts';
 import { RunningLines } from './running-lines';
+import { NetworkStops } from './network-stops';
 
 const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
   // Keep any other API route types visible with buses, below the tram and U-Bahn layers.
@@ -19,6 +30,7 @@ const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
 })
 export class MapView {
   protected readonly lines = inject(RunningLines);
+  protected readonly stops = inject(NetworkStops);
   protected readonly modes = [
     { type: 'all', label: 'All' },
     { type: 'subway', label: 'U-Bahn' },
@@ -28,10 +40,36 @@ export class MapView {
   protected readonly selectedMode = signal('all');
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
+  private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
+  private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
+
+  protected retryStops() {
+    // The error and retry button disappear after success, so focus the panel's persistent heading.
+    this.heading().nativeElement.focus();
+    this.stops.stops.reload();
+  }
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const document = inject(DOCUMENT);
+
+    effect(() => {
+      const error = this.stops.stops.error();
+      const retry = this.stopRetry()?.nativeElement;
+      // Polling also removes the retry button, so preserve focus before Angular updates the view.
+      if (!error && retry && document.activeElement === retry) {
+        this.heading().nativeElement.focus();
+      }
+    });
+
+    effect(() => {
+      const map = this.map();
+      const stops = this.stops.latest();
+      if (map) {
+        void map.getSource<GeoJSONSource>('stops')?.setData(stops ?? { type: 'FeatureCollection', features: [] });
+      }
+    });
 
     effect(() => {
       const map = this.map();
@@ -46,6 +84,7 @@ export class MapView {
     effect(() => {
       const map = this.map();
       const mode = this.selectedMode();
+      const classified = this.stops.classified();
       const filter: ExpressionSpecification | null = mode === 'all' ? null : ['==', ['get', 'type'], mode];
       for (const layer of routeLayers) {
         const layerFilter: FilterSpecification = filter ? ['all', layer.filter, filter] : layer.filter;
@@ -53,6 +92,7 @@ export class MapView {
         map?.setFilter(`lines-${layer.mode}`, layerFilter);
       }
       map?.setFilter('line-names', filter);
+      map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, ['get', 'modes']]);
     });
 
     // MapLibre sizes the map from its container, which has a size only once it is rendered.
@@ -114,7 +154,7 @@ export class MapView {
             },
           });
         }
-        map.addSource('stops', { type: 'geojson', data: '/api/stops' });
+        map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
           id: 'stops',
           type: 'circle',

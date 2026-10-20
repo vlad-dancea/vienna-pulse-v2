@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.importer.read.FeedFormatException;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
 import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
 import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
@@ -11,12 +12,15 @@ import com.vladdancea.viennapulse.importer.read.route.Route;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
 import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
 import com.vladdancea.viennapulse.importer.read.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.stopcall.StopCall;
 import com.vladdancea.viennapulse.importer.read.trip.Trip;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
 import org.springframework.context.annotation.Import;
@@ -86,6 +90,8 @@ class StoreTest {
         assertThat(trips()).isEqualTo(TRIPS_AFTER);
         assertThat(calendars()).isEqualTo(CALENDARS_AFTER);
         assertThat(dates()).isEqualTo(DATES_AFTER);
+        assertThat(stopModes()).containsExactly("s2:{SUBWAY,TRAM}");
+        assertTempCallsRemoved();
     }
 
     @Test
@@ -106,6 +112,7 @@ class StoreTest {
         assertThat(calendars()).isEqualTo(CALENDARS_BEFORE);
         assertThat(dates()).isEqualTo(DATES_BEFORE);
         assertThat(schemas()).containsExactly("timetable");
+        assertThat(stopModes()).containsExactly("s1:{SUBWAY}");
     }
 
     // The reader leaves checks across rows to whoever groups the points, which is the primary key.
@@ -146,9 +153,79 @@ class StoreTest {
         assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
-                        "The import loaded nothing into [calendar_dates, service_calendars, shape_points, stops, trips]");
+                        "The import loaded nothing into [calendar_dates, service_calendars, shape_points, stop_modes, stops, trips]");
 
         assertThat(routes()).isEqualTo(ROUTES_BEFORE);
+    }
+
+    @Test
+    void classifiesDuplicateUnsortedCallsAndKeepsUnusedStops() throws IOException {
+        var stops = List.of(STOPS_AFTER.getFirst(), new Stop("unused", "Unused", 48.2, 16.4, null));
+        var calls = List.of(
+                new StopCall(TRIPS_AFTER.getLast().id(), "s2", false),
+                new StopCall(TRIPS_AFTER.getFirst().id(), "s2", true),
+                new StopCall(TRIPS_AFTER.getFirst().id(), "s2", true));
+        load(ROUTES_AFTER, stops, SHAPE_POINTS_AFTER, TRIPS_AFTER, CALENDARS_AFTER, DATES_AFTER, calls);
+        assertThat(stopModes()).containsExactly("s2:{TRAM}", "unused:{}");
+        assertTempCallsRemoved();
+        assertThat(store.needsImport()).isFalse();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"missing,s1,true", "missing,s1,false", "1.T0.U1.1.H,missing,true", "1.T0.U1.1.H,missing,false"})
+    void rejectsUnknownReferencesEvenOnExcludedCalls(String trip, String stop, boolean eligible) throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
+        assertThatThrownBy(() -> load(
+                        ROUTES_BEFORE,
+                        STOPS_BEFORE,
+                        SHAPE_POINTS_BEFORE,
+                        TRIPS_BEFORE,
+                        CALENDARS_BEFORE,
+                        DATES_BEFORE,
+                        List.of(new StopCall(trip, stop, eligible))))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("unknown trip, stop or route");
+        assertThat(stopModes()).containsExactly("s1:{SUBWAY}");
+        assertThat(stops()).isEqualTo(STOPS_BEFORE);
+        assertTempCallsRemoved();
+    }
+
+    @Test
+    void rejectsACallWhoseTripHasAnUnknownRoute() throws IOException {
+        var trips = List.of(new Trip("t", "missing", "T0", null, null, null));
+        assertThatThrownBy(() -> load(
+                        ROUTES_BEFORE,
+                        STOPS_BEFORE,
+                        SHAPE_POINTS_BEFORE,
+                        trips,
+                        CALENDARS_BEFORE,
+                        DATES_BEFORE,
+                        List.of(new StopCall("t", "s1", false))))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("unknown trip, stop or route");
+        assertTempCallsRemoved();
+    }
+
+    @Test
+    void detectsAnUpgradeUntilClassificationHasCompletedEvenWithoutPassengerCalls() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE, List.of());
+        assertThat(store.needsImport()).isFalse();
+        assertThat(stopModes()).containsExactly("s1:{}");
+        jdbc.sql("DELETE FROM timetable.stop_modes").update();
+        assertThat(store.needsImport()).isTrue();
+    }
+
+    private List<@Nullable String> stopModes() {
+        return jdbc.sql("SELECT stop_id || ':' || types::text FROM timetable.stop_modes ORDER BY stop_id")
+                .query(String.class)
+                .list();
+    }
+
+    private void assertTempCallsRemoved() {
+        assertThat(jdbc.sql("SELECT to_regclass('pg_temp.pulse_stop_calls') IS NULL")
+                        .query(Boolean.class)
+                        .single())
+                .isTrue();
     }
 
     private void load(
@@ -159,6 +236,27 @@ class StoreTest {
             List<ServiceCalendar> calendars,
             List<CalendarDate> dates)
             throws IOException {
+        load(
+                routes,
+                stops,
+                shapePoints,
+                trips,
+                calendars,
+                dates,
+                trips.stream()
+                        .map(trip -> new StopCall(trip.id(), stops.getFirst().id(), true))
+                        .toList());
+    }
+
+    private void load(
+            List<Route> routes,
+            List<Stop> stops,
+            List<ShapePoint> shapePoints,
+            List<Trip> trips,
+            List<ServiceCalendar> calendars,
+            List<CalendarDate> dates,
+            List<StopCall> calls)
+            throws IOException {
         store.replace(staging -> {
             staging.copy("routes", Route.class, routes::forEach);
             staging.copy("stops", Stop.class, stops::forEach);
@@ -166,6 +264,7 @@ class StoreTest {
             staging.copy("trips", Trip.class, trips::forEach);
             staging.copy("service_calendars", ServiceCalendar.class, calendars::forEach);
             staging.copy("calendar_dates", CalendarDate.class, dates::forEach);
+            staging.stopModes(calls::forEach);
         });
     }
 

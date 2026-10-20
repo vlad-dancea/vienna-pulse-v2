@@ -41,6 +41,7 @@ class StopControllerTest {
     @BeforeEach
     void removeAllStops() {
         jdbc.sql("DELETE FROM timetable.stops").update();
+        jdbc.sql("DELETE FROM timetable.stop_modes").update();
     }
 
     @Test
@@ -63,10 +64,10 @@ class StopControllerTest {
                         {"type": "FeatureCollection", "features": [
                           {"type": "Feature", "id": "s1",
                            "geometry": {"type": "Point", "coordinates": [16.36951, 48.20024]},
-                           "properties": {"name": "Karlsplatz"}},
+                           "properties": {"name": "Karlsplatz", "modes": null}},
                           {"type": "Feature", "id": "s2",
                            "geometry": {"type": "Point", "coordinates": [16.37212, 48.20845]},
-                           "properties": {"name": "Stephansplatz"}}
+                           "properties": {"name": "Stephansplatz", "modes": null}}
                         ]}
                         """, JsonCompareMode.STRICT);
     }
@@ -89,12 +90,47 @@ class StopControllerTest {
                         {"type": "FeatureCollection", "features": [
                           {"type": "Feature", "id": "at:49:1320",
                            "geometry": {"type": "Point", "coordinates": [16.37212, 48.20845]},
-                           "properties": {"name": "Stephansplatz"}},
+                           "properties": {"name": "Stephansplatz", "modes": null}},
                           {"type": "Feature", "id": "at:49:1349",
                            "geometry": {"type": "Point", "coordinates": [16.5, 48.5]},
-                           "properties": {"name": "Hauptbahnhof"}}
+                           "properties": {"name": "Hauptbahnhof", "modes": null}}
                         ]}
                         """, JsonCompareMode.STRICT);
+    }
+
+    @Test
+    void combinesModesWithoutWeightingTheNameOrCentroidByModeCount() {
+        addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
+        addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
+        addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
+        addStop("unused", "Unused", 48.0, 16.0);
+        jdbc.sql("""
+                INSERT INTO timetable.stop_modes VALUES
+                ('at:49:1349:0:1', ARRAY['TRAM']),
+                ('at:49:1349:0:2', ARRAY['TRAM', 'SUBWAY', 'BUS']),
+                ('at:49:1349:0:3', ARRAY['SUBWAY']),
+                ('unused', ARRAY[]::text[])
+                """).update();
+        client.get()
+                .uri("/api/stops")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json("""
+                {"type":"FeatureCollection","features":[
+                  {"type":"Feature","id":"at:49:1349",
+                   "geometry":{"type":"Point","coordinates":[16.5,48.5]},
+                   "properties":{"name":"Hauptbahnhof","modes":["bus","subway","tram"]}},
+                  {"type":"Feature","id":"unused",
+                   "geometry":{"type":"Point","coordinates":[16.0,48.0]},
+                   "properties":{"name":"Unused","modes":[]}}
+                ]}
+                """, JsonCompareMode.STRICT);
+        var before = etag();
+        jdbc.sql("UPDATE timetable.stop_modes SET types = ARRAY['SUBWAY'] WHERE stop_id LIKE 'at:%'")
+                .update();
+        assertThat(etag()).isNotEqualTo(before);
     }
 
     @Test
