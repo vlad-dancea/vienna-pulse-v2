@@ -234,6 +234,28 @@ describe('MapView', () => {
     },
   );
 
+  it('keeps unclassified stops on the map when a recheck fails', async () => {
+    const fixture = TestBed.createComponent(MapView);
+    TestBed.tick();
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    const legacy = {
+      ...stops,
+      features: stops.features.map((stop) => ({ ...stop, properties: { name: stop.properties.name } })),
+    };
+    http.expectOne('/api/stops').flush(legacy);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    TestBed.inject(NetworkStops).stops.reload();
+    TestBed.tick();
+    http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+    await fixture.whenStable();
+    expect(setStops).toHaveBeenLastCalledWith(legacy);
+    expect(element.textContent).toContain('Stop filters are updating. All stops are shown for now.');
+    expect(element.textContent).not.toContain('Retry stops');
+    fixture.destroy();
+  });
+
   it('retries failed stops while keeping keyboard focus in the Filters panel', async () => {
     const fixture = TestBed.createComponent(MapView);
     TestBed.tick();

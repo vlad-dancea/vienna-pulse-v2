@@ -23,18 +23,20 @@
   </div>
   @if (!stops.classified()) {
     <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">
-      @if (stops.stops.isLoading()) {
-        Loading stops...
+      @if (stops.latest(); as latest) {
+        @if (latest.features.length === 0) {
+          No stops are available yet.
+        } @else {
+          Stop filters are updating. All stops are shown for now.
+        }
       } @else if (stops.stops.error()) {
         Stops could not be loaded.
-      } @else if (stops.stops.hasValue() && stops.stops.value().features.length === 0) {
-        No stops are available yet.
       } @else {
-        Stop filters are updating. All stops are shown for now.
+        Loading stops...
       }
     </p>
   }
-  @if (stops.stops.error()) {
+  @if (stops.stops.error() && !stops.latest()) {
     <button
       #stopRetry
       type="button"

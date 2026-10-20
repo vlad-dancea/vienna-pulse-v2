@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { computed, DestroyRef, inject, Service } from '@angular/core';
+import { computed, DestroyRef, inject, linkedSignal, Service } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
 
 /** Describes a stop complex, with unknown modes while the backend is being upgraded. */
@@ -12,12 +12,18 @@ export interface StopProperties {
 @Service()
 export class NetworkStops {
   readonly stops = httpResource<FeatureCollection<Point, StopProperties>>(() => '/api/stops');
-  readonly classified = computed(
-    () =>
-      this.stops.hasValue() &&
-      this.stops.value().features.length > 0 &&
-      this.stops.value().features.every((stop) => Array.isArray(stop.properties.modes)),
-  );
+  /** The last stops that loaded, kept on the map when a later recheck fails. */
+  readonly latest = linkedSignal<
+    FeatureCollection<Point, StopProperties> | undefined,
+    FeatureCollection<Point, StopProperties> | undefined
+  >({
+    source: () => (this.stops.hasValue() ? this.stops.value() : undefined),
+    computation: (next, previous) => next ?? previous?.value,
+  }).asReadonly();
+  readonly classified = computed(() => {
+    const features = this.latest()?.features ?? [];
+    return features.length > 0 && features.every((stop) => Array.isArray(stop.properties.modes));
+  });
 
   constructor() {
     const timer = setInterval(() => {

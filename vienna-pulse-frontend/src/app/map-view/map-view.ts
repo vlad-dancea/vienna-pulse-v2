@@ -64,11 +64,9 @@ export class MapView {
 
     effect(() => {
       const map = this.map();
-      const stops = this.stops.stops;
+      const stops = this.stops.latest();
       if (map) {
-        void map
-          .getSource<GeoJSONSource>('stops')
-          ?.setData(stops.hasValue() ? stops.value() : { type: 'FeatureCollection', features: [] });
+        void map.getSource<GeoJSONSource>('stops')?.setData(stops ?? { type: 'FeatureCollection', features: [] });
       }
     });
 
