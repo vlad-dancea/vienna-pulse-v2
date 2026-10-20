@@ -13,12 +13,8 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
-import org.springframework.web.ErrorResponseException;
 
 /// Reads the lines that run on a day of the current timetable.
 @Service
@@ -27,8 +23,8 @@ public class LineService {
     private final JdbcClient jdbc;
 
     /// Every route with a trip on `date`, ordered by id, drawn along the distinct paths its trips
-    /// follow that day. Fails with a 404 [ErrorResponseException] if the timetable does not cover
-    /// `date`, which an empty map would hide when the imports stop.
+    /// follow that day. Fails with a 404 if the timetable does not cover `date`, which an empty map
+    /// would hide when the imports stop.
     ///
     /// A trip runs on the days of its service: the weekly days of its `calendar.txt` row between
     /// its first and last date, minus the days `calendar_dates.txt` removes, plus the days it adds.
@@ -142,20 +138,11 @@ public class LineService {
 
     private static void requireCovered(LocalDate date, Row coverage) {
         if (coverage.first() == null || coverage.last() == null) {
-            throw notFound("There is no timetable yet");
+            throw Problems.notFound("There is no timetable yet");
         }
         if (date.isBefore(coverage.first()) || date.isAfter(coverage.last())) {
-            throw notFound("The timetable covers %s to %s".formatted(coverage.first(), coverage.last()));
+            throw Problems.notFound("The timetable covers %s to %s".formatted(coverage.first(), coverage.last()));
         }
-    }
-
-    // Caches may keep a 404 without being told, but the next import can cover the day, so they must
-    // ask again like for the lines themselves.
-    private static ErrorResponseException notFound(String detail) {
-        var exception = new ErrorResponseException(
-                HttpStatus.NOT_FOUND, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, detail), null);
-        exception.getHeaders().setCacheControl(CacheControl.noCache());
-        return exception;
     }
 
     private static RoutePath routePath(ResultSet row) throws SQLException {
