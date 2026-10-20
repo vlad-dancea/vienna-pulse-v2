@@ -79,6 +79,28 @@ const stops = {
   ],
 };
 
+const vehicles = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      id: 'trip-1',
+      geometry: { type: 'Point', coordinates: [16.35, 48.2] },
+      properties: {
+        line: 'tram-62',
+        name: '62',
+        longName: null,
+        type: 'tram',
+        color: null,
+        textColor: null,
+        headsign: 'Oper',
+      },
+    },
+  ],
+};
+
+const noVehicles = { type: 'FeatureCollection', features: [] };
+
 const busFilter: FilterSpecification = ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]];
 const expectedLayers: [string, FilterSpecification][] = [
   ['lines-bus-casing', busFilter],
@@ -94,6 +116,7 @@ describe('MapView', () => {
   let loadMap: () => void;
   let setData: ReturnType<typeof vi.fn>;
   let setStops: ReturnType<typeof vi.fn>;
+  let setVehicles: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,7 +125,12 @@ describe('MapView', () => {
     });
     setData = vi.fn();
     setStops = vi.fn();
-    map.getSource.mockImplementation((source: string) => ({ setData: source === 'stops' ? setStops : setData }));
+    setVehicles = vi.fn();
+    map.getSource.mockImplementation((source: string) => ({
+      setData: source === 'stops' ? setStops : source === 'vehicles' ? setVehicles : setData,
+    }));
+    // jsdom has no media queries. Reduced motion draws the vehicles once, where they are.
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: true }) });
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -126,6 +154,7 @@ describe('MapView', () => {
     selected?.click();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
     expect(setData).not.toHaveBeenCalled();
 
@@ -136,6 +165,7 @@ describe('MapView', () => {
       expect(map.setFilter).toHaveBeenCalledWith(layer, ['all', filter, ['==', ['get', 'type'], type]]);
     }
     expect(map.setFilter).toHaveBeenCalledWith('line-names', ['==', ['get', 'type'], type]);
+    expect(map.setFilter).toHaveBeenCalledWith('vehicles', ['==', ['get', 'type'], type]);
     expect(selected?.getAttribute('aria-pressed')).toBe('true');
     expect(setStops).toHaveBeenLastCalledWith(stops);
     expect(TestBed.inject(NetworkStops).classified()).toBe(true);
@@ -159,6 +189,7 @@ describe('MapView', () => {
     }
     expect(map.setFilter).toHaveBeenLastCalledWith('stops', null);
     expect(map.setFilter).toHaveBeenCalledWith('line-names', null);
+    expect(map.setFilter).toHaveBeenCalledWith('vehicles', null);
     http.expectNone((request) => request.url === '/api/lines');
     http.expectNone('/api/stops');
     fixture.destroy();
@@ -172,6 +203,7 @@ describe('MapView', () => {
     TestBed.tick();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
     const lineLayers = map.addLayer.mock.calls
@@ -182,9 +214,35 @@ describe('MapView', () => {
       ...expectedLayers.map(([id]) => id),
       'stops',
       'line-names',
+      'vehicles',
       'district-boundaries',
       'district-names',
     ]);
+  });
+
+  it('draws the running vehicles and keeps them when a refresh fails', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      loadMap();
+      TestBed.tick();
+      http.expectOne((request) => request.url === '/api/lines').flush(routes);
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(vehicles);
+      await fixture.whenStable();
+      expect(setVehicles).toHaveBeenLastCalledWith(vehicles);
+
+      vi.advanceTimersByTime(15_000);
+      TestBed.tick();
+      http.expectOne('/api/vehicles').flush({}, { status: 503, statusText: 'Unavailable' });
+      await fixture.whenStable();
+      expect(setVehicles).toHaveBeenLastCalledWith(vehicles);
+    } finally {
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      vi.useRealTimers();
+    }
   });
 
   it('replaces neighborhood labels while retaining the place filter and street names', async () => {
@@ -200,6 +258,7 @@ describe('MapView', () => {
     loadMap();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
 
     expect(map.setFilter).toHaveBeenCalledWith('places', [
@@ -219,6 +278,7 @@ describe('MapView', () => {
     loadMap();
     http.expectOne((request) => request.url === '/api/lines').flush({}, { status, statusText: 'Unavailable' });
     http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(element.querySelectorAll('button'));
@@ -246,6 +306,7 @@ describe('MapView', () => {
         ...stops,
         features: stops.features.map((stop) => ({ ...stop, properties: { name: stop.properties.name, modes } })),
       });
+      http.expectOne('/api/vehicles').flush(noVehicles);
       await fixture.whenStable();
       const element = fixture.nativeElement as HTMLElement;
       const subway = Array.from(element.querySelectorAll('button')).find(
@@ -275,6 +336,7 @@ describe('MapView', () => {
       features: stops.features.map((stop) => ({ ...stop, properties: { name: stop.properties.name } })),
     };
     http.expectOne('/api/stops').flush(legacy);
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     TestBed.inject(NetworkStops).stops.reload();
@@ -293,6 +355,7 @@ describe('MapView', () => {
     loadMap();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+    http.expectOne('/api/vehicles').flush(noVehicles);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     const retry = Array.from(element.querySelectorAll('button')).find(
@@ -317,6 +380,7 @@ describe('MapView', () => {
         loadMap();
         http.expectOne((request) => request.url === '/api/lines').flush(routes);
         http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+        http.expectOne('/api/vehicles').flush(noVehicles);
         await fixture.whenStable();
         const element = fixture.nativeElement as HTMLElement;
         const buttons = Array.from(element.querySelectorAll('button'));
@@ -324,6 +388,7 @@ describe('MapView', () => {
         vi.advanceTimersByTime(60_000);
         TestBed.tick();
         http.expectOne('/api/stops').flush(stops);
+        http.expectOne('/api/vehicles').flush(noVehicles);
         await fixture.whenStable();
         expect(document.activeElement?.textContent.trim()).toBe(focusRetry ? 'Filters' : 'U-Bahn');
         expect(element.textContent).not.toContain('Stops could not be loaded');
