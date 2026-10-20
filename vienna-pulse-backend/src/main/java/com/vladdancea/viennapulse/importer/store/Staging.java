@@ -111,7 +111,7 @@ public final class Staging {
                 throw exception;
             }
         } catch (SQLException exception) {
-            throw new UncategorizedSQLException("Copying into staging." + table, sql, exception);
+            throw new UncategorizedSQLException("Copying into " + schema + "." + table, sql, exception);
         } finally {
             DataSourceUtils.releaseConnection(connection, dataSource);
         }
