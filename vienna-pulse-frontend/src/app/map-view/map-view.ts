@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
+import { addDistricts } from './districts';
 import { RunningLines } from './running-lines';
 import { NetworkStops } from './network-stops';
 
@@ -184,6 +185,7 @@ export class MapView {
             'text-halo-width': 2,
           },
         });
+        addDistricts(map);
         this.map.set(map);
       });
 

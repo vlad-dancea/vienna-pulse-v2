@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { FilterSpecification, LayerSpecification } from 'maplibre-gl';
+import type { FilterSpecification, LayerSpecification, LineLayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
 import { NetworkStops } from './network-stops';
@@ -9,7 +9,8 @@ import { NetworkStops } from './network-stops';
 const map = vi.hoisted(() => ({
   once: vi.fn(),
   addSource: vi.fn(),
-  addLayer: vi.fn<(layer: LayerSpecification) => void>(),
+  addLayer: vi.fn<(layer: LayerSpecification, beforeId?: string) => void>(),
+  getStyle: vi.fn<() => { layers: LayerSpecification[] }>(() => ({ layers: [] })),
   getSource: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
@@ -173,13 +174,43 @@ describe('MapView', () => {
     http.expectOne('/api/stops').flush(stops);
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
-    const lineLayers = map.addLayer.mock.calls.map(([layer]) => layer).filter((layer) => layer.type === 'line');
+    const lineLayers = map.addLayer.mock.calls
+      .map(([layer]) => layer)
+      .filter((layer): layer is LineLayerSpecification => layer.type === 'line' && layer.source === 'lines');
     expect(lineLayers.map((layer) => [layer.id, layer.filter])).toEqual(expectedLayers);
     expect(map.addLayer.mock.calls.map(([layer]) => layer.id)).toEqual([
       ...expectedLayers.map(([id]) => id),
       'stops',
       'line-names',
+      'district-boundaries',
+      'district-names',
     ]);
+  });
+
+  it('replaces neighborhood labels while retaining the place filter and street names', async () => {
+    const placeFilter: FilterSpecification = ['!=', ['get', 'class'], 'country'];
+    map.getStyle.mockReturnValueOnce({
+      layers: [
+        { id: 'roads', type: 'symbol', source: 'basemap', 'source-layer': 'transportation_name' },
+        { id: 'places', type: 'symbol', source: 'basemap', 'source-layer': 'place', filter: placeFilter },
+      ],
+    });
+    const fixture = TestBed.createComponent(MapView);
+    TestBed.tick();
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/stops').flush(stops);
+    await fixture.whenStable();
+
+    expect(map.setFilter).toHaveBeenCalledWith('places', [
+      'all',
+      placeFilter,
+      ['!', ['in', ['get', 'class'], ['literal', ['suburb', 'quarter', 'neighbourhood']]]],
+    ]);
+    expect(map.setFilter).not.toHaveBeenCalledWith('roads', expect.anything());
+    const layerIds = map.addLayer.mock.calls.map(([layer]) => layer.id);
+    expect(map.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id: 'district-boundaries' }), 'roads');
+    expect(layerIds.indexOf('district-names')).toBeGreaterThan(layerIds.indexOf('line-names'));
   });
 
   it.each([404, 503])('keeps the map empty and mode controls usable after HTTP %s', async (status) => {

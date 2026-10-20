@@ -86,6 +86,27 @@ test('preserves API paths, query strings, methods, bodies and backend errors ins
   });
 });
 
+test('serves bundled boundaries and matching labels for all 23 districts', async () => {
+  const collections = [];
+  for (const path of ['/data/vienna-districts.geojson', '/data/vienna-district-labels.geojson']) {
+    const response = await server.fetch(path);
+    assert.equal(response.status, 200);
+    const collection = await response.json();
+    assert.equal(collection.type, 'FeatureCollection');
+    assert.deepEqual(
+      collection.features.map((feature) => feature.properties.number).sort((a, b) => a - b),
+      Array.from({ length: 23 }, (_, index) => index + 1),
+    );
+    collections.push(collection);
+  }
+  assert.deepEqual(
+    collections[0].features.map((feature) => feature.properties),
+    collections[1].features.map((feature) => feature.properties),
+  );
+  assert.ok(collections[0].features.every((feature) => feature.geometry.type === 'Polygon'));
+  assert.ok(collections[1].features.every((feature) => feature.geometry.type === 'Point'));
+});
+
 test('sends Preview API requests to the production origin', async () => {
   const response = await preview.fetch('/api/stops?line=U1', {
     method: 'POST',
