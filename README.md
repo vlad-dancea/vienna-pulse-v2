@@ -7,7 +7,7 @@ A live map of the Vienna public transport network, built on the Wiener Linien GT
 
 | Folder | What it is |
 | --- | --- |
-| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops and scheduled lines as GeoJSON |
+| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON |
 | [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops and scheduled routes |
 
 ## Run
@@ -51,14 +51,21 @@ when the stops request fails.
 
 Stop modes come from `stop_times.txt`, trips and routes. The importer stores every stop time and
 classifies every platform before swapping the timetable into place. An existing database starts a
-new import after a schema upgrade adds stop modes or stop times. While the backend is upgrading or
-importing for the first time, the frontend keeps available stops visible and rechecks once a minute
-until classifications arrive.
+new import after a schema upgrade adds stop modes, stop times or trip spans. While the backend is
+upgrading or importing for the first time, the frontend keeps available stops visible and rechecks
+once a minute until classifications arrive.
 
 The backend also serves a stop's next 20 departures from the stored stop times at
 `/api/stops/{id}/departures`, with the merged stop id the map uses, such as `at:49:1320`. Each
 departure gives its time in Vienna, its line, its headsign and its platform. The map does not show
 them yet.
+
+`/api/vehicles` serves a GeoJSON point for every trip running now, where its timetable puts it,
+with the trip id as feature id and the line, its colors and the headsign as properties. A
+vehicle moves along its shape at an even speed between two stops and waits at a stop between
+its arrival and departure. These are scheduled positions, not live ones, and the map does not
+show them yet. To find the running trips without reading every call, the importer stores when
+each trip leaves its first stop and reaches its last.
 
 In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
 MapLibre's own mouse, touch and keyboard controls. The view is in

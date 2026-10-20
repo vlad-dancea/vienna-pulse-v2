@@ -46,12 +46,14 @@ public class Store {
         dropPrevious();
     }
 
-    /// Whether the timetable is empty or an upgrade added stop modes or stop times it has not loaded yet.
+    /// Whether the timetable is empty or an upgrade added stop modes, stop times or trip spans it has
+    /// not loaded yet.
     public boolean needsImport() {
         return jdbc.sql("""
                         SELECT NOT EXISTS (SELECT FROM timetable.stops)
                             OR NOT EXISTS (SELECT FROM timetable.stop_modes)
                             OR NOT EXISTS (SELECT FROM timetable.stop_times)
+                            OR NOT EXISTS (SELECT FROM timetable.trip_spans)
                         """).query(Boolean.class).single();
     }
 

@@ -204,7 +204,7 @@ class StoreTest {
         assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
-                        "The import loaded nothing into [calendar_dates, service_calendars, shape_points, stop_modes, stop_times, stops, trips]");
+                        "The import loaded nothing into [calendar_dates, service_calendars, shape_points, stop_modes, stop_times, stops, trip_spans, trips]");
 
         assertThat(routes()).isEqualTo(ROUTES_BEFORE);
     }
@@ -270,6 +270,35 @@ class StoreTest {
         assertThat(store.needsImport()).isFalse();
         assertThat(stopModes()).containsExactly("s1:{}");
         jdbc.sql("DELETE FROM timetable.stop_modes").update();
+        assertThat(store.needsImport()).isTrue();
+    }
+
+    @Test
+    void recordsWhenEachTripLeavesItsFirstStopAndReachesItsLast() throws IOException {
+        var first = TRIPS_AFTER.getFirst().id();
+        var last = TRIPS_AFTER.getLast().id();
+        var stopTimes = List.of(
+                new StopTime(last, 3, "s2", 90_000, 90_060, PickupDropOffType.REGULAR, PickupDropOffType.REGULAR, 0.0),
+                // A call between two timed ones may leave its times out.
+                new StopTime(last, 5, "s2", null, null, PickupDropOffType.REGULAR, PickupDropOffType.REGULAR, 900.0),
+                new StopTime(
+                        last, 8, "s2", 90_600, 90_600, PickupDropOffType.REGULAR, PickupDropOffType.REGULAR, 1800.0),
+                // Without any times the trip never runs.
+                new StopTime(first, 1, "s2", null, null, PickupDropOffType.REGULAR, PickupDropOffType.REGULAR, null));
+        load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER, TRIPS_AFTER, CALENDARS_AFTER, DATES_AFTER, stopTimes);
+
+        assertThat(jdbc.sql("SELECT concat_ws(':', trip_id, service_id, first_departure, last_arrival)"
+                                + " FROM timetable.trip_spans ORDER BY trip_id")
+                        .query(String.class)
+                        .list())
+                .containsExactly("2.T2.U2.1.H:T2:90060:90600");
+    }
+
+    @Test
+    void detectsAnUpgradeThatAddedTheTripSpans() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
+        assertThat(store.needsImport()).isFalse();
+        jdbc.sql("DELETE FROM timetable.trip_spans").update();
         assertThat(store.needsImport()).isTrue();
     }
 

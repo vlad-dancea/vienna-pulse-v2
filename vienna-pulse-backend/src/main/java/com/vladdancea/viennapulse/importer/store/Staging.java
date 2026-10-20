@@ -51,8 +51,8 @@ public final class Staging {
     }
 
     /// Streams `stop_times.txt` into its table, then classifies every platform by the route types of
-    /// the calls where passengers can board or alight. The references are checked on every call,
-    /// even those without passengers.
+    /// the calls where passengers can board or alight and records when each trip runs. The
+    /// references are checked on every call, even those without passengers.
     public void stopTimes(Rows<StopTime> rows) throws IOException {
         copy("stop_times", StopTime.class, rows);
         var jdbc = JdbcClient.create(dataSource);
@@ -84,6 +84,16 @@ public final class Staging {
                 ) m ON m.stop_id = s.id
                 """).update();
         loadedTables.add("stop_modes");
+        // A trip none of whose calls has a time cannot be placed on the map at any moment.
+        jdbc.sql("""
+                INSERT INTO staging.trip_spans (trip_id, service_id, first_departure, last_arrival)
+                SELECT t.id, t.service_id, min(c.departure_time), max(c.arrival_time)
+                FROM staging.stop_times c
+                JOIN staging.trips t ON t.id = c.trip_id
+                GROUP BY t.id, t.service_id
+                HAVING min(c.departure_time) IS NOT NULL AND max(c.arrival_time) IS NOT NULL
+                """).update();
+        loadedTables.add("trip_spans");
     }
 
     private <T extends Record> void copy(String schema, String table, Class<T> type, Rows<T> rows) throws IOException {
