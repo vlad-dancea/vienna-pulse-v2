@@ -1,12 +1,13 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import type { LayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 
 const map = vi.hoisted(() => ({
   once: vi.fn(),
   addSource: vi.fn(),
-  addLayer: vi.fn(),
+  addLayer: vi.fn<(layer: LayerSpecification) => void>(),
   getSource: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
@@ -107,6 +108,11 @@ describe('MapView', () => {
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
     expect(element.textContent).toContain('Routes follow the timetable');
+    const lineLayers = map.addLayer.mock.calls.map(([layer]) => layer).filter((layer) => layer.type === 'line');
+    expect(lineLayers.map((layer) => layer.id)).toEqual(['lines-casing', 'lines']);
+    for (const layer of lineLayers) {
+      expect(layer.layout?.['line-sort-key']).toEqual(['match', ['get', 'type'], 'subway', 2, 'tram', 1, 0]);
+    }
   });
 
   it.each([

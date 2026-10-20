@@ -1,6 +1,6 @@
 import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
-import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl';
+import type { FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { RunningLines } from './running-lines';
 
 /** Displays Vienna's stops and today's scheduled routes with transport-mode controls. */
@@ -71,11 +71,17 @@ export class MapView {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
+        const lineLayout: LineLayerSpecification['layout'] = {
+          'line-cap': 'round',
+          'line-join': 'round',
+          // Higher sort keys draw last, keeping U-Bahn above trams and buses at crossings.
+          'line-sort-key': ['match', ['get', 'type'], 'subway', 2, 'tram', 1, 0],
+        };
         map.addLayer({
           id: 'lines-casing',
           type: 'line',
           source: 'lines',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: lineLayout,
           paint: {
             'line-color': '#ffffff',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 9],
@@ -85,7 +91,7 @@ export class MapView {
           id: 'lines',
           type: 'line',
           source: 'lines',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: lineLayout,
           paint: {
             'line-color': [
               'coalesce',
