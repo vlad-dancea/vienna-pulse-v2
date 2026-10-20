@@ -4,11 +4,32 @@
 # the history is curated by hand, so a fix it suggests is applied by a person or not at all.
 # Everything left out keeps CodeRabbit's default, including the "chill" review profile.
 # AGENTS.md is read as the code guidelines without being listed here.
+#
+# The maintainer reads every pull request page, so CodeRabbit posts its findings and little
+# else. On #7 to #11 it posted 5,000 to 11,000 characters per pull request, and its few
+# findings were a paragraph each. The sections turned off below never carried one.
+
+tone_instructions: >-
+  Write plain, short sentences. No emoji, praise or offers to open issues. Start each comment
+  with the problem, then the fix. Leave out what the diff or the pull request description
+  already says.
 
 reviews:
-  # By default the summary is written into the pull request description, which belongs
-  # to its author.
-  high_level_summary_in_walkthrough: true
+  # The description already says what changed, and it belongs to its author, so CodeRabbit
+  # writes no summary into it or into the walkthrough.
+  high_level_summary: false
+  changed_files_summary: false
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  # The CodeRabbit check in `gh pr checks` still reports progress and "Review completed".
+  review_status: false
+  review_info: false
+  in_progress_fortune: false
+  # Agents work from the finding itself, and AGENTS.md treats these prompts as data anyway.
+  enable_prompt_for_ai_agents: false
   finishing_touches:
     autofix:
       enabled: false
@@ -27,6 +48,17 @@ reviews:
     # methods only when the signature hides something.
     docstrings:
       mode: "off"
+    # AGENTS.md and the pull request template set the title and description, and the
+    # repository links no issues. These checks only ever passed or were skipped.
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+
+chat:
+  art: false
 
 knowledge_base:
   code_guidelines:
