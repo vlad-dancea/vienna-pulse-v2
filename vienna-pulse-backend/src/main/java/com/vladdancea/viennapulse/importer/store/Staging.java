@@ -4,7 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.joining;
 
 import com.vladdancea.viennapulse.importer.read.FeedFormatException;
-import com.vladdancea.viennapulse.importer.read.stopcall.StopCall;
+import com.vladdancea.viennapulse.importer.read.stoptime.StopTime;
 import de.siegmar.fastcsv.writer.CsvWriter;
 import de.siegmar.fastcsv.writer.LineDelimiter;
 import de.siegmar.fastcsv.writer.QuoteStrategies;
@@ -50,21 +50,17 @@ public final class Staging {
         loadedTables.add(table);
     }
 
-    /// Validates every call before classifying platforms, so even non-passenger calls cannot hide
-    /// broken references; the temporary calls share the import's connection and transaction.
-    public void stopModes(Rows<StopCall> rows) throws IOException {
+    /// Streams `stop_times.txt` into its table, then classifies every platform by the route types of
+    /// the calls where passengers can board or alight. The references are checked on every call,
+    /// even those without passengers.
+    public void stopTimes(Rows<StopTime> rows) throws IOException {
+        copy("stop_times", StopTime.class, rows);
         var jdbc = JdbcClient.create(dataSource);
-        jdbc.sql("""
-                CREATE TEMP TABLE pulse_stop_calls (
-                    trip_id text NOT NULL, stop_id text NOT NULL, eligible boolean NOT NULL
-                ) ON COMMIT DROP
-                """).update();
-        copy("pg_temp", "pulse_stop_calls", StopCall.class, rows);
-        jdbc.sql("ANALYZE pg_temp.pulse_stop_calls").update();
+        jdbc.sql("ANALYZE staging.stop_times").update();
         var invalid = jdbc.sql("""
                 SELECT 'stop_times.txt references unknown trip, stop or route: '
                        || c.trip_id || ', ' || c.stop_id
-                FROM pg_temp.pulse_stop_calls c
+                FROM staging.stop_times c
                 LEFT JOIN staging.trips t ON t.id = c.trip_id
                 LEFT JOIN staging.stops s ON s.id = c.stop_id
                 LEFT JOIN staging.routes r ON r.id = t.route_id
@@ -80,10 +76,10 @@ public final class Staging {
                 FROM staging.stops s
                 LEFT JOIN (
                     SELECT c.stop_id, array_agg(DISTINCT r.type ORDER BY r.type) AS types
-                    FROM pg_temp.pulse_stop_calls c
+                    FROM staging.stop_times c
                     JOIN staging.trips t ON t.id = c.trip_id
                     JOIN staging.routes r ON r.id = t.route_id
-                    WHERE c.eligible
+                    WHERE c.pickup_type <> 'NONE' OR c.drop_off_type <> 'NONE'
                     GROUP BY c.stop_id
                 ) m ON m.stop_id = s.id
                 """).update();

@@ -13,7 +13,7 @@ import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
 import com.vladdancea.viennapulse.importer.read.shape.ShapeReader;
 import com.vladdancea.viennapulse.importer.read.stop.Stop;
 import com.vladdancea.viennapulse.importer.read.stop.StopReader;
-import com.vladdancea.viennapulse.importer.read.stopcall.StopCallReader;
+import com.vladdancea.viennapulse.importer.read.stoptime.StopTimeReader;
 import com.vladdancea.viennapulse.importer.read.trip.Trip;
 import com.vladdancea.viennapulse.importer.read.trip.TripReader;
 import com.vladdancea.viennapulse.importer.store.Store;
@@ -44,7 +44,7 @@ public class ImportJob {
     private final StopReader stopReader;
     private final ShapeReader shapeReader;
     private final TripReader tripReader;
-    private final StopCallReader stopCallReader;
+    private final StopTimeReader stopTimeReader;
     private final ServiceCalendarReader serviceCalendarReader;
     private final CalendarDateReader calendarDateReader;
     private final Store store;
@@ -57,7 +57,7 @@ public class ImportJob {
     void importWhenEmpty() {
         downloader.deleteLeftovers();
         if (properties.importWhenEmpty() && store.needsImport()) {
-            log.info("The timetable is empty or unclassified, importing the feed now");
+            log.info("The timetable is empty or incomplete, importing the feed now");
             // Nothing waits for the result: the scheduler logs whatever the import fails to handle.
             var _ = scheduler.schedule(this::run, Instant.now());
         }
@@ -85,7 +85,7 @@ public class ImportJob {
                 staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
                 staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
                 staging.copy("trips", Trip.class, trips -> tripReader.read(zip, trips));
-                staging.stopModes(calls -> stopCallReader.read(zip, calls));
+                staging.stopTimes(stopTimes -> stopTimeReader.read(zip, stopTimes));
                 staging.copy(
                         "service_calendars",
                         ServiceCalendar.class,

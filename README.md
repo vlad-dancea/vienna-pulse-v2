@@ -49,10 +49,11 @@ visible for every mode that serves them. Stop modes cover the full imported time
 routes run on today's service date. These are timetable routes, without live vehicle positions. Stop loading and upgrade status appear in the map panel only while needed, with a retry button
 when the stops request fails.
 
-Stop modes come from `stop_times.txt`, trips and routes. The importer classifies every platform
-before swapping the timetable into place. An existing database starts a new import after the
-stop-mode schema upgrade. While the backend is upgrading or importing for the first time, the
-frontend keeps available stops visible and rechecks once a minute until classifications arrive.
+Stop modes come from `stop_times.txt`, trips and routes. The importer stores every stop time and
+classifies every platform before swapping the timetable into place. An existing database starts a
+new import after a schema upgrade adds stop modes or stop times. While the backend is upgrading or
+importing for the first time, the frontend keeps available stops visible and rechecks once a minute
+until classifications arrive.
 
 In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
 MapLibre's own mouse, touch and keyboard controls. The view is in
