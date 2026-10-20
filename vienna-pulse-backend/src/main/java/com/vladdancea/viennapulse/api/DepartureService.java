@@ -52,8 +52,15 @@ public class DepartureService {
                                        - interval '12 hours' AS origin
                             FROM generate_series(-1, 2) AS shift
                         ),
+                        -- Each service day with the seconds of its times that fall between now and the end of
+                        -- tomorrow's service day.
                         service_days AS (
-                            SELECT day, origin FROM days WHERE shift <= 1
+                            SELECT day,
+                                   origin,
+                                   extract(epoch FROM CAST(:now AS timestamptz) - origin) AS first_second,
+                                   extract(epoch FROM (SELECT origin FROM days WHERE shift = 2) - origin) AS end_second
+                            FROM days
+                            WHERE shift <= 1
                         ),
                         running AS (
                             (SELECT d.day, c.service_id
@@ -78,23 +85,44 @@ public class DepartureService {
                             FROM timetable.calendar_dates
                             WHERE exception_type = 'ADDED' AND date IN (SELECT day FROM service_days)
                         ),
+                        -- The stop's calls come from the stop_id index first. Left to itself, the planner, which
+                        -- expects about one running service where there are hundreds, reads every call of every
+                        -- running trip instead, about 700,000 rows.
+                        calls AS MATERIALIZED (
+                            SELECT trip_id, sequence, stop_id, departure_time
+                            FROM timetable.stop_times
+                            WHERE stop_id IN (SELECT id FROM platforms) AND pickup_type <> 'NONE'
+                        ),
+                        -- Each day's calls are sorted by time before anything else, so the trips are looked up
+                        -- one call at a time until 20 of them run that day and go on, instead of for all of the
+                        -- tens of thousands of calls a busy stop has.
                         departures AS (
-                            SELECT d.origin + st.departure_time * interval '1 second' AS time,
-                                   st.trip_id,
-                                   st.sequence,
-                                   st.stop_id,
-                                   t.route_id,
-                                   t.headsign
-                            FROM timetable.stop_times st
-                            JOIN timetable.trips t ON t.id = st.trip_id
-                            JOIN running r ON r.service_id = t.service_id
-                            JOIN service_days d ON d.day = r.day
-                            WHERE st.stop_id IN (SELECT id FROM platforms)
-                              AND st.pickup_type <> 'NONE'
-                              -- The last call of a trip only arrives, though the feed lets passengers board.
-                              AND EXISTS (SELECT
-                                          FROM timetable.stop_times later
-                                          WHERE later.trip_id = st.trip_id AND later.sequence > st.sequence)
+                            SELECT next.*
+                            FROM service_days d
+                            CROSS JOIN LATERAL (
+                                SELECT d.origin + c.departure_time * interval '1 second' AS time,
+                                       c.trip_id,
+                                       c.sequence,
+                                       c.stop_id,
+                                       t.route_id,
+                                       t.headsign
+                                -- OFFSET 0 keeps the sort in here, ahead of the joins.
+                                FROM (SELECT *
+                                      FROM calls
+                                      WHERE departure_time >= d.first_second AND departure_time < d.end_second
+                                      ORDER BY departure_time, trip_id, sequence
+                                      OFFSET 0) AS c
+                                JOIN timetable.trips t ON t.id = c.trip_id
+                                WHERE t.service_id IN (SELECT service_id FROM running r WHERE r.day = d.day)
+                                  -- The last call of a trip only arrives, though the feed lets passengers board.
+                                  AND EXISTS (SELECT
+                                              FROM timetable.stop_times later
+                                              WHERE later.trip_id = c.trip_id AND later.sequence > c.sequence)
+                                ORDER BY c.departure_time, c.trip_id, c.sequence
+                                LIMIT :limit
+                            ) AS next
+                            ORDER BY next.time, next.trip_id, next.sequence
+                            LIMIT :limit
                         )
                         SELECT stop.name AS stop_name,
                                next.time,
@@ -109,15 +137,9 @@ public class DepartureService {
                         -- The name comes in every row, and alone in one when nothing leaves; it is null
                         -- only when no platform belongs to the stop.
                         FROM (SELECT mode() WITHIN GROUP (ORDER BY name) AS name FROM platforms) AS stop
-                        LEFT JOIN (
-                            SELECT *
-                            FROM departures
-                            WHERE time >= :now AND time < (SELECT origin FROM days WHERE shift = 2)
-                            ORDER BY time, route_id, trip_id, sequence
-                            LIMIT :limit
-                        ) AS next ON true
+                        LEFT JOIN departures AS next ON true
                         LEFT JOIN timetable.routes r ON r.id = next.route_id
-                        ORDER BY next.time, next.route_id, next.trip_id, next.sequence
+                        ORDER BY next.time, next.trip_id, next.sequence
                         """)
                 .param("stop", stopId)
                 .param("today", LocalDate.ofInstant(now, VIENNA))
