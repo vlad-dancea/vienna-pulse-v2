@@ -63,6 +63,12 @@ export class MapView {
         style: 'https://tiles.openfreemap.org/styles/positron',
         center: [16.3738, 48.2082],
         zoom: 12,
+        // Include the surrounding network through Baden. MapLibre also limits zoom-out
+        // to keep the viewport inside these bounds as the screen size changes.
+        maxBounds: [
+          [16.1, 47.95],
+          [16.65, 48.4],
+        ],
       });
 
       // Keep routes below stops so platforms stay visible at interchanges.
