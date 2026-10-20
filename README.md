@@ -46,8 +46,8 @@ updates within a minute of midnight and when a suspended tab resumes. Lines use
 the feed's colors, with fallback colors when none are supplied, and show their names at closer
 zoom levels. The All, U-Bahn, Tram and Bus controls filter routes and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while
-routes run on today's service date. These are timetable routes, without live vehicle positions. Loading, empty and unavailable
-responses appear in the map panel, with a retry button when the request fails.
+routes run on today's service date. These are timetable routes, without live vehicle positions. Stop loading and upgrade status appear in the map panel only while needed, with a retry button
+when the stops request fails.
 
 Stop modes come from `stop_times.txt`, trips and routes. The importer classifies every platform
 before swapping the timetable into place. An existing database starts a new import after the

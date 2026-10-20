@@ -22,18 +22,12 @@ export class MapView {
   protected readonly selectedMode = signal('all');
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
-  private readonly status = viewChild.required<ElementRef<HTMLElement>>('status');
-  private readonly stopStatus = viewChild.required<ElementRef<HTMLElement>>('stopStatus');
+  private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
 
-  protected retryRoutes() {
-    // The retry button disappears after success, so keep keyboard focus on the status instead.
-    this.status().nativeElement.focus();
-    this.lines.routes.reload();
-  }
-
   protected retryStops() {
-    this.stopStatus().nativeElement.focus();
+    // The error and retry button disappear after success, so focus the panel's persistent heading.
+    this.heading().nativeElement.focus();
     this.stops.stops.reload();
   }
 
@@ -83,6 +77,12 @@ export class MapView {
         style: 'https://tiles.openfreemap.org/styles/positron',
         center: [16.3738, 48.2082],
         zoom: 12,
+        // Include the surrounding network through Baden. MapLibre also limits zoom-out
+        // to keep the viewport inside these bounds as the screen size changes.
+        maxBounds: [
+          [16.1, 47.95],
+          [16.65, 48.4],
+        ],
       });
 
       // Keep routes below stops so platforms stay visible at interchanges.
