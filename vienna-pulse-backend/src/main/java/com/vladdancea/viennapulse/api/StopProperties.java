@@ -1,4 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
-/// What the map shows about a stop besides its position.
-public record StopProperties(String name) {}
+import java.util.List;
+import org.jspecify.annotations.Nullable;
+
+/// A stop's name and timetable-wide modes, with null modes while classification is pending.
+public record StopProperties(String name, @Nullable List<String> modes) {}

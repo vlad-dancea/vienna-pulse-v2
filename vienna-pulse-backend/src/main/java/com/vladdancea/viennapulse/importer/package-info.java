@@ -7,11 +7,11 @@
 /// 1. [com.vladdancea.viennapulse.importer.download] downloads the feed and checks that every
 ///    file we need is there.
 /// 2. [com.vladdancea.viennapulse.importer.read] parses each file into records, with one
-///    subpackage per GTFS file. Currently reads `routes.txt` and `stops.txt`.
+///    subpackage per GTFS file, including stop calls used to classify each stop's transport modes.
 /// 3. [com.vladdancea.viennapulse.importer.store] replaces the timetable in PostgreSQL with the
 ///    records, all at once.
 ///
-/// The steps do not know each other: only [ImportJob] connects them.
+/// [ImportJob] connects downloading, parsing and storage.
 @NullMarked
 package com.vladdancea.viennapulse.importer;
 

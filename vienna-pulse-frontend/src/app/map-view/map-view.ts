@@ -2,6 +2,7 @@ import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, sig
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl';
 import { RunningLines } from './running-lines';
+import { NetworkStops } from './network-stops';
 
 /** Displays Vienna's stops and today's scheduled routes with transport-mode controls. */
 @Component({
@@ -11,6 +12,7 @@ import { RunningLines } from './running-lines';
 })
 export class MapView {
   protected readonly lines = inject(RunningLines);
+  protected readonly stops = inject(NetworkStops);
   protected readonly modes = [
     { type: 'all', label: 'All' },
     { type: 'subway', label: 'U-Bahn' },
@@ -21,6 +23,7 @@ export class MapView {
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly status = viewChild.required<ElementRef<HTMLElement>>('status');
+  private readonly stopStatus = viewChild.required<ElementRef<HTMLElement>>('stopStatus');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
 
   protected retryRoutes() {
@@ -29,8 +32,23 @@ export class MapView {
     this.lines.routes.reload();
   }
 
+  protected retryStops() {
+    this.stopStatus().nativeElement.focus();
+    this.stops.stops.reload();
+  }
+
   constructor() {
     const destroyRef = inject(DestroyRef);
+
+    effect(() => {
+      const map = this.map();
+      const stops = this.stops.stops;
+      if (map) {
+        void map
+          .getSource<GeoJSONSource>('stops')
+          ?.setData(stops.hasValue() ? stops.value() : { type: 'FeatureCollection', features: [] });
+      }
+    });
 
     effect(() => {
       const map = this.map();
@@ -45,10 +63,12 @@ export class MapView {
     effect(() => {
       const map = this.map();
       const mode = this.selectedMode();
+      const classified = this.stops.classified();
       const filter: FilterSpecification | null = mode === 'all' ? null : ['==', ['get', 'type'], mode];
       for (const layer of ['lines-casing', 'lines', 'line-names']) {
         map?.setFilter(layer, filter);
       }
+      map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, ['get', 'modes']]);
     });
 
     // MapLibre sizes the map from its container, which has a size only once it is rendered.
@@ -95,7 +115,7 @@ export class MapView {
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 5],
           },
         });
-        map.addSource('stops', { type: 'geojson', data: '/api/stops' });
+        map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
           id: 'stops',
           type: 'circle',

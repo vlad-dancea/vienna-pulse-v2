@@ -3,7 +3,12 @@ package com.vladdancea.viennapulse.api;
 import com.vladdancea.viennapulse.api.geojson.Feature;
 import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import com.vladdancea.viennapulse.api.geojson.Point;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
@@ -22,19 +27,35 @@ public class StopService {
     /// use; on a tie, the first in alphabetical order, so that the response stays the same.
     public FeatureCollection<StopProperties> stops() {
         var features = jdbc.sql("""
-                        SELECT array_to_string((string_to_array(id, ':'))[1:3], ':') AS id,
+                        WITH grouped AS (
+                            SELECT array_to_string((string_to_array(id, ':'))[1:3], ':') AS id,
                                mode() WITHIN GROUP (ORDER BY name) AS name,
                                avg(latitude) AS latitude,
                                avg(longitude) AS longitude
-                        FROM timetable.stops
-                        GROUP BY 1
-                        ORDER BY 1
+                            FROM timetable.stops
+                            GROUP BY 1
+                        ), modes AS (
+                            SELECT array_to_string((string_to_array(stop_id, ':'))[1:3], ':') AS id,
+                                   array_agg(DISTINCT lower(type) ORDER BY lower(type)) AS modes
+                            FROM timetable.stop_modes CROSS JOIN LATERAL unnest(types) AS type
+                            GROUP BY 1
+                        )
+                        SELECT g.*, CASE WHEN EXISTS (SELECT FROM timetable.stop_modes)
+                                         THEN coalesce(m.modes, ARRAY[]::text[]) END AS modes
+                        FROM grouped g LEFT JOIN modes m USING (id)
+                        ORDER BY g.id
                         """)
                 .query((row, number) -> new Feature<>(
                         row.getString("id"),
                         new Point(row.getDouble("longitude"), row.getDouble("latitude")),
-                        new StopProperties(row.getString("name"))))
+                        new StopProperties(row.getString("name"), modes(row))))
                 .list();
         return new FeatureCollection<>(features);
+    }
+
+    // Null distinguishes an upgrade awaiting its first classification from a known unused stop.
+    private static @Nullable List<String> modes(ResultSet row) throws SQLException {
+        var modes = row.getArray("modes");
+        return modes == null ? null : Arrays.asList((String[]) modes.getArray());
     }
 }

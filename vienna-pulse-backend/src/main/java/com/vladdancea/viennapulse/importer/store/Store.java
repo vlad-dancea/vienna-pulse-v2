@@ -46,9 +46,10 @@ public class Store {
         dropPrevious();
     }
 
-    /// Whether the timetable has no stops, as before the first import into a new database.
-    public boolean isEmpty() {
-        return jdbc.sql("SELECT NOT EXISTS (SELECT FROM timetable.stops)")
+    /// Whether the timetable is empty or still needs its first stop-mode classification after an upgrade.
+    public boolean needsImport() {
+        return jdbc.sql(
+                        "SELECT NOT EXISTS (SELECT FROM timetable.stops) OR NOT EXISTS (SELECT FROM timetable.stop_modes)")
                 .query(Boolean.class)
                 .single();
     }
