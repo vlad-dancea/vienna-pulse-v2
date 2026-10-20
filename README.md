@@ -55,6 +55,11 @@ new import after a schema upgrade adds stop modes or stop times. While the backe
 importing for the first time, the frontend keeps available stops visible and rechecks once a minute
 until classifications arrive.
 
+The backend also serves a stop's next 20 departures from the stored stop times at
+`/api/stops/{id}/departures`, with the merged stop id the map uses, such as `at:49:1320`. Each
+departure gives its time in Vienna, its line, its headsign and its platform. The map does not show
+them yet.
+
 In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
 MapLibre's own mouse, touch and keyboard controls. The view is in
 [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
