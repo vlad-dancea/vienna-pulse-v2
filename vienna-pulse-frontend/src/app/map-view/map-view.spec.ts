@@ -254,4 +254,31 @@ describe('MapView', () => {
     expect(element.textContent).not.toContain('Stops could not be loaded');
     fixture.destroy();
   });
+  it.each([true, false])(
+    'preserves keyboard focus during automatic recovery (retry focused: %s)',
+    async (focusRetry) => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      const fixture = TestBed.createComponent(MapView);
+      try {
+        TestBed.tick();
+        loadMap();
+        http.expectOne((request) => request.url === '/api/lines').flush(routes);
+        http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+        await fixture.whenStable();
+        const element = fixture.nativeElement as HTMLElement;
+        const buttons = Array.from(element.querySelectorAll('button'));
+        buttons.find((button) => button.textContent.trim() === (focusRetry ? 'Retry stops' : 'U-Bahn'))?.focus();
+        vi.advanceTimersByTime(60_000);
+        TestBed.tick();
+        http.expectOne('/api/stops').flush(stops);
+        await fixture.whenStable();
+        expect(document.activeElement?.textContent.trim()).toBe(focusRetry ? 'Filters' : 'U-Bahn');
+        expect(element.textContent).not.toContain('Stops could not be loaded');
+      } finally {
+        fixture.destroy();
+        TestBed.resetTestingModule();
+        vi.useRealTimers();
+      }
+    },
+  );
 });

@@ -36,6 +36,7 @@
   }
   @if (stops.stops.error()) {
     <button
+      #stopRetry
       type="button"
       class="mt-2 min-h-11 rounded-lg px-3 text-sm font-medium underline underline-offset-4 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
       (click)="retryStops()"

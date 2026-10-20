@@ -1,4 +1,14 @@
-import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  DestroyRef,
+  DOCUMENT,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { RunningLines } from './running-lines';
@@ -30,6 +40,7 @@ export class MapView {
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
+  private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
 
   protected retryStops() {
@@ -40,6 +51,16 @@ export class MapView {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const document = inject(DOCUMENT);
+
+    effect(() => {
+      const error = this.stops.stops.error();
+      const retry = this.stopRetry()?.nativeElement;
+      // Polling also removes the retry button, so preserve focus before Angular updates the view.
+      if (!error && retry && document.activeElement === retry) {
+        this.heading().nativeElement.focus();
+      }
+    });
 
     effect(() => {
       const map = this.map();
