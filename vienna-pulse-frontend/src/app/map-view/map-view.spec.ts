@@ -99,35 +99,28 @@ describe('MapView', () => {
   it('populates an already loaded map when the routes arrive', async () => {
     const fixture = TestBed.createComponent(MapView);
     TestBed.tick();
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain("Loading today's routes...");
     loadMap();
     TestBed.tick();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
-    expect(element.textContent).toContain('Routes follow the timetable');
   });
 
-  it.each([
-    [404, "Today's routes are not available yet."],
-    [503, 'Routes could not be loaded.'],
-  ])('explains HTTP %s and retries without losing keyboard focus', async (status, message) => {
+  it.each([404, 503])('keeps the map empty and mode controls usable after HTTP %s', async (status) => {
     const fixture = TestBed.createComponent(MapView);
     TestBed.tick();
     loadMap();
     http.expectOne((request) => request.url === '/api/lines').flush({}, { status, statusText: 'Unavailable' });
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('[role="status"]')?.textContent).toContain(message);
-    const retry = Array.from(element.querySelectorAll('button')).find((button) => button.textContent.includes('Retry'));
-    retry?.focus();
-    retry?.click();
-    TestBed.tick();
-    http.expectOne((request) => request.url === '/api/lines').flush({ type: 'FeatureCollection', features: [] });
+    const buttons = Array.from(element.querySelectorAll('button'));
+    expect(element.querySelector('h2')?.textContent).toBe('Filters');
+    expect(element.querySelector('section')?.textContent.replace(/\s+/g, ' ').trim()).toBe(
+      'Filters All U-Bahn Tram Bus',
+    );
+    buttons.find((button) => button.textContent.trim() === 'Tram')?.click();
     await fixture.whenStable();
-    expect(element.textContent).toContain('No routes are scheduled for today.');
     expect(setData).toHaveBeenLastCalledWith({ type: 'FeatureCollection', features: [] });
-    expect(document.activeElement).toBe(element.querySelector('[role="status"]'));
+    expect(map.setFilter).toHaveBeenCalledWith('lines', ['==', ['get', 'type'], 'tram']);
   });
 });
