@@ -1,6 +1,7 @@
 import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl';
+import { addDistricts } from './districts';
 import { RunningLines } from './running-lines';
 
 /** Displays Vienna's stops and today's scheduled routes with transport-mode controls. */
@@ -125,6 +126,7 @@ export class MapView {
             'text-halo-width': 2,
           },
         });
+        addDistricts(map);
         this.map.set(map);
       });
 

@@ -52,6 +52,32 @@ In development, the Angular dev server forwards `/api` to the backend on port 80
 MapLibre's own mouse, touch and keyboard controls. The view is in
 [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
+Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
+neighborhood labels inside and outside the city. Street, town and village names stay
+visible above the boundaries. District names appear from zoom 12 and fade out between
+zoom 14 and 15. Wider views show district numbers. The bundled geometry comes from
+[Stadt Wien's district boundaries](https://www.data.gv.at/katalog/dataset/2ee6b8bf-6292-413c-bb8b-bd22dbb2ad4b/resource/f5ad0704-ceca-4c46-87f2-f2e131eee44b)
+under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Datenquelle: Stadt Wien - https://data.wien.gv.at.
+
+The snapshot was downloaded on 2026-10-20, with source update date 2026-09-01. It is
+simplified to a 5-meter interval and coordinates rounded to five decimal places. Label
+anchors are interior points of the simplified polygons. To refresh both assets from the
+repository root:
+
+```sh
+district_tmp=$(mktemp -d)
+curl --fail --location 'https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&typeName=ogdwien:BEZIRKSGRENZEOGD&srsName=EPSG:4326&outputFormat=json' -o "$district_tmp/districts.json"
+mise exec -- pnpm dlx mapshaper@0.7.36 \
+  -i "$district_tmp/districts.json" \
+  -filter-fields BEZNR,NAMEK -rename-fields number=BEZNR,name=NAMEK \
+  -simplify interval=5 keep-shapes \
+  -o vienna-pulse-frontend/public/data/vienna-districts.geojson format=geojson precision=0.00001 \
+  -points inner \
+  -o vienna-pulse-frontend/public/data/vienna-district-labels.geojson format=geojson precision=0.00001
+rm -r "$district_tmp"
+```
+
 ## Deployment
 
 The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
