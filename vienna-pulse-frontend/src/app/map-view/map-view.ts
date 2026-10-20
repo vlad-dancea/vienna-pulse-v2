@@ -1,8 +1,15 @@
 import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
-import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl';
+import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { RunningLines } from './running-lines';
 import { NetworkStops } from './network-stops';
+
+const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
+  // Keep any other API route types visible with buses, below the tram and U-Bahn layers.
+  { mode: 'bus', filter: ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]] },
+  { mode: 'tram', filter: ['==', ['get', 'type'], 'tram'] },
+  { mode: 'subway', filter: ['==', ['get', 'type'], 'subway'] },
+];
 
 /** Displays Vienna's stops and today's scheduled routes with transport-mode controls. */
 @Component({
@@ -58,10 +65,13 @@ export class MapView {
       const map = this.map();
       const mode = this.selectedMode();
       const classified = this.stops.classified();
-      const filter: FilterSpecification | null = mode === 'all' ? null : ['==', ['get', 'type'], mode];
-      for (const layer of ['lines-casing', 'lines', 'line-names']) {
-        map?.setFilter(layer, filter);
+      const filter: ExpressionSpecification | null = mode === 'all' ? null : ['==', ['get', 'type'], mode];
+      for (const layer of routeLayers) {
+        const layerFilter: FilterSpecification = filter ? ['all', layer.filter, filter] : layer.filter;
+        map?.setFilter(`lines-${layer.mode}-casing`, layerFilter);
+        map?.setFilter(`lines-${layer.mode}`, layerFilter);
       }
+      map?.setFilter('line-names', filter);
       map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, ['get', 'modes']]);
     });
 
@@ -91,30 +101,39 @@ export class MapView {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: 'lines-casing',
-          type: 'line',
-          source: 'lines',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 9],
-          },
-        });
-        map.addLayer({
-          id: 'lines',
-          type: 'line',
-          source: 'lines',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: {
-            'line-color': [
-              'coalesce',
-              ['get', 'color'],
-              ['match', ['get', 'type'], 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
-            ],
-            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 5],
-          },
-        });
+        const lineLayout: LineLayerSpecification['layout'] = {
+          'line-cap': 'round',
+          'line-join': 'round',
+        };
+        // Each mode's casing must also cover lower-priority strokes at crossings.
+        for (const layer of routeLayers) {
+          map.addLayer({
+            id: `lines-${layer.mode}-casing`,
+            type: 'line',
+            source: 'lines',
+            filter: layer.filter,
+            layout: lineLayout,
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 9],
+            },
+          });
+          map.addLayer({
+            id: `lines-${layer.mode}`,
+            type: 'line',
+            source: 'lines',
+            filter: layer.filter,
+            layout: lineLayout,
+            paint: {
+              'line-color': [
+                'coalesce',
+                ['get', 'color'],
+                ['match', ['get', 'type'], 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
+              ],
+              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 5],
+            },
+          });
+        }
         map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
           id: 'stops',

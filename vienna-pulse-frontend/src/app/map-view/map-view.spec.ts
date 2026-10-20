@@ -1,15 +1,15 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import type { FilterSpecification, LayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
-import type { FilterSpecification } from 'maplibre-gl';
 import { NetworkStops } from './network-stops';
 
 const map = vi.hoisted(() => ({
   once: vi.fn(),
   addSource: vi.fn(),
-  addLayer: vi.fn(),
+  addLayer: vi.fn<(layer: LayerSpecification) => void>(),
   getSource: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
@@ -78,6 +78,16 @@ const stops = {
   ],
 };
 
+const busFilter: FilterSpecification = ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]];
+const expectedLayers: [string, FilterSpecification][] = [
+  ['lines-bus-casing', busFilter],
+  ['lines-bus', busFilter],
+  ['lines-tram-casing', ['==', ['get', 'type'], 'tram']],
+  ['lines-tram', ['==', ['get', 'type'], 'tram']],
+  ['lines-subway-casing', ['==', ['get', 'type'], 'subway']],
+  ['lines-subway', ['==', ['get', 'type'], 'subway']],
+];
+
 describe('MapView', () => {
   let http: HttpTestingController;
   let loadMap: () => void;
@@ -121,9 +131,10 @@ describe('MapView', () => {
     loadMap();
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
-    for (const layer of ['lines-casing', 'lines', 'line-names']) {
-      expect(map.setFilter).toHaveBeenCalledWith(layer, ['==', ['get', 'type'], type]);
+    for (const [layer, filter] of expectedLayers) {
+      expect(map.setFilter).toHaveBeenCalledWith(layer, ['all', filter, ['==', ['get', 'type'], type]]);
     }
+    expect(map.setFilter).toHaveBeenCalledWith('line-names', ['==', ['get', 'type'], type]);
     expect(selected?.getAttribute('aria-pressed')).toBe('true');
     expect(setStops).toHaveBeenLastCalledWith(stops);
     expect(TestBed.inject(NetworkStops).classified()).toBe(true);
@@ -138,13 +149,15 @@ describe('MapView', () => {
         .map((stop) => stop.id),
     ).toEqual([type, 'interchange']);
 
+    map.setFilter.mockClear();
     buttons.find((button) => button.textContent.trim() === 'All')?.click();
     await fixture.whenStable();
     expect(selected?.getAttribute('aria-pressed')).toBe('false');
-    for (const layer of ['lines-casing', 'lines', 'line-names']) {
-      expect(map.setFilter).toHaveBeenCalledWith(layer, null);
+    for (const [layer, filter] of expectedLayers) {
+      expect(map.setFilter).toHaveBeenCalledWith(layer, filter);
     }
     expect(map.setFilter).toHaveBeenLastCalledWith('stops', null);
+    expect(map.setFilter).toHaveBeenCalledWith('line-names', null);
     http.expectNone((request) => request.url === '/api/lines');
     http.expectNone('/api/stops');
     fixture.destroy();
@@ -160,6 +173,13 @@ describe('MapView', () => {
     http.expectOne('/api/stops').flush(stops);
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
+    const lineLayers = map.addLayer.mock.calls.map(([layer]) => layer).filter((layer) => layer.type === 'line');
+    expect(lineLayers.map((layer) => [layer.id, layer.filter])).toEqual(expectedLayers);
+    expect(map.addLayer.mock.calls.map(([layer]) => layer.id)).toEqual([
+      ...expectedLayers.map(([id]) => id),
+      'stops',
+      'line-names',
+    ]);
   });
 
   it.each([404, 503])('keeps the map empty and mode controls usable after HTTP %s', async (status) => {
@@ -178,7 +198,11 @@ describe('MapView', () => {
     buttons.find((button) => button.textContent.trim() === 'Tram')?.click();
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith({ type: 'FeatureCollection', features: [] });
-    expect(map.setFilter).toHaveBeenCalledWith('lines', ['==', ['get', 'type'], 'tram']);
+    expect(map.setFilter).toHaveBeenCalledWith('lines-tram', [
+      'all',
+      ['==', ['get', 'type'], 'tram'],
+      ['==', ['get', 'type'], 'tram'],
+    ]);
   });
   it.each([undefined, null])(
     'keeps stops visible against unclassified API modes %s, then applies the selected mode',
