@@ -11,8 +11,9 @@ It needs T3 Code's `delegate_task` tool. Without it, say so and stop.
 
 ## Each round
 
-1. Collect the change: `git diff origin/main...HEAD` for commits, `git diff HEAD` for staged and
-   unstaged work, and `git status --short -uall` for new files, which no diff shows.
+1. Run `git fetch origin`. Collect the change: `git diff origin/main...HEAD` for commits,
+   `git diff HEAD` for staged and unstaged work, and `git status --short -uall` for new files,
+   which no diff shows.
 2. Call `orchestrator_capabilities`, then `delegate_task` with provider instance `codex`, model
    `gpt-6.1-sol`, option `reasoningEffort: high`, role `review`, interaction mode `plan` (so it
    cannot edit) and mode `async`. End your turn and let its completion wake you.
