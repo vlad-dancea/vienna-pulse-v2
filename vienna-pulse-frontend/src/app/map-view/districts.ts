@@ -20,7 +20,7 @@ export function addDistricts(map: MapLibreMap): void {
       'Datenquelle: <a href="https://data.wien.gv.at">Stadt Wien - data.wien.gv.at</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, simplified)',
   });
   // Boundaries are context, so they stay beneath the base map's street and water names.
-  const firstLabel = layers.find((layer) => layer.type === 'symbol')?.id ?? 'lines-casing';
+  const firstLabel = layers.find((layer) => layer.type === 'symbol')?.id ?? 'lines-bus-casing';
   map.addLayer(
     {
       id: 'district-boundaries',

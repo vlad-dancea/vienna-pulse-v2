@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { FilterSpecification, LayerSpecification } from 'maplibre-gl';
+import type { FilterSpecification, LayerSpecification, LineLayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 
 const map = vi.hoisted(() => ({
@@ -40,6 +40,16 @@ const routes = {
     },
   ],
 };
+
+const busFilter: FilterSpecification = ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]];
+const expectedLayers: [string, FilterSpecification][] = [
+  ['lines-bus-casing', busFilter],
+  ['lines-bus', busFilter],
+  ['lines-tram-casing', ['==', ['get', 'type'], 'tram']],
+  ['lines-tram', ['==', ['get', 'type'], 'tram']],
+  ['lines-subway-casing', ['==', ['get', 'type'], 'subway']],
+  ['lines-subway', ['==', ['get', 'type'], 'subway']],
+];
 
 describe('MapView', () => {
   let http: HttpTestingController;
@@ -81,18 +91,21 @@ describe('MapView', () => {
     loadMap();
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
-    for (const layer of ['lines-casing', 'lines', 'line-names']) {
-      expect(map.setFilter).toHaveBeenCalledWith(layer, ['==', ['get', 'type'], type]);
+    for (const [layer, filter] of expectedLayers) {
+      expect(map.setFilter).toHaveBeenCalledWith(layer, ['all', filter, ['==', ['get', 'type'], type]]);
     }
+    expect(map.setFilter).toHaveBeenCalledWith('line-names', ['==', ['get', 'type'], type]);
     expect(selected?.getAttribute('aria-pressed')).toBe('true');
     expect(map.setFilter).not.toHaveBeenCalledWith('stops', expect.anything());
 
+    map.setFilter.mockClear();
     buttons.find((button) => button.textContent.trim() === 'All')?.click();
     await fixture.whenStable();
     expect(selected?.getAttribute('aria-pressed')).toBe('false');
-    for (const layer of ['lines-casing', 'lines', 'line-names']) {
-      expect(map.setFilter).toHaveBeenCalledWith(layer, null);
+    for (const [layer, filter] of expectedLayers) {
+      expect(map.setFilter).toHaveBeenCalledWith(layer, filter);
     }
+    expect(map.setFilter).toHaveBeenLastCalledWith('line-names', null);
     http.expectNone((request) => request.url === '/api/lines');
     fixture.destroy();
     expect(map.remove).toHaveBeenCalledOnce();
@@ -106,6 +119,17 @@ describe('MapView', () => {
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith(routes);
+    const lineLayers = map.addLayer.mock.calls
+      .map(([layer]) => layer)
+      .filter((layer): layer is LineLayerSpecification => layer.type === 'line' && layer.source === 'lines');
+    expect(lineLayers.map((layer) => [layer.id, layer.filter])).toEqual(expectedLayers);
+    expect(map.addLayer.mock.calls.map(([layer]) => layer.id)).toEqual([
+      ...expectedLayers.map(([id]) => id),
+      'stops',
+      'line-names',
+      'district-boundaries',
+      'district-names',
+    ]);
   });
 
   it('replaces neighborhood labels while retaining the place filter and street names', async () => {
@@ -148,6 +172,10 @@ describe('MapView', () => {
     buttons.find((button) => button.textContent.trim() === 'Tram')?.click();
     await fixture.whenStable();
     expect(setData).toHaveBeenLastCalledWith({ type: 'FeatureCollection', features: [] });
-    expect(map.setFilter).toHaveBeenCalledWith('lines', ['==', ['get', 'type'], 'tram']);
+    expect(map.setFilter).toHaveBeenCalledWith('lines-tram', [
+      'all',
+      ['==', ['get', 'type'], 'tram'],
+      ['==', ['get', 'type'], 'tram'],
+    ]);
   });
 });
