@@ -9,7 +9,7 @@ import java.util.List;
 /// the usual spoken order.
 @JsonPropertyOrder({"type", "coordinates"})
 public record Point(
-        @JsonIgnore double longitude, @JsonIgnore double latitude) {
+        @JsonIgnore double longitude, @JsonIgnore double latitude) implements Geometry {
     @JsonProperty
     public String type() {
         return "Point";

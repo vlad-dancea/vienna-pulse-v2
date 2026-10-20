@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.api;
 
+import java.time.Clock;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,5 +20,11 @@ class ApiConfiguration {
         var registration = new FilterRegistrationBean<>(filter);
         registration.addUrlPatterns("/api/*");
         return registration;
+    }
+
+    /// The current time, as a bean so that tests can fix it.
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
     }
 }
