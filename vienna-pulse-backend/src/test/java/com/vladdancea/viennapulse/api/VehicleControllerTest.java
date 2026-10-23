@@ -39,6 +39,9 @@ class VehicleControllerTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    ResponseCache cache;
+
     // Never read: the field only names the bean that clock() replaces.
     @TestBean
     @Nullable
@@ -74,6 +77,7 @@ class VehicleControllerTest {
         addShapePoint(SHAPE, 1, 16.0, 48.0, 0.0);
         addShapePoint(SHAPE, 2, 16.1, 48.0, 1000.0);
         addShapePoint(SHAPE, 3, 16.1, 48.1, 2000.0);
+        cache.clear();
     }
 
     @Test
@@ -173,6 +177,48 @@ class VehicleControllerTest {
                 .expectBody()
                 .jsonPath("$.features[*].geometry.coordinates")
                 .isEqualTo(List.of(List.of(16.1, 48.0)));
+    }
+
+    @Test
+    void placesTheVehiclesOncePerStep() {
+        addWeeklyService("tuesdays", "tuesday", DAY);
+        // A meter a second along the first leg of the shape.
+        addTrip("first", "u1", "tuesdays", SHAPE, call(1, null, "00:00:00", 0), call(2, "00:33:20", null, 2000));
+        // Five past midnight on DAY in Vienna, 300 m east.
+        now = Clock.fixed(Instant.parse("2026-10-19T22:05:00Z"), ZoneOffset.UTC);
+        var etag = client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult()
+                .getResponseHeaders()
+                .getETag();
+
+        // Within the step, the trip added and the meters moved since are not read.
+        now = Clock.fixed(Instant.parse("2026-10-19T22:05:04Z"), ZoneOffset.UTC);
+        addTrip("second", "u1", "tuesdays", SHAPE, call(1, null, "00:00:00", 0), call(2, "00:33:20", null, 2000));
+        client.get()
+                .uri("/api/vehicles")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isNotModified();
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].geometry.coordinates")
+                .isEqualTo(List.of(List.of(16.03, 48.0)));
+
+        // The next step reads them again, where they are at its start.
+        now = Clock.fixed(Instant.parse("2026-10-19T22:05:06Z"), ZoneOffset.UTC);
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].geometry.coordinates")
+                .isEqualTo(List.of(List.of(16.0305, 48.0), List.of(16.0305, 48.0)));
     }
 
     @Test
