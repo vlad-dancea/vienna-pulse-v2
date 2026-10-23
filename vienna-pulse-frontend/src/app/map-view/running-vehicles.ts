@@ -26,7 +26,7 @@ export class RunningVehicles {
 
   constructor() {
     const document = inject(DOCUMENT);
-    // Nobody sees a hidden tab, and every request runs the Cloudflare Worker and a database query.
+    // Nobody sees a hidden tab, and every request runs a database query.
     // Returning refreshes at once instead of showing positions from before the tab was hidden.
     const refresh = () => {
       if (!document.hidden && !this.vehicles.isLoading()) {
