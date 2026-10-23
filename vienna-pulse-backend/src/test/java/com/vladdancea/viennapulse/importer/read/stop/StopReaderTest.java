@@ -35,8 +35,11 @@ class StopReaderTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
                     "s1","Karlsplatz","48.2","16.37","1"   | unsupported location type 1
+                    "s1","Karlsplatz","","16.37",""        | missing stop_lat
                     "s1","Karlsplatz","north","16.37",""   | stop_lat north is not a number
+                    "s1","Karlsplatz","48.2","east",""     | stop_lon east is not a number
                     "s1","Karlsplatz","91","16.37",""      | stop_lat 91.0 is not between -90 and 90
+                    "s1","Karlsplatz","48.2","-181",""     | stop_lon -181.0 is not between -180 and 180
                     "s1","","48.2","16.37",""              | missing stop_name
                     """)
     void rejectsRowsThatBreakTheGtfsRules(String row, String problem) throws Exception {
