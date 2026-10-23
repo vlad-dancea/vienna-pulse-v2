@@ -74,4 +74,9 @@ tasks.test {
     if (providers.gradleProperty("updateApiDescription").isPresent) {
         systemProperty("updateApiDescription", "true")
     }
+    // Every checkout's tests and the app in development share /tmp, where the importer downloads
+    // the feed and deletes the leftovers of others. A directory of their own keeps them apart.
+    val tmpdir = layout.buildDirectory.dir("tmp/test-java-tmpdir").get().asFile
+    systemProperty("java.io.tmpdir", tmpdir.absolutePath)
+    doFirst { tmpdir.mkdirs() }
 }
