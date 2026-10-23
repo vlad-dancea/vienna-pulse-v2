@@ -25,6 +25,6 @@ export function assertSiteHeaders(path, headers) {
 export function assertRevalidated(path, headers) {
   // Without Cache-Control a browser may reuse the response for a while on its own estimate.
   const cacheControl = headers.get('Cache-Control') ?? '';
-  assert.match(cacheControl, /\b(no-cache|max-age=0)\b/, `${path} caching`);
-  assert.doesNotMatch(cacheControl, /immutable/, `${path} caching`);
+  assert.match(cacheControl, /\b(no-cache|max-age=0)\b/i, `${path} caching`);
+  assert.doesNotMatch(cacheControl, /immutable/i, `${path} caching`);
 }
