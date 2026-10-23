@@ -12,6 +12,7 @@ out-tsc/
 # Test output
 coverage/
 __screenshots__/
+test-results/
 
 # Tool logs
 *.log
