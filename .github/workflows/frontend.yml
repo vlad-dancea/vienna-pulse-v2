@@ -126,6 +126,9 @@ jobs:
 
       - run: mise run //vienna-pulse-frontend:smoke
 
+      # The same API checks as after a backend deploy, through the Worker that was just deployed.
+      - run: mise run //vienna-pulse-backend:smoke
+
   # This stable check reports even when the project is unchanged, and fails closed when
   # detection, validation or packaging fails or is cancelled.
   required:
