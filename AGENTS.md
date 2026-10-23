@@ -19,7 +19,8 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
 - Run `mise run dev` in one worktree at a time. Its ports are fixed, and every worktree shares
   one Docker Compose project and database volume, named after the `vienna-pulse-backend` folder.
   `mise run check` starts its own database with Testcontainers, so it runs in parallel safely.
-- The Compose database's user and database are both `pulse`, and it listens on a random port.
+- `compose.yaml` has always created its database volume with the user and database `pulse`, and
+  the database listens on a random port.
   Connect from the repository root with
   `docker compose -f vienna-pulse-backend/compose.yaml exec -T postgres psql -U pulse -d pulse`.
   There is no `postgres` role.
