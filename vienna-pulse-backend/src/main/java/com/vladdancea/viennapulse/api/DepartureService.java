@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +18,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class DepartureService {
-    // The time zone the timetable's days and times are written in.
-    private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
     private static final int LIMIT = 20;
 
     private final JdbcClient jdbc;
@@ -129,11 +126,11 @@ public class DepartureService {
                                next.route_id,
                                next.headsign,
                                next.stop_id,
-                               coalesce(r.short_name, r.long_name) AS name,
+                               r.short_name,
                                r.long_name,
-                               lower(r.type) AS type,
-                               '#' || r.color AS color,
-                               '#' || r.text_color AS text_color
+                               r.type,
+                               r.color,
+                               r.text_color
                         -- The name comes in every row, and alone in one when nothing leaves; it is null
                         -- only when no platform belongs to the stop.
                         FROM (SELECT mode() WITHIN GROUP (ORDER BY name) AS name FROM platforms) AS stop
@@ -142,7 +139,7 @@ public class DepartureService {
                         ORDER BY next.time, next.trip_id, next.sequence
                         """)
                 .param("stop", stopId)
-                .param("today", LocalDate.ofInstant(now, VIENNA))
+                .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
                 .param("limit", LIMIT)
                 .query((row, number) -> new Row(row.getString("stop_name"), departure(row)))
@@ -162,15 +159,8 @@ public class DepartureService {
             return null;
         }
         return new Departure(
-                time.atZoneSameInstant(VIENNA).toOffsetDateTime(),
-                new Line(
-                        row.getString("route_id"),
-                        new LineProperties(
-                                row.getString("name"),
-                                row.getString("long_name"),
-                                row.getString("type"),
-                                row.getString("color"),
-                                row.getString("text_color"))),
+                time.atZoneSameInstant(Timetable.ZONE).toOffsetDateTime(),
+                new Line(row.getString("route_id"), LineProperties.from(row)),
                 row.getString("headsign"),
                 row.getString("stop_id"));
     }

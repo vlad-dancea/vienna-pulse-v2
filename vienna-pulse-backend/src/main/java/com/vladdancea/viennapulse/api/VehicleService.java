@@ -5,7 +5,6 @@ import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import com.vladdancea.viennapulse.api.geojson.Point;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -15,9 +14,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class VehicleService {
-    // The time zone the timetable's days and times are written in.
-    private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
-
     private final JdbcClient jdbc;
 
     /// A point for every trip that has left its first stop and not yet reached its last at `now`,
@@ -144,11 +140,11 @@ public class VehicleService {
                         SELECT v.trip_id,
                                v.route_id,
                                v.headsign,
-                               coalesce(r.short_name, r.long_name) AS name,
+                               r.short_name,
                                r.long_name,
-                               lower(r.type) AS type,
-                               '#' || r.color AS color,
-                               '#' || r.text_color AS text_color,
+                               r.type,
+                               r.color,
+                               r.text_color,
                                -- Rounded like the lines, to six decimals (about 10 cm).
                                round((v.longitude_before + (v.longitude_after - v.longitude_before) * v.share) * 1e6)
                                    / 1e6 AS longitude,
@@ -158,20 +154,13 @@ public class VehicleService {
                         JOIN timetable.routes r ON r.id = v.route_id
                         ORDER BY v.trip_id
                         """)
-                .param("today", LocalDate.ofInstant(now, VIENNA))
+                .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
                 .query((row, number) -> new Feature<>(
                         row.getString("trip_id"),
                         new Point(row.getDouble("longitude"), row.getDouble("latitude")),
                         new VehicleProperties(
-                                row.getString("route_id"),
-                                new LineProperties(
-                                        row.getString("name"),
-                                        row.getString("long_name"),
-                                        row.getString("type"),
-                                        row.getString("color"),
-                                        row.getString("text_color")),
-                                row.getString("headsign"))))
+                                row.getString("route_id"), LineProperties.from(row), row.getString("headsign"))))
                 .list();
         return new FeatureCollection<>(features);
     }

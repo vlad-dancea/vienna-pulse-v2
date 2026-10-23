@@ -100,7 +100,7 @@ public class LineService {
                         SELECT coverage.first_date,
                                coverage.last_date,
                                line.id,
-                               line.name,
+                               line.short_name,
                                line.long_name,
                                line.type,
                                line.color,
@@ -111,11 +111,11 @@ public class LineService {
                         FROM coverage
                         LEFT JOIN (
                             SELECT r.id,
-                                   coalesce(r.short_name, r.long_name) AS name,
+                                   r.short_name,
                                    r.long_name,
-                                   lower(r.type) AS type,
-                                   '#' || r.color AS color,
-                                   '#' || r.text_color AS text_color,
+                                   r.type,
+                                   r.color,
+                                   r.text_color,
                                    p.first_shape_id,
                                    p.longitudes,
                                    p.latitudes
@@ -150,12 +150,7 @@ public class LineService {
         var latitudes = row.getArray("latitudes");
         return new RoutePath(
                 row.getString("id"),
-                new LineProperties(
-                        row.getString("name"),
-                        row.getString("long_name"),
-                        row.getString("type"),
-                        row.getString("color"),
-                        row.getString("text_color")),
+                LineProperties.from(row),
                 longitudes == null || latitudes == null ? List.of() : positions(longitudes, latitudes));
     }
 
