@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.importer.read.shape;
 
+import com.vladdancea.viennapulse.importer.read.Coordinates;
 import org.jspecify.annotations.Nullable;
 
 /// One point of a vehicle's path in `shapes.txt`, ordered within its shape by sequence.
@@ -14,8 +15,8 @@ public record ShapePoint(
         if (shapeId.isBlank()) {
             throw new IllegalArgumentException("shape id is blank");
         }
-        validateCoordinate("shape_pt_lat", latitude, 90);
-        validateCoordinate("shape_pt_lon", longitude, 180);
+        Coordinates.checkLatitude("shape_pt_lat", latitude);
+        Coordinates.checkLongitude("shape_pt_lon", longitude);
         if (sequence < 0) {
             throw new IllegalArgumentException("shape_pt_sequence " + sequence + " is negative");
         }
@@ -26,12 +27,6 @@ public record ShapePoint(
             if (distanceTraveled < 0) {
                 throw new IllegalArgumentException("shape_dist_traveled " + distanceTraveled + " is negative");
             }
-        }
-    }
-
-    private static void validateCoordinate(String field, double value, int limit) {
-        if (!Double.isFinite(value) || value < -limit || value > limit) {
-            throw new IllegalArgumentException(field + " " + value + " is not between " + -limit + " and " + limit);
         }
     }
 }

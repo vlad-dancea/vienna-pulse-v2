@@ -1,6 +1,8 @@
 package com.vladdancea.viennapulse.importer.read.stoptime;
 
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.integer;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.optional;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.optionalDecimal;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.required;
 
 import com.vladdancea.viennapulse.importer.read.StreamingFeedFileReader;
@@ -22,24 +24,15 @@ public class StopTimeReader implements StreamingFeedFileReader<StopTime> {
 
     @Override
     public StopTime parse(NamedCsvRecord row) {
-        var distance = optional(row, "shape_dist_traveled");
         return new StopTime(
                 required(row, "trip_id"),
-                sequence(required(row, "stop_sequence")),
+                integer(row, "stop_sequence"),
                 required(row, "stop_id"),
                 time("arrival_time", optional(row, "arrival_time")),
                 time("departure_time", optional(row, "departure_time")),
                 type(row, "pickup_type"),
                 type(row, "drop_off_type"),
-                distance == null ? null : distance(distance));
-    }
-
-    private static int sequence(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("stop_sequence " + value + " is not an integer", exception);
-        }
+                optionalDecimal(row, "shape_dist_traveled"));
     }
 
     // GTFS writes HH:MM:SS, or H:MM:SS before 10 o'clock, and lets hours pass 24 after midnight.
@@ -63,13 +56,5 @@ public class StopTimeReader implements StreamingFeedFileReader<StopTime> {
         }
         return PickupDropOffType.fromCode(code)
                 .orElseThrow(() -> new IllegalArgumentException(field + " " + code + " is not 0 to 3"));
-    }
-
-    private static double distance(String value) {
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("shape_dist_traveled " + value + " is not a number", exception);
-        }
     }
 }
