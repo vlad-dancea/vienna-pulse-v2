@@ -69,7 +69,9 @@ each trip leaves its first stop and reaches its last.
 
 In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
 MapLibre's own mouse, touch and keyboard controls. The view is in
-[`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+[`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts), and the API types and the
+services that load them are in [`timetable/`](vienna-pulse-frontend/src/app/timetable), which
+lint keeps free of MapLibre.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
