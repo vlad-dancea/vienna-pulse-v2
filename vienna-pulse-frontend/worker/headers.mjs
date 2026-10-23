@@ -23,5 +23,8 @@ export function assertSiteHeaders(path, headers) {
 
 /** Checks that a response must be revalidated before it is reused. */
 export function assertRevalidated(path, headers) {
-  assert.doesNotMatch(headers.get('Cache-Control') ?? '', /max-age=[1-9]|immutable/, `${path} caching`);
+  // Without Cache-Control a browser may reuse the response for a while on its own estimate.
+  const cacheControl = headers.get('Cache-Control') ?? '';
+  assert.match(cacheControl, /\b(no-cache|max-age=0)\b/, `${path} caching`);
+  assert.doesNotMatch(cacheControl, /immutable/, `${path} caching`);
 }
