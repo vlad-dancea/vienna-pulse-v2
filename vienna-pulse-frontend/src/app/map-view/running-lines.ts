@@ -1,15 +1,11 @@
 import { HttpErrorResponse, httpResource } from '@angular/common/http';
 import { computed, DestroyRef, DOCUMENT, inject, Service, signal } from '@angular/core';
-import type { FeatureCollection, MultiLineString } from 'geojson';
+import type { MultiLineString } from 'geojson';
+import type { ApiFeatureCollection } from '../api-response';
+import type { components } from '../openapi';
 
 /** Describes a scheduled line using the public names, mode and colors from the API. */
-export interface LineProperties {
-  name: string;
-  longName: string | null;
-  type: string;
-  color: string | null;
-  textColor: string | null;
-}
+export type LineProperties = components['schemas']['LineProperties'];
 
 /** Loads today's scheduled routes and follows the service date in Vienna. */
 @Service()
@@ -22,7 +18,9 @@ export class RunningLines {
   });
   private readonly day = signal(this.dateFormat.format(new Date()));
 
-  readonly routes = httpResource<FeatureCollection<MultiLineString, LineProperties>>(() => ({
+  readonly routes = httpResource<
+    ApiFeatureCollection<components['schemas']['FeatureCollectionLineProperties'], MultiLineString>
+  >(() => ({
     url: '/api/lines',
     params: { date: this.day() },
   }));

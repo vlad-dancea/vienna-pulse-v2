@@ -13,22 +13,31 @@ import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { addDistricts } from './districts';
 import { RunningLines } from './running-lines';
+import type { LineProperties } from './running-lines';
 import { NetworkStops } from './network-stops';
+import type { StopProperties } from './network-stops';
 import { MovingVehicles } from './moving-vehicles';
 import { RunningVehicles } from './running-vehicles';
+import type { VehicleProperties } from './running-vehicles';
+
+// MapLibre reads properties by name, so the names are checked against the API's types here: a field
+// the backend renames fails type-checking instead of leaving the map without colors or filters.
+// Lines and vehicles share their filters and colors, so a line property must exist in both.
+const lineProperty = (name: keyof LineProperties & keyof VehicleProperties): ExpressionSpecification => ['get', name];
+const stopProperty = (name: keyof StopProperties): ExpressionSpecification => ['get', name];
 
 const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
   // Keep any other API route types visible with buses, below the tram and U-Bahn layers.
-  { mode: 'bus', filter: ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]] },
-  { mode: 'tram', filter: ['==', ['get', 'type'], 'tram'] },
-  { mode: 'subway', filter: ['==', ['get', 'type'], 'subway'] },
+  { mode: 'bus', filter: ['!', ['in', lineProperty('type'), ['literal', ['tram', 'subway']]]] },
+  { mode: 'tram', filter: ['==', lineProperty('type'), 'tram'] },
+  { mode: 'subway', filter: ['==', lineProperty('type'), 'subway'] },
 ];
 
 // Lines and their vehicles have the line's color, or one color per mode when the feed has none.
 const lineColor: ExpressionSpecification = [
   'coalesce',
-  ['get', 'color'],
-  ['match', ['get', 'type'], 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
+  lineProperty('color'),
+  ['match', lineProperty('type'), 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
 ];
 
 /** Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls. */
@@ -106,7 +115,7 @@ export class MapView {
       const map = this.map();
       const mode = this.selectedMode();
       const classified = this.stops.classified();
-      const filter: ExpressionSpecification | null = mode === 'all' ? null : ['==', ['get', 'type'], mode];
+      const filter: ExpressionSpecification | null = mode === 'all' ? null : ['==', lineProperty('type'), mode];
       for (const layer of routeLayers) {
         const layerFilter: FilterSpecification = filter ? ['all', layer.filter, filter] : layer.filter;
         map?.setFilter(`lines-${layer.mode}-casing`, layerFilter);
@@ -114,7 +123,7 @@ export class MapView {
       }
       map?.setFilter('line-names', filter);
       map?.setFilter('vehicles', filter);
-      map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, ['get', 'modes']]);
+      map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, stopProperty('modes')]);
     });
 
     // MapLibre sizes the map from its container, which has a size only once it is rendered.
@@ -193,7 +202,7 @@ export class MapView {
           layout: {
             'symbol-placement': 'line',
             'text-font': ['Noto Sans Bold'],
-            'text-field': ['get', 'name'],
+            'text-field': lineProperty('name'),
             'text-size': 12,
             'symbol-spacing': 250,
           },
