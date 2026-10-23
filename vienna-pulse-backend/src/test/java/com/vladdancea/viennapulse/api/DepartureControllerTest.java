@@ -1,14 +1,15 @@
 package com.vladdancea.viennapulse.api;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
-import java.time.Clock;
-import java.time.Instant;
+import com.vladdancea.viennapulse.TimetableFixture;
+import com.vladdancea.viennapulse.TimetableFixture.Call;
+import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
+import com.vladdancea.viennapulse.importer.read.route.RouteType;
+import com.vladdancea.viennapulse.importer.read.stoptime.PickupDropOffType;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,6 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -32,64 +31,38 @@ class DepartureControllerTest {
     private static final String STOP = "at:49:1320";
     private static final String NEXT_STOP = "at:49:1350:0:1";
 
-    // Each test sets the time, which the application reads through the clock bean.
-    private static Clock now = Clock.systemUTC();
-
     @Autowired
     RestTestClient client;
 
     @Autowired
-    JdbcClient jdbc;
+    TimetableFixture timetable;
 
-    // Never read: the field only names the bean that clock() replaces.
-    @TestBean
-    @Nullable
-    Clock clock;
-
-    static Clock clock() {
-        return new Clock() {
-            @Override
-            public ZoneOffset getZone() {
-                return ZoneOffset.UTC;
-            }
-
-            @Override
-            public Clock withZone(ZoneId zone) {
-                return now.withZone(zone);
-            }
-
-            @Override
-            public Instant instant() {
-                return now.instant();
-            }
-        };
-    }
+    @Autowired
+    TestClock clock;
 
     @BeforeEach
     void removeTheTimetable() {
-        for (var table : List.of("stops", "routes", "trips", "stop_times", "service_calendars", "calendar_dates")) {
-            jdbc.sql("DELETE FROM timetable." + table).update();
-        }
-        addStop(STOP + ":0:1", "Stephansplatz");
-        addStop(STOP + ":0:2", "Stephansplatz");
-        addStop(STOP + ":0:3", "Stephansplatz U1");
-        addStop(NEXT_STOP, "Karlsplatz");
+        // Half past midnight on DAY in Vienna.
+        clock.set("2026-10-19T22:30:00Z");
+        timetable.clear();
+        timetable.addStop(STOP + ":0:1", "Stephansplatz");
+        timetable.addStop(STOP + ":0:2", "Stephansplatz");
+        timetable.addStop(STOP + ":0:3", "Stephansplatz U1");
+        timetable.addStop(NEXT_STOP, "Karlsplatz");
         // Its id starts like the stop's, but it is another stop.
-        addStop("at:49:13200:0:1", "Elsewhere");
-        addRoute("u1", "U1", "Leopoldau - Oberlaa", "SUBWAY", "E3000F", "FFFFFF");
-        addRoute("n25", "N25", null, "BUS", null, null);
+        timetable.addStop("at:49:13200:0:1", "Elsewhere");
+        timetable.addRoute("u1", "U1", "Leopoldau - Oberlaa", RouteType.SUBWAY, "E3000F", "FFFFFF");
+        timetable.addRoute("n25", "N25", null, RouteType.BUS, null, null);
     }
 
     @Test
     void servesTheNextDeparturesOfEveryPlatformAcrossMidnight() {
-        // Half past midnight on DAY in Vienna.
-        now = Clock.fixed(Instant.parse("2026-10-19T22:30:00Z"), ZoneOffset.UTC);
-        addWeeklyService("mondays", "monday", DAY.minusDays(1));
-        addWeeklyService("tuesdays", "tuesday", DAY);
-        addWeeklyService("wednesdays", "wednesday", DAY.plusDays(1));
-        addWeeklyService("removed", "tuesday", DAY);
-        addException("removed", DAY, "REMOVED");
-        addException("added", DAY, "ADDED");
+        timetable.addWeeklyService("mondays", DAY.minusDays(1));
+        timetable.addWeeklyService("tuesdays", DAY);
+        timetable.addWeeklyService("wednesdays", DAY.plusDays(1));
+        timetable.addWeeklyService("removed", DAY);
+        timetable.addException("removed", DAY, ExceptionType.REMOVED);
+        timetable.addException("added", DAY, ExceptionType.ADDED);
 
         // Yesterday's trips run past midnight; the first has left already.
         addDeparture("left", "u1", "mondays", STOP + ":0:1", "24:20:00");
@@ -99,13 +72,21 @@ class DepartureControllerTest {
         addDeparture("removed", "u1", "removed", STOP + ":0:1", "05:10:00");
         addDeparture("added", "u1", "added", STOP + ":0:1", "05:20:00");
         addDeparture("elsewhere", "u1", "tuesdays", "at:49:13200:0:1", "05:30:00");
-        addTrip("no-pickup", "u1", "tuesdays");
-        addCall("no-pickup", 1, STOP + ":0:1", "05:40:00", "NONE");
-        addCall("no-pickup", 2, NEXT_STOP, "05:45:00", "REGULAR");
+        timetable.addTrip(
+                "no-pickup",
+                "u1",
+                "tuesdays",
+                null,
+                Call.at(1, STOP + ":0:1", "05:40:00").withPickup(PickupDropOffType.NONE),
+                Call.at(2, NEXT_STOP, "05:45:00"));
         // Ends at the stop, so nobody boards there although the feed allows it.
-        addTrip("arrives", "u1", "tuesdays");
-        addCall("arrives", 1, NEXT_STOP, "05:50:00", "REGULAR");
-        addCall("arrives", 2, STOP + ":0:1", "05:55:00", "REGULAR");
+        timetable.addTrip(
+                "arrives",
+                "u1",
+                "tuesdays",
+                null,
+                Call.at(1, NEXT_STOP, "05:50:00"),
+                Call.at(2, STOP + ":0:1", "05:55:00"));
         addDeparture("tomorrow", "u1", "wednesdays", STOP + ":0:1", "04:30:00");
         // Leaves after tomorrow's service day, where the day after's earliest trips would be missing.
         addDeparture("too-late", "u1", "wednesdays", STOP + ":0:1", "24:30:00");
@@ -145,8 +126,8 @@ class DepartureControllerTest {
     @Test
     void countsTheTimesFromNoonMinusTwelveHoursWhenTheClocksGoBack() {
         // Sunday 2026-10-25, before the clocks go back at 03:00 summer time.
-        now = Clock.fixed(Instant.parse("2026-10-24T23:30:00Z"), ZoneOffset.UTC);
-        addWeeklyService("sundays", "sunday", LocalDate.parse("2026-10-25"));
+        clock.set("2026-10-24T23:30:00Z");
+        timetable.addWeeklyService("sundays", LocalDate.parse("2026-10-25"));
         // 08:00 in winter time, nine hours after midnight in summer time.
         addDeparture("morning", "u1", "sundays", STOP + ":0:1", "08:00:00");
 
@@ -162,8 +143,7 @@ class DepartureControllerTest {
 
     @Test
     void servesTheFirstTwentyDepartures() {
-        now = Clock.fixed(Instant.parse("2026-10-19T22:30:00Z"), ZoneOffset.UTC);
-        addWeeklyService("tuesdays", "tuesday", DAY);
+        timetable.addWeeklyService("tuesdays", DAY);
         for (int minute = 20; minute >= 0; minute--) {
             addDeparture("trip-" + minute, "u1", "tuesdays", STOP + ":0:1", "06:%02d:00".formatted(minute));
         }
@@ -214,72 +194,6 @@ class DepartureControllerTest {
 
     // A trip with its headsign named after it, leaving `platform` and calling at the next stop after.
     private void addDeparture(String trip, String route, String service, String platform, String time) {
-        addTrip(trip, route, service);
-        addCall(trip, 1, platform, time, "REGULAR");
-        addCall(trip, 2, NEXT_STOP, time, "REGULAR");
-    }
-
-    private void addStop(String id, String name) {
-        jdbc.sql("INSERT INTO timetable.stops (id, name, latitude, longitude) VALUES (?, ?, 48.2, 16.37)")
-                .params(id, name)
-                .update();
-    }
-
-    private void addRoute(
-            String id,
-            String shortName,
-            @Nullable String longName,
-            String type,
-            @Nullable String color,
-            @Nullable String textColor) {
-        jdbc.sql("""
-                        INSERT INTO timetable.routes (id, short_name, long_name, type, color, text_color)
-                        VALUES (:id, :shortName, :longName, :type, :color, :textColor)
-                        """)
-                .param("id", id)
-                .param("shortName", shortName)
-                .param("longName", longName)
-                .param("type", type)
-                .param("color", color)
-                .param("textColor", textColor)
-                .update();
-    }
-
-    // Runs on one weekday from a week before `day` to a week after.
-    private void addWeeklyService(String id, String weekday, LocalDate day) {
-        jdbc.sql("""
-                        INSERT INTO timetable.service_calendars
-                        VALUES (:id, false, false, false, false, false, false, false, :start, :end)
-                        """)
-                .param("id", id)
-                .param("start", day.minusDays(7))
-                .param("end", day.plusDays(7))
-                .update();
-        jdbc.sql("UPDATE timetable.service_calendars SET %s = true WHERE service_id = :id".formatted(weekday))
-                .param("id", id)
-                .update();
-    }
-
-    private void addException(String service, LocalDate date, String type) {
-        jdbc.sql("INSERT INTO timetable.calendar_dates VALUES (?, ?, ?)")
-                .params(service, date, type)
-                .update();
-    }
-
-    private void addTrip(String id, String route, String service) {
-        jdbc.sql("INSERT INTO timetable.trips (id, route_id, service_id, headsign) VALUES (?, ?, ?, ?)")
-                .params(id, route, service, id)
-                .update();
-    }
-
-    // Times written as in the feed, where hours can pass 24.
-    private void addCall(String trip, int sequence, String stop, String time, String pickup) {
-        var parts = time.split(":", -1);
-        var seconds = Integer.parseInt(parts[0]) * 3600 + Integer.parseInt(parts[1]) * 60 + Integer.parseInt(parts[2]);
-        jdbc.sql("""
-                        INSERT INTO timetable.stop_times
-                            (trip_id, sequence, stop_id, arrival_time, departure_time, pickup_type, drop_off_type)
-                        VALUES (?, ?, ?, ?, ?, ?, 'REGULAR')
-                        """).params(trip, sequence, stop, seconds, seconds, pickup).update();
+        timetable.addTrip(trip, route, service, null, Call.at(1, platform, time), Call.at(2, NEXT_STOP, time));
     }
 }
