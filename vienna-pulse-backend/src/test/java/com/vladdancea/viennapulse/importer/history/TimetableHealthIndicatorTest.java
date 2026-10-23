@@ -93,6 +93,29 @@ class TimetableHealthIndicatorTest {
                         .build());
     }
 
+    // Tomorrow is a Sunday inside the timetable's days, but none of its services runs then.
+    @Test
+    void isDownWhenNoServiceRunsTomorrow() {
+        var lastSuccess = NOW.minus(Duration.ofHours(1));
+        recordImport("SUCCEEDED", lastSuccess);
+        var lastDay = LocalDate.parse("2026-12-12");
+        jdbc.sql("""
+                        INSERT INTO timetable.service_calendars
+                        VALUES ('weekdays', true, true, true, true, true, false, false, :firstDay, :lastDay),
+                               ('daily', true, true, true, true, true, true, true, :firstDay, :lastDay)
+                        """).param("firstDay", FIRST_DAY).param("lastDay", lastDay).update();
+        jdbc.sql("INSERT INTO timetable.calendar_dates VALUES ('daily', :date, 'REMOVED')")
+                .param("date", TOMORROW)
+                .update();
+
+        assertThat(health())
+                .isEqualTo(Health.down()
+                        .withDetail("lastSuccessfulImport", lastSuccess.toString())
+                        .withDetail("coveredFrom", FIRST_DAY.toString())
+                        .withDetail("coveredUntil", lastDay.toString())
+                        .build());
+    }
+
     @Test
     void isDownBeforeTheFirstImport() {
         assertThat(health()).isEqualTo(Health.down().build());

@@ -12,8 +12,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 /// The `timetable` health component: DOWN when the last successful import is more than 36 hours
-/// old or the timetable does not cover tomorrow in Vienna. The readiness group leaves it out,
-/// because an old timetable still beats no API.
+/// old or no service of the timetable runs tomorrow in Vienna, which would leave the map without
+/// lines or vehicles. The readiness group leaves it out, because an old timetable still beats no API.
 @Component
 @RequiredArgsConstructor
 public class TimetableHealthIndicator extends AbstractHealthIndicator {
@@ -33,9 +33,9 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
         var lastSuccess = history.lastSuccess();
         var coverage = coverage();
         var fresh = lastSuccess.filter(time -> time.isAfter(now.minus(MAX_AGE))).isPresent();
-        var covered = coverage.covers(LocalDate.ofInstant(now, VIENNA).plusDays(1));
+        var running = runsOn(LocalDate.ofInstant(now, VIENNA).plusDays(1));
 
-        if (fresh && covered) {
+        if (fresh && running) {
             builder.up();
         } else {
             builder.down();
@@ -45,6 +45,34 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
             builder.withDetail("coveredFrom", coverage.first().toString())
                     .withDetail("coveredUntil", coverage.last().toString());
         }
+    }
+
+    // Whether any service runs on `day`, decided like the lines endpoint decides which lines to draw.
+    private boolean runsOn(LocalDate day) {
+        return jdbc.sql("""
+                        SELECT EXISTS (
+                            SELECT service_id
+                            FROM timetable.service_calendars
+                            WHERE CAST(:day AS date) BETWEEN start_date AND end_date
+                              AND CASE extract(isodow FROM CAST(:day AS date))
+                                      WHEN 1 THEN monday
+                                      WHEN 2 THEN tuesday
+                                      WHEN 3 THEN wednesday
+                                      WHEN 4 THEN thursday
+                                      WHEN 5 THEN friday
+                                      WHEN 6 THEN saturday
+                                      WHEN 7 THEN sunday
+                                  END
+                            EXCEPT
+                            SELECT service_id
+                            FROM timetable.calendar_dates
+                            WHERE date = :day AND exception_type = 'REMOVED'
+                            UNION
+                            SELECT service_id
+                            FROM timetable.calendar_dates
+                            WHERE date = :day AND exception_type = 'ADDED'
+                        )
+                        """).param("day", day).query(Boolean.class).single();
     }
 
     // The days the timetable covers, counted the way the lines endpoint counts them, which answers
@@ -68,9 +96,5 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
 
     // Both days are empty while the timetable is.
     private record Coverage(
-            @Nullable LocalDate first, @Nullable LocalDate last) {
-        boolean covers(LocalDate day) {
-            return first != null && last != null && !day.isBefore(first) && !day.isAfter(last);
-        }
-    }
+            @Nullable LocalDate first, @Nullable LocalDate last) {}
 }
