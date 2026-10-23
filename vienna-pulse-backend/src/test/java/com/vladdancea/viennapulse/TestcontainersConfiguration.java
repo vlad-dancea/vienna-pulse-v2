@@ -9,11 +9,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /// Runs tests against PostgreSQL in a container, from the image `compose.yaml` runs in development,
-/// and on a [TestClock] that each test sets.
+/// with a [TimetableFixture] to fill it and a [TestClock] that each test sets.
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
     // Reading the image from compose.yaml leaves one pin to update, which Renovate already does.
@@ -36,6 +37,11 @@ public class TestcontainersConfiguration {
     @Primary
     TestClock testClock() {
         return new TestClock();
+    }
+
+    @Bean
+    TimetableFixture timetableFixture(JdbcClient jdbc) {
+        return new TimetableFixture(jdbc);
     }
 
     private static DockerImageName postgresImage() {

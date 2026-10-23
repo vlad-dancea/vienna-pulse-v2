@@ -2,9 +2,12 @@ package com.vladdancea.viennapulse.api;
 
 import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.TimetableFixture;
+import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
+import com.vladdancea.viennapulse.importer.read.route.RouteType;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +21,6 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -33,7 +35,7 @@ class LineControllerTest {
     RestTestClient client;
 
     @Autowired
-    JdbcClient jdbc;
+    TimetableFixture timetable;
 
     @Autowired
     TestClock clock;
@@ -42,39 +44,37 @@ class LineControllerTest {
     void removeTheTimetable() {
         // Half past midnight on DAY in Vienna, still the day before in UTC.
         clock.set("2026-10-19T22:30:00Z");
-        for (var table : Set.of("routes", "trips", "shape_points", "service_calendars", "calendar_dates")) {
-            jdbc.sql("DELETE FROM timetable." + table).update();
-        }
+        timetable.clear();
     }
 
     @Test
     void servesEachRunningRouteWithTheDistinctPathsOfItsShapes() {
-        addWeeklyService("weekdays", "tuesday", DAY, DAY);
-        addWeeklyService("sundays", "sunday", DAY, DAY);
-        addRoute("tram-62", "62", "Oper - Lainz", "TRAM", "C00808", "FFFFFF");
-        addRoute("bus-n25", "N25", null, "BUS", null, null);
-        addRoute("subway-u1", "U1", "Leopoldau - Oberlaa", "SUBWAY", "E3000F", "FFFFFF");
+        timetable.addWeeklyService("weekdays", DayOfWeek.TUESDAY, DAY, DAY);
+        timetable.addWeeklyService("sundays", DayOfWeek.SUNDAY, DAY, DAY);
+        timetable.addRoute("tram-62", "62", "Oper - Lainz", RouteType.TRAM, "C00808", "FFFFFF");
+        timetable.addRoute("bus-n25", "N25", null, RouteType.BUS, null, null);
+        timetable.addRoute("subway-u1", "U1", "Leopoldau - Oberlaa", RouteType.SUBWAY, "E3000F", "FFFFFF");
 
         // Two shapes with the same points, rounded to six decimals, make one path.
-        addShape("62-b", 16.1234561, 48.1, 16.2, 48.2);
-        addShape("62-a", 16.1234559, 48.1, 16.2, 48.2);
-        addShape("62-c", 16.3, 48.3, 16.4, 48.4);
-        addTrip("t1", "tram-62", "weekdays", "62-c");
-        addTrip("t2", "tram-62", "weekdays", "62-b");
-        addTrip("t3", "tram-62", "weekdays", "62-a");
-        addTrip("t4", "tram-62", "weekdays", "62-a");
+        timetable.addShape("62-b", 16.1234561, 48.1, 16.2, 48.2);
+        timetable.addShape("62-a", 16.1234559, 48.1, 16.2, 48.2);
+        timetable.addShape("62-c", 16.3, 48.3, 16.4, 48.4);
+        timetable.addTrip("t1", "tram-62", "weekdays", "62-c");
+        timetable.addTrip("t2", "tram-62", "weekdays", "62-b");
+        timetable.addTrip("t3", "tram-62", "weekdays", "62-a");
+        timetable.addTrip("t4", "tram-62", "weekdays", "62-a");
         // A shape of a single point is no line.
-        addShape("n25-a", 16.5, 48.5);
-        addShape("n25-b", 16.5, 48.5, 16.6, 48.6);
-        addTrip("t5", "bus-n25", "weekdays", "n25-a");
-        addTrip("t6", "bus-n25", "weekdays", "n25-b");
+        timetable.addShape("n25-a", 16.5, 48.5);
+        timetable.addShape("n25-b", 16.5, 48.5, 16.6, 48.6);
+        timetable.addTrip("t5", "bus-n25", "weekdays", "n25-a");
+        timetable.addTrip("t6", "bus-n25", "weekdays", "n25-b");
         // Runs on Sundays only.
-        addShape("u1", 16.7, 48.7, 16.8, 48.8);
-        addTrip("t7", "subway-u1", "sundays", "u1");
+        timetable.addShape("u1", 16.7, 48.7, 16.8, 48.8);
+        timetable.addTrip("t7", "subway-u1", "sundays", "u1");
         // Runs, but along no shape of two points or more, so there is nothing to draw.
-        addRoute("bus-13a", "13A", null, "BUS", null, null);
-        addTrip("t8", "bus-13a", "weekdays", null);
-        addTrip("t9", "bus-13a", "weekdays", "n25-a");
+        timetable.addRoute("bus-13a", "13A", null, RouteType.BUS, null, null);
+        timetable.addTrip("t8", "bus-13a", "weekdays", null);
+        timetable.addTrip("t9", "bus-13a", "weekdays", "n25-a");
 
         client.get()
                 .uri("/api/lines?date=2026-10-20")
@@ -113,10 +113,10 @@ class LineControllerTest {
     @NullSource
     @ValueSource(strings = {"missing", "single"})
     void keepsARunningRouteWithNoUsablePath(@Nullable String shape) {
-        addWeeklyService("weekdays", "tuesday", DAY, DAY);
-        addRoute("bus-13a", "13A", null, "BUS", null, null);
-        addShape("single", 16.5, 48.5);
-        addTrip("trip", "bus-13a", "weekdays", shape);
+        timetable.addWeeklyService("weekdays", DayOfWeek.TUESDAY, DAY, DAY);
+        timetable.addRoute("bus-13a", "13A", null, RouteType.BUS, null, null);
+        timetable.addShape("single", 16.5, 48.5);
+        timetable.addTrip("trip", "bus-13a", "weekdays", shape);
 
         client.get()
                 .uri("/api/lines?date=2026-10-20")
@@ -136,17 +136,17 @@ class LineControllerTest {
 
     @Test
     void runsTheServicesOfTheDayFromTheirWeeklyDaysAndExceptions() {
-        addShape("shape", 16.1, 48.1, 16.2, 48.2);
-        addRunningService("tuesdays", "tuesday", DAY, DAY);
-        addRunningService("wednesdays", "wednesday", DAY.minusDays(7), DAY.plusDays(7));
-        addRunningService("ended", "tuesday", DAY.minusDays(7), DAY.minusDays(1));
-        addRunningService("removed", "tuesday", DAY.minusDays(7), DAY.plusDays(7));
-        addException("removed", DAY, "REMOVED");
-        addRunningService("added", "wednesday", DAY.minusDays(7), DAY.plusDays(7));
-        addException("added", DAY, "ADDED");
-        addRoute("only-added", "only-added", null, "BUS", null, null);
-        addTrip("only-added", "only-added", "only-added", "shape");
-        addException("only-added", DAY, "ADDED");
+        timetable.addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        addRunningService("tuesdays", DayOfWeek.TUESDAY, DAY, DAY);
+        addRunningService("wednesdays", DayOfWeek.WEDNESDAY, DAY.minusDays(7), DAY.plusDays(7));
+        addRunningService("ended", DayOfWeek.TUESDAY, DAY.minusDays(7), DAY.minusDays(1));
+        addRunningService("removed", DayOfWeek.TUESDAY, DAY.minusDays(7), DAY.plusDays(7));
+        timetable.addException("removed", DAY, ExceptionType.REMOVED);
+        addRunningService("added", DayOfWeek.WEDNESDAY, DAY.minusDays(7), DAY.plusDays(7));
+        timetable.addException("added", DAY, ExceptionType.ADDED);
+        timetable.addRoute("only-added", "only-added", null, RouteType.BUS, null, null);
+        timetable.addTrip("only-added", "only-added", "only-added", "shape");
+        timetable.addException("only-added", DAY, ExceptionType.ADDED);
 
         client.get()
                 .uri("/api/lines?date=2026-10-20")
@@ -160,10 +160,10 @@ class LineControllerTest {
 
     @Test
     void readsTheLinesOfTodayInViennaWithoutADate() {
-        addShape("shape", 16.1, 48.1, 16.2, 48.2);
-        addRoute("night", "N6", null, "BUS", null, null);
-        addTrip("night", "night", "today", "shape");
-        addException("today", DAY, "ADDED");
+        timetable.addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        timetable.addRoute("night", "N6", null, RouteType.BUS, null, null);
+        timetable.addTrip("night", "night", "today", "shape");
+        timetable.addException("today", DAY, ExceptionType.ADDED);
 
         client.get()
                 .uri("/api/lines")
@@ -179,10 +179,10 @@ class LineControllerTest {
     void answersNotFoundForADayTheTimetableDoesNotCover() {
         expectNotFound("2026-10-20", "There is no timetable yet");
 
-        addWeeklyService("weekdays", "tuesday", DAY, DAY.plusDays(4));
+        timetable.addWeeklyService("weekdays", DayOfWeek.TUESDAY, DAY, DAY.plusDays(4));
         // A day added after the last week counts, a day removed before the first does not.
-        addException("weekdays", DAY.plusDays(10), "ADDED");
-        addException("weekdays", DAY.minusDays(10), "REMOVED");
+        timetable.addException("weekdays", DAY.plusDays(10), ExceptionType.ADDED);
+        timetable.addException("weekdays", DAY.minusDays(10), ExceptionType.REMOVED);
 
         // Nothing runs on that Wednesday, which the timetable does cover.
         client.get()
@@ -233,69 +233,9 @@ class LineControllerTest {
     }
 
     // A service with one route of the same id, whose only trip follows the shape `shape`.
-    private void addRunningService(String id, String weekday, LocalDate start, LocalDate end) {
-        addWeeklyService(id, weekday, start, end);
-        addRoute(id, id, null, "BUS", null, null);
-        addTrip(id, id, id, "shape");
-    }
-
-    private void addWeeklyService(String id, String weekday, LocalDate start, LocalDate end) {
-        jdbc.sql("""
-                        INSERT INTO timetable.service_calendars
-                        VALUES (:id, false, false, false, false, false, false, false, :start, :end)
-                        """).param("id", id).param("start", start).param("end", end).update();
-        jdbc.sql("UPDATE timetable.service_calendars SET %s = true WHERE service_id = :id".formatted(weekday))
-                .param("id", id)
-                .update();
-    }
-
-    private void addException(String service, LocalDate date, String type) {
-        jdbc.sql("INSERT INTO timetable.calendar_dates VALUES (?, ?, ?)")
-                .params(service, date, type)
-                .update();
-    }
-
-    private void addRoute(
-            String id,
-            String shortName,
-            @Nullable String longName,
-            String type,
-            @Nullable String color,
-            @Nullable String textColor) {
-        jdbc.sql("""
-                        INSERT INTO timetable.routes (id, short_name, long_name, type, color, text_color)
-                        VALUES (:id, :shortName, :longName, :type, :color, :textColor)
-                        """)
-                .param("id", id)
-                .param("shortName", shortName)
-                .param("longName", longName)
-                .param("type", type)
-                .param("color", color)
-                .param("textColor", textColor)
-                .update();
-    }
-
-    private void addTrip(String id, String route, String service, @Nullable String shape) {
-        jdbc.sql("""
-                        INSERT INTO timetable.trips (id, route_id, service_id, shape_id)
-                        VALUES (:id, :route, :service, :shape)
-                        """)
-                .param("id", id)
-                .param("route", route)
-                .param("service", service)
-                .param("shape", shape)
-                .update();
-    }
-
-    // Inserted from the last point to the first, so the response must order them by sequence.
-    private void addShape(String id, double... longitudesAndLatitudes) {
-        for (int i = longitudesAndLatitudes.length - 2; i >= 0; i -= 2) {
-            jdbc.sql("""
-                            INSERT INTO timetable.shape_points (shape_id, sequence, longitude, latitude)
-                            VALUES (?, ?, ?, ?)
-                            """)
-                    .params(id, i, longitudesAndLatitudes[i], longitudesAndLatitudes[i + 1])
-                    .update();
-        }
+    private void addRunningService(String id, DayOfWeek weekday, LocalDate start, LocalDate end) {
+        timetable.addWeeklyService(id, weekday, start, end);
+        timetable.addRoute(id, id, null, RouteType.BUS, null, null);
+        timetable.addTrip(id, id, id, "shape");
     }
 }
