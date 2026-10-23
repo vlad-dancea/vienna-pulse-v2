@@ -126,12 +126,22 @@ class StoreTest {
     @Test
     void appliesTheTimetableRulesToTheCurrentTimetable() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
-        load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER, TRIPS_AFTER, CALENDARS_AFTER, DATES_AFTER);
+        var platform = new Stop("at:49:1320:0:3", "Stephansplatz", 48.20845, 16.37212, null);
+        var stops = List.of(STOPS_AFTER.getFirst(), platform);
+        load(ROUTES_AFTER, stops, SHAPE_POINTS_AFTER, TRIPS_AFTER, CALENDARS_AFTER, DATES_AFTER);
 
         // A Saturday of T2, a Monday T0 is added on and a Sunday T2 is removed from.
         assertThat(runningServices(LocalDate.of(2026, 10, 24))).containsExactly("T2");
         assertThat(runningServices(LocalDate.of(2026, 10, 26))).containsExactly("T0");
         assertThat(runningServices(LocalDate.of(2026, 11, 1))).isEmpty();
+        assertThat(jdbc.sql("SELECT id || ' ' || merged_id FROM timetable.stops ORDER BY id")
+                        .query(String.class)
+                        .list())
+                .containsExactly("at:49:1320:0:3 at:49:1320", "s2 s2");
+        assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE schemaname = 'timetable' AND tablename = 'stops'")
+                        .query(String.class)
+                        .list())
+                .contains("CREATE INDEX stops_merged_id_idx ON timetable.stops USING btree (merged_id)");
     }
 
     @Test

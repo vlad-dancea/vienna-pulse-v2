@@ -39,8 +39,7 @@ public class DepartureService {
                         WITH platforms AS (
                             SELECT id, name
                             FROM timetable.stops
-                            -- The space keeps :3 from reading as a parameter.
-                            WHERE array_to_string((string_to_array(id, ':'))[1 : 3], ':') = :stop
+                            WHERE merged_id = :stop
                         ),
                         days AS (
                             SELECT shift,
