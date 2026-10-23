@@ -3,22 +3,13 @@ package com.vladdancea.viennapulse.importer.download;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import com.vladdancea.viennapulse.importer.ImporterProperties;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AutoClose;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -29,109 +20,92 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 class FeedDownloaderTest {
-    private static final byte[] FEED = "PK feed bytes".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] FEED =
+            "PK not really a zip, but the downloader never looks".getBytes(StandardCharsets.UTF_8);
 
-    private HttpServer server;
-    private List<Path> feedsBefore;
+    @AutoClose
+    final FeedServer server = FeedServer.start();
+
+    final FeedDownloader downloader = downloader(RestClient.builder());
 
     @BeforeEach
-    void startServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        // A slow answer must not block the server from noticing that the client hung up.
-        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
-        feedsBefore = feedFiles();
-    }
-
-    @AfterEach
-    void stopServer() {
-        server.stop(0);
-    }
-
-    @Test
-    void downloadsTheFeedIntoATemporaryFile() throws IOException {
-        serve(exchange -> {
-            exchange.sendResponseHeaders(200, FEED.length);
-            try (var body = exchange.getResponseBody()) {
-                body.write(FEED);
-            }
-        });
-
-        try (var feed = downloader(RestClient.builder()).download()) {
-            assertThat(Files.readAllBytes(feed.path())).isEqualTo(FEED);
+    void removeEarlierDownloads() throws IOException {
+        for (var download : FeedServer.downloads()) {
+            Files.delete(download);
         }
     }
 
     @Test
-    void stopsAnOversizedDownloadAndDeletesItsFile() {
-        // Sends until the client hangs up, or 256 MB if it reads on.
-        var sent = new AtomicLong();
-        serve(exchange -> {
-            try (var body = exchange.getResponseBody()) {
-                exchange.sendResponseHeaders(200, 0);
-                var chunk = new byte[64 * 1024];
-                while (sent.get() < 256 * 1024 * 1024) {
-                    body.write(chunk);
-                    sent.addAndGet(chunk.length);
-                }
-            } catch (IOException exception) {
-                // The client hung up.
-            }
-        });
+    void downloadsTheFeedIntoAFileThatClosingDeletes() throws IOException {
+        server.serve(FEED);
 
-        var downloader = downloader(RestClient.builder());
+        try (var feed = downloader.download()) {
+            assertThat(feed.path()).hasBinaryContent(FEED);
+            assertThat(FeedServer.downloads()).containsExactly(feed.path());
+        }
+        assertThat(FeedServer.downloads()).isEmpty();
+    }
+
+    @Test
+    void failsOnAnErrorAnswerWithoutLeavingAFile() throws IOException {
+        server.fail(500);
+
+        assertThatThrownBy(downloader::download)
+                .isInstanceOf(RestClientException.class)
+                .hasMessage("GTFS download failed with HTTP 500");
+        assertThat(FeedServer.downloads()).isEmpty();
+    }
+
+    @Test
+    void deletesTheFileOfADownloadThatIsCutOff() throws IOException {
+        server.cutOff(FEED, 10);
+
+        assertThatThrownBy(downloader::download).isInstanceOf(RestClientException.class);
+        assertThat(FeedServer.downloads()).isEmpty();
+    }
+
+    @Test
+    void stopsAnOversizedDownloadWithoutLeavingAFile() throws IOException {
+        server.flood(256 * 1024 * 1024);
 
         assertThatThrownBy(downloader::download)
                 .isInstanceOf(RestClientException.class)
                 .hasMessage("GTFS download passed 1 MB and was stopped");
-        assertThat(feedFiles()).isEqualTo(feedsBefore);
+        assertThat(FeedServer.downloads()).isEmpty();
         // Spring reads the rest of a response it closes, unless the downloader closed the body first.
-        assertThat(sent.get()).isLessThan(64 * 1024 * 1024);
+        assertThat(server.sent()).isLessThan(64 * 1024 * 1024);
     }
 
     @Test
-    void stopsASlowDownloadAndDeletesItsFile() {
+    void stopsASlowDownloadWithoutLeavingAFile() throws IOException {
         // Each byte arrives well within the read timeout, but all of them would take ten seconds.
-        serve(exchange -> {
-            exchange.sendResponseHeaders(200, 0);
-            try (var body = exchange.getResponseBody()) {
-                for (var i = 0; i < 100; i++) {
-                    body.write(0);
-                    body.flush();
-                    Thread.sleep(100);
-                }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-            }
-        });
-
+        server.trickle(100, Duration.ofMillis(100));
         // Only the read timeout bounds the whole download, as Spring Boot applies it to the client
         // it detects. Another HTTP client may apply it to each read instead and fail this test.
         var factory = ClientHttpRequestFactoryBuilder.detect()
                 .build(HttpClientSettings.defaults().withReadTimeout(Duration.ofSeconds(1)));
-        var downloader = downloader(RestClient.builder().requestFactory(factory));
 
-        assertThatThrownBy(downloader::download).isInstanceOf(ResourceAccessException.class);
-        assertThat(feedFiles()).isEqualTo(feedsBefore);
+        assertThatThrownBy(downloader(RestClient.builder().requestFactory(factory))::download)
+                .isInstanceOf(ResourceAccessException.class);
+        assertThat(FeedServer.downloads()).isEmpty();
     }
 
-    private void serve(HttpHandler handler) {
-        server.createContext("/gtfs.zip", handler);
+    @Test
+    void deletesTheLeftoverFeedsAndNothingElse() throws IOException {
+        var leftover = Files.createTempFile("pulse-gtfs-", ".zip");
+        var other = Files.createTempFile("other-", ".zip");
+        try {
+            downloader.deleteLeftovers();
+
+            assertThat(leftover).doesNotExist();
+            assertThat(other).exists();
+        } finally {
+            Files.delete(other);
+        }
     }
 
     private FeedDownloader downloader(RestClient.Builder clientBuilder) {
-        var url = URI.create("http://localhost:" + server.getAddress().getPort() + "/gtfs.zip");
         return new FeedDownloader(
-                new ImporterProperties(url, DataSize.ofMegabytes(1), false, List.of()), clientBuilder);
-    }
-
-    private static List<Path> feedFiles() {
-        var feeds = new ArrayList<Path>();
-        try (var files = Files.newDirectoryStream(Path.of(System.getProperty("java.io.tmpdir")), "pulse-gtfs-*.zip")) {
-            files.forEach(feeds::add);
-        } catch (IOException exception) {
-            throw new IllegalStateException(exception);
-        }
-        return feeds.stream().sorted().toList();
+                new ImporterProperties(server.uri(), DataSize.ofMegabytes(1), false, List.of()), clientBuilder);
     }
 }

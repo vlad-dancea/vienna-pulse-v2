@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.importer.read.route;
 
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.integer;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.optional;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.required;
 
@@ -22,7 +23,7 @@ public class RouteReader implements FeedFileReader<Route> {
                 optional(row, "agency_id"),
                 optional(row, "route_short_name"),
                 optional(row, "route_long_name"),
-                RouteType.fromCode(Integer.parseInt(required(row, "route_type"))),
+                RouteType.fromCode(integer(row, "route_type")),
                 optional(row, "route_color"),
                 optional(row, "route_text_color"));
     }

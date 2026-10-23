@@ -41,6 +41,8 @@ class RouteReaderTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
+                    "1","U1","","",""     | missing route_type
+                    "1","U1","","bus",""  | route_type bus is not an integer
                     "1","U1","","700",""  | unknown route type 700
                     "1","U1","","1","red" | color red is not six hex digits
                     "1","","","1",""      | route 1 has neither a short nor a long name

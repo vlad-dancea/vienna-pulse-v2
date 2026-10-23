@@ -67,7 +67,9 @@ tasks.javadoc {
 
 tasks.test {
     useJUnitPlatform()
-    // Tests write and delete feed files in the temporary directory, which test runs in other
-    // worktrees and the running app share otherwise.
-    systemProperty("java.io.tmpdir", temporaryDir.absolutePath)
+    // Every checkout's tests and the app in development share /tmp, where the importer downloads
+    // the feed and deletes the leftovers of others. A directory of their own keeps them apart.
+    val tmpdir = layout.buildDirectory.dir("tmp/test-java-tmpdir").get().asFile
+    systemProperty("java.io.tmpdir", tmpdir.absolutePath)
+    doFirst { tmpdir.mkdirs() }
 }
