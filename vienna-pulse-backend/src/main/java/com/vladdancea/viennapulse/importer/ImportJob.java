@@ -2,6 +2,9 @@ package com.vladdancea.viennapulse.importer;
 
 import com.vladdancea.viennapulse.importer.download.FeedDownloader;
 import com.vladdancea.viennapulse.importer.download.FeedValidator;
+import com.vladdancea.viennapulse.importer.history.FeedFile;
+import com.vladdancea.viennapulse.importer.history.ImportAttempt;
+import com.vladdancea.viennapulse.importer.history.ImportHistory;
 import com.vladdancea.viennapulse.importer.read.FeedFormatException;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDateReader;
@@ -19,6 +22,7 @@ import com.vladdancea.viennapulse.importer.read.trip.TripReader;
 import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.ScheduledFuture;
 import java.util.zip.ZipFile;
@@ -34,10 +38,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 import org.springframework.web.client.RestClientException;
 
-/// Imports the GTFS feed on the `pulse.importer.cron` schedule: download, validate, then store it
-/// in PostgreSQL. Each failure is logged once and retried after the `pulse.importer.retry-delays`,
-/// and the downloaded feed is deleted when the import ends, whatever the outcome. A new database
-/// gets its first import right after startup.
+/// Downloads, validates and stores the GTFS feed on the `pulse.importer.cron` schedule, and right
+/// after startup into a new database, recording each attempt in the [ImportHistory]. A failed
+/// import is retried after each of the `pulse.importer.retry-delays`.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -52,8 +55,10 @@ public class ImportJob {
     private final ServiceCalendarReader serviceCalendarReader;
     private final CalendarDateReader calendarDateReader;
     private final Store store;
+    private final ImportHistory history;
     private final ImporterProperties properties;
     private final TaskScheduler scheduler;
+    private final Clock clock;
 
     // Only the scheduler's single thread runs imports and changes this.
     private @Nullable ScheduledFuture<?> retry;
@@ -99,37 +104,67 @@ public class ImportJob {
 
     private boolean importFeed() {
         log.info("Feed import triggered");
-        try (var feed = downloader.download()) {
-            validator.validate(feed.path());
-            replaceTimetable(feed.path());
-            return true;
+        var attempt = new ImportAttempt(clock.instant(), properties.feedUrl());
+        try {
+            var feed = downloader.download();
+            try {
+                attempt = attempt.withFeed(FeedFile.of(feed.path()));
+                validator.validate(feed.path());
+                replaceTimetable(feed.path(), attempt);
+                return true;
+            } finally {
+                cleanUp(feed, "the downloaded feed " + feed.path());
+            }
         } catch (RestClientException exception) {
             log.error("Feed download failed", exception);
+            history.failed(attempt, exception);
         } catch (IOException | FeedFormatException exception) {
             log.error("Feed import failed", exception);
+            history.failed(attempt, exception);
         } catch (DataAccessException | TransactionException exception) {
             log.error("Storing the timetable failed", exception);
+            history.failed(attempt, exception);
+        } catch (RuntimeException exception) {
+            // Such as a table the import left empty. Caught so the history records it and it is retried.
+            log.error("Feed import failed unexpectedly", exception);
+            history.failed(attempt, exception);
         }
         return false;
     }
 
-    private void replaceTimetable(Path feed) throws IOException {
-        try (var zip = new ZipFile(feed.toFile())) {
-            store.replace(staging -> {
-                staging.copy("routes", Route.class, routeReader.read(zip).values()::forEach);
-                staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
-                staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
-                staging.copy("trips", Trip.class, trips -> tripReader.read(zip, trips));
-                staging.stopTimes(stopTimes -> stopTimeReader.read(zip, stopTimes));
-                staging.copy(
-                        "service_calendars",
-                        ServiceCalendar.class,
-                        serviceCalendarReader.read(zip).values()::forEach);
-                staging.copy(
-                        "calendar_dates",
-                        CalendarDate.class,
-                        calendarDateReader.read(zip).values()::forEach);
-            });
+    // Runs after the import may have replaced the timetable, so a failure is only logged: a feed left
+    // behind takes disk space until the next start deletes it, and the import has already succeeded.
+    private static void cleanUp(AutoCloseable resource, String name) {
+        try {
+            resource.close();
+        } catch (Exception exception) {
+            log.warn("Could not close {}", name, exception);
+        }
+    }
+
+    private void replaceTimetable(Path feed, ImportAttempt attempt) throws IOException {
+        var zip = new ZipFile(feed.toFile());
+        try {
+            store.replace(
+                    staging -> {
+                        staging.copy(
+                                "routes", Route.class, routeReader.read(zip).values()::forEach);
+                        staging.copy("stops", Stop.class, stopReader.read(zip).values()::forEach);
+                        staging.copy("shape_points", ShapePoint.class, points -> shapeReader.read(zip, points));
+                        staging.copy("trips", Trip.class, trips -> tripReader.read(zip, trips));
+                        staging.stopTimes(stopTimes -> stopTimeReader.read(zip, stopTimes));
+                        staging.copy(
+                                "service_calendars",
+                                ServiceCalendar.class,
+                                serviceCalendarReader.read(zip).values()::forEach);
+                        staging.copy(
+                                "calendar_dates",
+                                CalendarDate.class,
+                                calendarDateReader.read(zip).values()::forEach);
+                    },
+                    rowCounts -> history.succeeded(attempt, rowCounts));
+        } finally {
+            cleanUp(zip, "the feed's ZIP file " + feed);
         }
         log.info("Stored the timetable from {}", feed);
     }

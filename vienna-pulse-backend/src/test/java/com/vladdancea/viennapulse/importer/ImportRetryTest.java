@@ -12,6 +12,7 @@ import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.importer.download.DownloadedFeed;
 import com.vladdancea.viennapulse.importer.download.FeedDownloader;
 import com.vladdancea.viennapulse.importer.download.FeedValidator;
+import com.vladdancea.viennapulse.importer.history.ImportHistory;
 import com.vladdancea.viennapulse.importer.read.TestFeed;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDateReader;
 import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendarReader;
@@ -65,12 +66,14 @@ class ImportRetryTest {
             mock(ServiceCalendarReader.class),
             mock(CalendarDateReader.class),
             store,
+            mock(ImportHistory.class),
             new ImporterProperties(
                     URI.create("https://example.com/gtfs.zip"),
                     DataSize.ofMegabytes(500),
                     false,
                     List.of(Duration.ofMinutes(10), Duration.ofHours(1), Duration.ofHours(3))),
-            scheduler);
+            scheduler,
+            clock);
 
     @TempDir
     Path dir;
@@ -99,7 +102,7 @@ class ImportRetryTest {
                 Arguments.of("database", (Failure)
                         test -> doThrow(new CannotCreateTransactionException("Could not open JDBC Connection"))
                                 .when(test.store)
-                                .replace(any())));
+                                .replace(any(), any())));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -129,7 +132,7 @@ class ImportRetryTest {
         runRetries();
 
         assertThat(retryTimes).containsExactly(NOW.plus(Duration.ofMinutes(10)));
-        verify(store).replace(any());
+        verify(store).replace(any(), any());
     }
 
     @Test

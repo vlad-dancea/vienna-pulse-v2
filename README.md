@@ -72,6 +72,12 @@ previous timetable or the new one, never a mix, and a failed import leaves the p
 place. A failed import tries again after 10 minutes, 1 hour and 3 hours, then waits for the next
 morning. The download stops at 500 MB.
 
+Every attempt leaves a row in `public.imports`, outside the schema the import replaces: its
+outcome, the error of a failure, the feed's size and SHA-256, and the rows loaded into each table.
+A success's row commits with its swap. The `timetable` health component on the management port
+turns DOWN when the last success is more than 36 hours old or no trip runs tomorrow.
+Readiness leaves it out, because an old timetable still beats no API.
+
 Flyway migrations create the tables when the backend starts. A new database gets its first
 import right after startup, and so does one where an upgrade added stop modes, stop times or
 trip spans that are still empty.
