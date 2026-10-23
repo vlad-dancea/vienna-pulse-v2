@@ -11,13 +11,20 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
 - Use pnpm for frontend dependencies and commit its lockfile. Keep direct dependencies pinned.
 - Run `mise run check` after changing a project, the tool pins or a workflow. Report exactly
   what ran and any limitations, including changes that no check covers.
-- Stop only processes you started, by the PID you captured. Never `pkill -f` a pattern that
-  also appears in your own command line, because it kills your own shell.
+- Stop only processes you started, by the PID you captured. `pkill -f` and `pgrep -f` match
+  your own shell too, because the pattern is in its command line, so a `pkill -f` or a `kill`
+  loop over `pgrep -f` kills the shell running it. If you must match by pattern, bracket one
+  letter, as in `pgrep -f '[n]g serve'`.
 - Run `mise run dev` in one worktree at a time. Its ports are fixed, and every worktree shares
   one Docker Compose project and database volume, named after the `vienna-pulse-backend` folder.
   `mise run check` starts its own database with Testcontainers, so it runs in parallel safely.
+- The Compose database's user and database are both `pulse`, and it listens on a random port.
+  Connect from the repository root with
+  `docker compose -f vienna-pulse-backend/compose.yaml exec -T postgres psql -U pulse -d pulse`.
+  There is no `postgres` role.
 - Keep scratch files, downloaded feeds and plans outside the repository, in a `mktemp -d`
-  directory, and remove them afterwards.
+  directory under `/tmp`, and leave it there. `/tmp` empties on reboot, and Codex rejects any
+  command containing `rm -rf` or `rm -f`, including a cleanup `trap`.
 
 ## Automated workflows
 
@@ -116,8 +123,8 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   lists, tutorial boilerplate and speculative documentation.
 - Write few, meaningful tests. Avoid trivial construction, accessor and enum tests.
   Assert whole records or messages where practical and verify tests fail when behavior breaks.
-- Verify importer behavior against the real Wiener Linien feed when changing ingestion,
-  use temporary files and clean them up afterwards.
+- Verify importer behavior against the real Wiener Linien feed when changing ingestion, with
+  the feed downloaded to a `mktemp -d` directory.
 
 ## Backend
 
