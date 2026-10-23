@@ -1,9 +1,7 @@
 package com.vladdancea.viennapulse.importer.read;
 
-import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 import java.util.zip.ZipFile;
 
@@ -20,22 +18,6 @@ public interface StreamingFeedFileReader<T> {
     /// Passes records to `consumer` in file order; the caller keeps ownership of the ZIP. Fails with a
     /// [FeedFormatException] on the first bad row, naming its line.
     default void read(ZipFile feed, Consumer<? super T> consumer) throws IOException {
-        try (var csv = FeedCsv.open(feed, file())) {
-            for (var row : csv) {
-                consumer.accept(parseLine(row));
-            }
-        } catch (CsvParseException exception) {
-            throw new FeedFormatException(file() + " is not valid CSV", exception);
-        } catch (UncheckedIOException exception) {
-            throw exception.getCause();
-        }
-    }
-
-    private T parseLine(NamedCsvRecord row) {
-        try {
-            return parse(row);
-        } catch (IllegalArgumentException exception) {
-            throw FeedFormatException.at(file(), row.getStartingLineNumber(), exception);
-        }
+        FeedCsv.read(feed, file(), this::parse, (record, line) -> consumer.accept(record));
     }
 }

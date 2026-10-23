@@ -1,6 +1,8 @@
 package com.vladdancea.viennapulse.importer.read.shape;
 
-import static com.vladdancea.viennapulse.importer.read.FeedCsv.optional;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.decimal;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.integer;
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.optionalDecimal;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.required;
 
 import com.vladdancea.viennapulse.importer.read.StreamingFeedFileReader;
@@ -19,29 +21,11 @@ public class ShapeReader implements StreamingFeedFileReader<ShapePoint> {
 
     @Override
     public ShapePoint parse(NamedCsvRecord row) {
-        var distance = optional(row, "shape_dist_traveled");
         return new ShapePoint(
                 required(row, "shape_id"),
-                number("shape_pt_lat", required(row, "shape_pt_lat")),
-                number("shape_pt_lon", required(row, "shape_pt_lon")),
-                sequence(required(row, "shape_pt_sequence")),
-                distance == null ? null : number("shape_dist_traveled", distance));
-    }
-
-    private static double number(String field, String value) {
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(field + " " + value + " is not a number", exception);
-        }
-    }
-
-    private static int sequence(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException exception) {
-            var problem = value.matches("[+-]?\\d+") ? " is out of range" : " is not an integer";
-            throw new IllegalArgumentException("shape_pt_sequence " + value + problem, exception);
-        }
+                decimal(row, "shape_pt_lat"),
+                decimal(row, "shape_pt_lon"),
+                integer(row, "shape_pt_sequence"),
+                optionalDecimal(row, "shape_dist_traveled"));
     }
 }

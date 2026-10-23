@@ -67,7 +67,7 @@ class TripReaderTest {
                     D,T0,,s1,0    | missing trip_id
                     D,T0,t1,s1,2  | direction_id 2 is not 0 or 1
                     D,T0,t1,s1,-1 | direction_id -1 is not 0 or 1
-                    D,T0,t1,s1,up | direction_id up is not 0 or 1
+                    D,T0,t1,s1,up | direction_id up is not an integer
                     """)
     void rejectsRowsThatBreakTheGtfsRules(String row, String problem) throws Exception {
         var trips = "route_id,service_id,trip_id,shape_id,direction_id\n" + row + "\n";
