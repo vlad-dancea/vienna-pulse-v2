@@ -1,6 +1,14 @@
 package com.vladdancea.viennapulse.api;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
+import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
+import com.vladdancea.viennapulse.importer.read.route.Route;
+import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
+import com.vladdancea.viennapulse.importer.read.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.trip.Trip;
+import com.vladdancea.viennapulse.importer.store.Store;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,6 +48,9 @@ class LineControllerTest {
 
     @Autowired
     ResponseCache cache;
+
+    @Autowired
+    Store store;
 
     // Never read: the field only names the bean that clock() replaces.
     @TestBean
@@ -188,7 +199,7 @@ class LineControllerTest {
     }
 
     @Test
-    void readsTodaysLinesOncePerTimetableAndOtherDaysEveryTime() {
+    void readsTodaysLinesOncePerTimetableAndOtherDaysEveryTime() throws IOException {
         addWeeklyService("daily", "tuesday", DAY, DAY.plusDays(1));
         jdbc.sql("UPDATE timetable.service_calendars SET wednesday = true").update();
         addShape("shape", 16.1, 48.1, 16.2, 48.2);
@@ -218,6 +229,21 @@ class LineControllerTest {
                 .expectBody()
                 .jsonPath("$.features[*].id")
                 .isEqualTo(List.of("bus-13a", "tram-62"));
+
+        importNothing();
+        addWeeklyService("daily", "tuesday", DAY, DAY);
+        addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        addRoute("subway-u1", "U1", null, "SUBWAY", null, null);
+        addTrip("t3", "subway-u1", "daily", "shape");
+        client.get()
+                .uri("/api/lines")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("subway-u1"));
     }
 
     @Test
@@ -259,6 +285,19 @@ class LineControllerTest {
                         {"title": "Bad Request", "status": 400, "instance": "/api/lines",
                          "detail": "The date must be a day written as YYYY-MM-DD, not '%s'"}
                         """.formatted(date), JsonCompareMode.STRICT);
+    }
+
+    // Swaps in an empty timetable the way the daily import swaps in the next one.
+    private void importNothing() throws IOException {
+        store.replace(staging -> {
+            staging.copy("routes", Route.class, row -> {});
+            staging.copy("stops", Stop.class, row -> {});
+            staging.copy("shape_points", ShapePoint.class, row -> {});
+            staging.copy("trips", Trip.class, row -> {});
+            staging.copy("service_calendars", ServiceCalendar.class, row -> {});
+            staging.copy("calendar_dates", CalendarDate.class, row -> {});
+            staging.stopTimes(row -> {});
+        });
     }
 
     private void expectNotFound(String date, String detail) {
