@@ -4,7 +4,7 @@
 [![frontend](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml/badge.svg)](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml)
 
 A live map of the Vienna public transport network, built on the Wiener Linien GTFS feed. It shows
-the stops, today's lines and every vehicle where its timetable puts it right now.
+the stops, today's lines and the running vehicles where the timetable puts them right now.
 
 | Folder | What it is |
 | --- | --- |
