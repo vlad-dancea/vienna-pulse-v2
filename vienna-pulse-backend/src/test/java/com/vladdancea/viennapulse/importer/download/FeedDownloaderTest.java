@@ -110,7 +110,8 @@ class FeedDownloaderTest {
 
     private FeedDownloader downloader(RestClient.Builder clientBuilder) {
         var url = URI.create("http://localhost:" + server.getAddress().getPort() + "/gtfs.zip");
-        return new FeedDownloader(new ImporterProperties(url, DataSize.ofMegabytes(1), false), clientBuilder);
+        return new FeedDownloader(
+                new ImporterProperties(url, DataSize.ofMegabytes(1), false, List.of()), clientBuilder);
     }
 
     private static List<Path> feedFiles() {

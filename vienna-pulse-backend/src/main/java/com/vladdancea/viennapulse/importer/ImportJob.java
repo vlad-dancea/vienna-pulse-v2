@@ -20,9 +20,11 @@ import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.concurrent.ScheduledFuture;
 import java.util.zip.ZipFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
@@ -32,8 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 /// Imports the GTFS feed on the `pulse.importer.cron` schedule: download, validate, then store it
-/// in PostgreSQL. Each failure is logged once, and the downloaded feed is deleted when the import
-/// ends, whatever the outcome. A new database gets its first import right after startup.
+/// in PostgreSQL. Each failure is logged once and retried after the `pulse.importer.retry-delays`,
+/// and the downloaded feed is deleted when the import ends, whatever the outcome. A new database
+/// gets its first import right after startup.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -51,6 +54,9 @@ public class ImportJob {
     private final ImporterProperties properties;
     private final TaskScheduler scheduler;
 
+    // Only the scheduler's single thread runs imports and changes this.
+    private @Nullable ScheduledFuture<?> retry;
+
     // Runs the import on the scheduler's single thread, like the daily one: startup and readiness
     // do not wait for the download, and the two imports can never overlap.
     @EventListener(ApplicationReadyEvent.class)
@@ -65,10 +71,37 @@ public class ImportJob {
 
     @Scheduled(cron = "${pulse.importer.cron}", zone = "Europe/Vienna")
     public void run() {
+        // A scheduled run starts its own retries, so the retries of an earlier run end here.
+        if (retry != null) {
+            retry.cancel(false);
+            retry = null;
+        }
+        attempt(0);
+    }
+
+    // Every failure is retried: the feed may come back fixed within hours, and a retry costs one
+    // download.
+    private void attempt(int retries) {
+        if (importFeed()) {
+            return;
+        }
+        var delays = properties.retryDelays();
+        if (retries == delays.size()) {
+            log.error("Feed import failed {} times, waiting for the next scheduled run", retries + 1);
+            return;
+        }
+        var delay = delays.get(retries);
+        log.warn("Retrying the feed import in {}", delay);
+        retry = scheduler.schedule(
+                () -> attempt(retries + 1), scheduler.getClock().instant().plus(delay));
+    }
+
+    private boolean importFeed() {
         log.info("Feed import triggered");
         try (var feed = downloader.download()) {
             validator.validate(feed.path());
             replaceTimetable(feed.path());
+            return true;
         } catch (RestClientException exception) {
             log.error("Feed download failed", exception);
         } catch (IOException | FeedFormatException exception) {
@@ -76,6 +109,7 @@ public class ImportJob {
         } catch (DataAccessException exception) {
             log.error("Storing the timetable failed", exception);
         }
+        return false;
     }
 
     private void replaceTimetable(Path feed) throws IOException {
