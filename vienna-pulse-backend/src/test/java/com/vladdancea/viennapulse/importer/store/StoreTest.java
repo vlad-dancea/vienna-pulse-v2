@@ -17,7 +17,9 @@ import com.vladdancea.viennapulse.importer.read.stoptime.StopTime;
 import com.vladdancea.viennapulse.importer.read.trip.Trip;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -103,7 +105,7 @@ class StoreTest {
     @Test
     void replacesTheWholeTimetable() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
-        load(
+        var rowCounts = load(
                 ROUTES_AFTER,
                 STOPS_AFTER,
                 SHAPE_POINTS_AFTER,
@@ -120,16 +122,54 @@ class StoreTest {
         assertThat(dates()).isEqualTo(DATES_AFTER);
         assertThat(stopTimes()).isEqualTo(STOP_TIMES_AFTER);
         assertThat(stopModes()).containsExactly("s2:{SUBWAY,TRAM}");
+        assertThat(rowCounts)
+                .isEqualTo(Map.of(
+                        "calendar_dates", 2L,
+                        "routes", 2L,
+                        "service_calendars", 1L,
+                        "shape_points", 3L,
+                        "stop_modes", 1L,
+                        "stop_times", 3L,
+                        "stops", 1L,
+                        "trip_spans", 2L,
+                        "trips", 2L));
+    }
+
+    // The import records its success after the swap, which must not stand without the record.
+    @Test
+    void keepsThePreviousTimetableWhenTheSwapCannotBeRecorded() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
+
+        assertThatThrownBy(() -> store.replace(
+                        staging -> {
+                            staging.copy("routes", Route.class, ROUTES_AFTER::forEach);
+                            staging.copy("stops", Stop.class, STOPS_AFTER::forEach);
+                            staging.copy("shape_points", ShapePoint.class, SHAPE_POINTS_AFTER::forEach);
+                            staging.copy("trips", Trip.class, TRIPS_AFTER::forEach);
+                            staging.copy("service_calendars", ServiceCalendar.class, CALENDARS_AFTER::forEach);
+                            staging.copy("calendar_dates", CalendarDate.class, DATES_AFTER::forEach);
+                            staging.stopTimes(STOP_TIMES_AFTER::forEach);
+                        },
+                        rowCounts -> {
+                            throw new IllegalStateException("history unavailable");
+                        }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("history unavailable");
+
+        assertThat(routes()).isEqualTo(ROUTES_BEFORE);
+        assertThat(schemas()).containsExactly("timetable");
     }
 
     @Test
     void keepsThePreviousTimetableWhenTheLoadFails() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
 
-        assertThatThrownBy(() -> store.replace(staging -> {
-                    staging.copy("routes", Route.class, ROUTES_AFTER::forEach);
-                    throw new IOException("feed cut off");
-                }))
+        assertThatThrownBy(() -> store.replace(
+                        staging -> {
+                            staging.copy("routes", Route.class, ROUTES_AFTER::forEach);
+                            throw new IOException("feed cut off");
+                        },
+                        rowCounts -> {}))
                 .isInstanceOf(IOException.class)
                 .hasMessage("feed cut off");
 
@@ -201,7 +241,8 @@ class StoreTest {
     void rejectsALoadThatSkipsATable() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
 
-        assertThatThrownBy(() -> store.replace(staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach)))
+        assertThatThrownBy(() -> store.replace(
+                        staging -> staging.copy("routes", Route.class, ROUTES_AFTER::forEach), rowCounts -> {}))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
                         "The import loaded nothing into [calendar_dates, service_calendars, shape_points, stop_modes, stop_times, stops, trip_spans, trips]");
@@ -352,7 +393,7 @@ class StoreTest {
                         .toList());
     }
 
-    private void load(
+    private Map<String, Long> load(
             List<Route> routes,
             List<Stop> stops,
             List<ShapePoint> shapePoints,
@@ -361,15 +402,19 @@ class StoreTest {
             List<CalendarDate> dates,
             List<StopTime> stopTimes)
             throws IOException {
-        store.replace(staging -> {
-            staging.copy("routes", Route.class, routes::forEach);
-            staging.copy("stops", Stop.class, stops::forEach);
-            staging.copy("shape_points", ShapePoint.class, shapePoints::forEach);
-            staging.copy("trips", Trip.class, trips::forEach);
-            staging.copy("service_calendars", ServiceCalendar.class, calendars::forEach);
-            staging.copy("calendar_dates", CalendarDate.class, dates::forEach);
-            staging.stopTimes(stopTimes::forEach);
-        });
+        var rowCounts = new HashMap<String, Long>();
+        store.replace(
+                staging -> {
+                    staging.copy("routes", Route.class, routes::forEach);
+                    staging.copy("stops", Stop.class, stops::forEach);
+                    staging.copy("shape_points", ShapePoint.class, shapePoints::forEach);
+                    staging.copy("trips", Trip.class, trips::forEach);
+                    staging.copy("service_calendars", ServiceCalendar.class, calendars::forEach);
+                    staging.copy("calendar_dates", CalendarDate.class, dates::forEach);
+                    staging.stopTimes(stopTimes::forEach);
+                },
+                rowCounts::putAll);
+        return rowCounts;
     }
 
     private List<@Nullable Route> routes() {
