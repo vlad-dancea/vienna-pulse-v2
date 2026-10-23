@@ -31,6 +31,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.client.RestClientException;
 
 /// Imports the GTFS feed on the `pulse.importer.cron` schedule: download, validate, then store it
@@ -106,7 +107,7 @@ public class ImportJob {
             log.error("Feed download failed", exception);
         } catch (IOException | FeedFormatException exception) {
             log.error("Feed import failed", exception);
-        } catch (DataAccessException exception) {
+        } catch (DataAccessException | TransactionException exception) {
             log.error("Storing the timetable failed", exception);
         }
         return false;

@@ -30,11 +30,16 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Stream;
 import java.util.zip.ZipException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClientException;
 
@@ -79,9 +84,27 @@ class ImportJobTest {
         });
     }
 
-    @Test
-    void retriesAFailedImportWithGrowingPausesThenWaitsForTheNextRun() {
-        when(downloader.download()).thenThrow(new RestClientException("wienerlinien.at is down"));
+    // Every failure is retried: a broken feed may be replaced within hours, and the database may
+    // come back after an outage.
+    static Stream<Arguments> failures() {
+        return Stream.of(
+                Arguments.of("download", (Failure) test ->
+                        when(test.downloader.download()).thenThrow(new RestClientException("wienerlinien.at is down"))),
+                Arguments.of("broken feed", (Failure)
+                        test -> doThrow(new ZipException("GTFS ZIP is missing a file: stops.txt"))
+                                .when(test.validator)
+                                .validate(any())),
+                Arguments.of("database", (Failure)
+                        test -> doThrow(new CannotCreateTransactionException("Could not open JDBC Connection"))
+                                .when(test.store)
+                                .replace(any())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("failures")
+    void retriesAFailedImportWithGrowingPausesThenWaitsForTheNextRun(String name, Failure failure) throws IOException {
+        serveFeed();
+        failure.prepare(this);
 
         job.run();
         runRetries();
@@ -94,12 +117,9 @@ class ImportJobTest {
 
     @Test
     void aSuccessfulRetryStopsTheRetries() throws IOException {
-        when(downloader.download()).thenAnswer(_ -> new DownloadedFeed(TestFeed.write(dir, "agency.txt", "agency")));
-        // A broken feed is retried too, because Wiener Linien may replace it within hours.
-        doThrow(new ZipException("GTFS ZIP is missing a file: stops.txt"))
-                .doNothing()
-                .when(validator)
-                .validate(any());
+        when(downloader.download())
+                .thenThrow(new RestClientException("wienerlinien.at is down"))
+                .thenAnswer(_ -> feed());
 
         job.run();
         runRetries();
@@ -117,6 +137,19 @@ class ImportJobTest {
 
         verify(retry).cancel(false);
         assertThat(retryTimes).hasSize(2);
+    }
+
+    private void serveFeed() {
+        when(downloader.download()).thenAnswer(_ -> feed());
+    }
+
+    private DownloadedFeed feed() throws IOException {
+        return new DownloadedFeed(TestFeed.write(dir, "agency.txt", "agency"));
+    }
+
+    @FunctionalInterface
+    interface Failure {
+        void prepare(ImportJobTest test) throws IOException;
     }
 
     // Runs each retry when it comes due, as the scheduler would, including the ones it schedules.
