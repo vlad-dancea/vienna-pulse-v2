@@ -21,26 +21,32 @@
       </button>
     }
   </div>
-  @if (styleFailed()) {
-    <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">
-      The map could not be loaded. Reload the page to try again.
-    </p>
-  }
-  @if (!stops.classified()) {
-    <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">
-      @if (stops.latest(); as latest) {
-        @if (latest.features.length === 0) {
-          No stops are available yet.
+  <!-- Screen readers announce changes inside a live region, so it stays while messages come and go. -->
+  <div role="status">
+    @if (styleFailed()) {
+      <p class="mt-3 max-w-64 text-sm text-slate-600">The map could not be loaded. Reload the page to try again.</p>
+    }
+    @if (!stops.classified()) {
+      <p class="mt-3 max-w-64 text-sm text-slate-600">
+        @if (stops.latest(); as latest) {
+          @if (latest.features.length === 0) {
+            No stops are available yet.
+          } @else {
+            Stop filters are updating. All stops are shown for now.
+          }
+        } @else if (stops.stops.error()) {
+          Stops could not be loaded.
         } @else {
-          Stop filters are updating. All stops are shown for now.
+          Loading stops...
         }
-      } @else if (stops.stops.error()) {
-        Stops could not be loaded.
-      } @else {
-        Loading stops...
-      }
-    </p>
-  }
+      </p>
+    }
+    @if (lines.unavailable()) {
+      <p class="mt-3 max-w-64 text-sm text-slate-600">There is no timetable for today.</p>
+    } @else if (lineRetryShown()) {
+      <p class="mt-3 max-w-64 text-sm text-slate-600">Lines could not be loaded.</p>
+    }
+  </div>
   @if (stopRetryShown()) {
     <button
       #stopRetry
@@ -51,10 +57,7 @@
       Retry stops
     </button>
   }
-  @if (lines.unavailable()) {
-    <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">There is no timetable for today.</p>
-  } @else if (lineRetryShown()) {
-    <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">Lines could not be loaded.</p>
+  @if (lineRetryShown()) {
     <button
       #lineRetry
       type="button"

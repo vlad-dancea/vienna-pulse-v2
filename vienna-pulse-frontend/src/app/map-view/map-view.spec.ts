@@ -465,13 +465,17 @@ describe('MapView', () => {
     const retry = Array.from(element.querySelectorAll('button')).find(
       (button) => button.textContent.trim() === 'Retry lines',
     );
+    const status = element.querySelector('[role="status"]');
+    expect(status?.textContent.trim()).toBe('Lines could not be loaded.');
     retry?.focus();
     retry?.click();
     TestBed.tick();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     await fixture.whenStable();
     expect(document.activeElement?.textContent).toBe('Filters');
-    expect(element.textContent).not.toContain('Lines could not be loaded');
+    // The same live region stays, so screen readers announce its next message.
+    expect(element.querySelector('[role="status"]')).toBe(status);
+    expect(status?.textContent.trim()).toBe('');
     expect(setData).toHaveBeenLastCalledWith(routes);
     fixture.destroy();
   });
