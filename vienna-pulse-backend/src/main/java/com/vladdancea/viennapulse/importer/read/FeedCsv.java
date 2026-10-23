@@ -7,12 +7,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.regex.Pattern;
 import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
 
-/// Shared CSV rules for the files inside a GTFS ZIP.
+/// Shared CSV rules for the files inside a GTFS ZIP, and the one parser for each field type, so the
+/// same mistake reads the same in every file.
 /// Wiener Linien writes UTF-8 with a byte order mark and quotes every field, and some names contain commas.
 public final class FeedCsv {
+    private static final Pattern DIGITS = Pattern.compile("[+-]?\\d+");
+
     private FeedCsv() {}
 
     /// Opens one CSV entry; closing the reader leaves the ZIP open.
@@ -52,6 +56,45 @@ public final class FeedCsv {
             return LocalDate.parse(value, DateTimeFormatter.BASIC_ISO_DATE);
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException(field + " " + value + " is not a date in YYYYMMDD form", exception);
+        }
+    }
+
+    /// Like [#required(NamedCsvRecord, String)], for a decimal number such as `48.20024`.
+    public static double decimal(NamedCsvRecord row, String field) {
+        return parseDecimal(field, required(row, field));
+    }
+
+    /// Like [#optional(NamedCsvRecord, String)], for a decimal number such as `48.20024`.
+    public static @Nullable Double optionalDecimal(NamedCsvRecord row, String field) {
+        var value = optional(row, field);
+        return value == null ? null : parseDecimal(field, value);
+    }
+
+    /// Like [#required(NamedCsvRecord, String)], for a whole number that fits an `int`.
+    public static int integer(NamedCsvRecord row, String field) {
+        return parseInteger(field, required(row, field));
+    }
+
+    /// Like [#optional(NamedCsvRecord, String)], for a whole number that fits an `int`.
+    public static @Nullable Integer optionalInteger(NamedCsvRecord row, String field) {
+        var value = optional(row, field);
+        return value == null ? null : parseInteger(field, value);
+    }
+
+    private static double parseDecimal(String field, String value) {
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(field + " " + value + " is not a number", exception);
+        }
+    }
+
+    private static int parseInteger(String field, String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            var problem = DIGITS.matcher(value).matches() ? " is out of range" : " is not an integer";
+            throw new IllegalArgumentException(field + " " + value + problem, exception);
         }
     }
 }
