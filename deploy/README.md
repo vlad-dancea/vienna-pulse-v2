@@ -148,8 +148,9 @@ to `main` deploy automatically. Cloudflare manages TLS using the hostname's exis
 
 Browsers ignore the site's `Strict-Transport-Security` header on plain HTTP, so a Single
 Redirect rule in the `vladdancea.com` zone (Rules > Redirect Rules) sends HTTP to HTTPS with a
-301 that keeps the path and query. It matches only this project's hostnames, the API's own
-hostname and the Previews, so other hosts in the zone are untouched:
+301 that keeps the path and query. It matches only this project's hostnames: the site, every
+name under it (all served by the Preview custom domain) and the API's own hostname, so other
+hosts in the zone are untouched:
 
 ```text
 Expression: not ssl and (http.host in {"pulse.vladdancea.com" "pulse-api.vladdancea.com"} or ends_with(http.host, ".pulse.vladdancea.com"))
