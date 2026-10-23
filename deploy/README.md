@@ -21,8 +21,8 @@ come from, runs `.github/workflows/frontend.yml`:
 
 1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, generated API types, typed
    ESLint, Angular tests, production build, Worker type checking and packaging, and integration
-   tests in Cloudflare's local runtime. The integration tests use a temporary local HTTP origin to verify API
-   forwarding without depending on production.
+   tests in Cloudflare's local runtime. The integration tests use a temporary local HTTP origin
+   to verify API forwarding without depending on production.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
 3. The smoke test checks that the public JavaScript and map worker match the build and that
