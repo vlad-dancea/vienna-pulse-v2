@@ -38,7 +38,7 @@ going. Everything else follows `AGENTS.md`, which wins over this skill when the 
      `gh run list --workflow frontend-preview.yml --event workflow_run`, wait for them with
      `gh run watch <id>`, then check the pull request again.
 6. The pull request is ready when:
-   - `backend-required` and `frontend-required` pass on the latest commit
+   - `backend-required`, `frontend-required` and `repository-required` pass on the latest commit
    - `gh pr checks <number>` shows CodeRabbit's "Review completed" for the latest commit
    - every review thread is resolved, or answered with a reason and left for the maintainer
    - the branch contains the latest `main`

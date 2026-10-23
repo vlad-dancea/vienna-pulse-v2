@@ -1,0 +1,92 @@
+# Checks for the files that belong to neither project: the workflows and the shell scripts.
+#
+# Runs the repository's `lint` task, the one `mise run check` also runs: actionlint and zizmor
+# for the workflows, shellcheck for the deploy scripts and mise file tasks. These files hold
+# the most power here (the Cloudflare token, the deploy key, a script that runs as root on the
+# server), and a mistake in them otherwise shows up only when they run.
+#
+# Like the project workflows, pull requests always report a required result, and the lint
+# runs only when one of these files changed. Nothing here deploys, so pushes to main do not
+# start it.
+name: repository
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.paths.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # The same paths as the lint task, and the root mise.toml, which pins the linters.
+      - id: paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA...$HEAD_SHA" -- '.github/workflows' 'deploy/vps' '*/mise-tasks/*' 'mise.toml'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            # A missing commit or another diff error must never skip validation.
+            if [ "$status" -ne 1 ]; then exit "$status"; fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Root tool pins also include the projects' toolchains; this job only needs the linters.
+      MISE_ENABLE_TOOLS: actionlint,shellcheck,zizmor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache_key_prefix: mise-repository
+
+      # The read-only token lets zizmor run its online audits, which look up the pinned
+      # actions on GitHub.
+      - run: mise run lint
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # This stable check reports even when nothing relevant changed, and fails closed when
+  # detection or the lint fails or is cancelled.
+  required:
+    name: repository-required
+    if: always()
+    needs: [changes, lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          DETECTION: ${{ needs.changes.result }}
+          CHANGED: ${{ needs.changes.outputs.changed }}
+          RESULTS: ${{ needs.lint.result }}
+        run: |
+          [ "$DETECTION" = success ] || exit 1
+          if [ "$CHANGED" = true ]; then
+            [ "$RESULTS" = success ]
+          else
+            [ "$CHANGED" = false ] && [ "$RESULTS" = skipped ]
+          fi
