@@ -72,6 +72,11 @@ class SecurityHeadersTest {
         assertThat(notFound.headers().firstValue("content-type")).hasValue("application/problem+json");
         assertSecurityHeaders(notFound.headers());
 
+        // A servlet path mapping such as /api/* matches /api itself too.
+        var bare = get("/api", Map.of());
+        assertThat(bare.statusCode()).isEqualTo(404);
+        assertSecurityHeaders(bare.headers());
+
         // An exception without a handler is answered by a second dispatch to Spring Boot's /error.
         var failure = get("/api/failure", Map.of());
         assertThat(failure.statusCode()).isEqualTo(500);
