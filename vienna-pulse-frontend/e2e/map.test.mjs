@@ -9,8 +9,6 @@ const center = [16.3738, 48.2082];
 const worldSize = 512 * 2 ** 12;
 const background = '#f8fafc';
 const stopColor = '#374151';
-const tramColor = '#ff0000';
-const busColor = '#0000ff';
 
 /** Returns the coordinates drawn `dx` and `dy` CSS pixels from the middle of the 800 x 600 map. */
 function offset(dx, dy) {
@@ -20,57 +18,55 @@ function offset(dx, dy) {
   return [(x / worldSize) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / worldSize))) * 180) / Math.PI];
 }
 
-// Each feature sits in the middle of a screen pixel, right of and below the filter panel.
-const points = {
-  tramStop: [100, 50],
-  busStop: [200, 50],
-  tramLine: [150, 120],
-  busLine: [150, 200],
-  tramVehicle: [100, 250],
-  busVehicle: [200, 250],
-};
-const at = (name) => offset(points[name][0] + 0.5, points[name][1] + 0.5);
-
-function line(name, type, color, y) {
-  return {
-    type: 'Feature',
-    properties: { name, longName: null, type, color, textColor: null },
-    geometry: { type: 'MultiLineString', coordinates: [[offset(0.5, y + 0.5), offset(300.5, y + 0.5)]] },
-  };
-}
-
-function vehicle(id, line, type, color) {
-  return {
-    type: 'Feature',
-    id,
-    properties: { line, name: line, longName: null, type, color, textColor: null, headsign: null },
-    geometry: { type: 'Point', coordinates: at(`${type}Vehicle`) },
-  };
-}
+// One stop, line and vehicle per mode, each in the middle of a screen pixel, right of and below
+// the filter panel. Stops and vehicles sit in columns, and each line is a horizontal row.
+const modes = [
+  { type: 'subway', button: 'U-Bahn', line: 'U1', color: '#00ff00', x: 100, lineY: 100 },
+  { type: 'tram', button: 'Tram', line: '1', color: '#ff0000', x: 200, lineY: 150 },
+  { type: 'bus', button: 'Bus', line: '13A', color: '#0000ff', x: 300, lineY: 200 },
+];
+const points = Object.fromEntries(
+  modes.flatMap((mode) => [
+    [`${mode.type}Stop`, [mode.x, 50]],
+    [`${mode.type}Line`, [175, mode.lineY]],
+    [`${mode.type}Vehicle`, [mode.x, 250]],
+  ]),
+);
+const at = ([dx, dy]) => offset(dx + 0.5, dy + 0.5);
 
 const api = {
   '/api/stops': {
     type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: { name: 'Tram stop', modes: ['tram'] },
-        geometry: { type: 'Point', coordinates: at('tramStop') },
-      },
-      {
-        type: 'Feature',
-        properties: { name: 'Bus stop', modes: ['bus'] },
-        geometry: { type: 'Point', coordinates: at('busStop') },
-      },
-    ],
+    features: modes.map((mode) => ({
+      type: 'Feature',
+      properties: { name: `${mode.button} stop`, modes: [mode.type] },
+      geometry: { type: 'Point', coordinates: at([mode.x, 50]) },
+    })),
   },
   '/api/lines': {
     type: 'FeatureCollection',
-    features: [line('1', 'tram', tramColor, points.tramLine[1]), line('13A', 'bus', busColor, points.busLine[1])],
+    features: modes.map((mode) => ({
+      type: 'Feature',
+      properties: { name: mode.line, longName: null, type: mode.type, color: mode.color, textColor: null },
+      geometry: { type: 'MultiLineString', coordinates: [[at([0, mode.lineY]), at([350, mode.lineY])]] },
+    })),
   },
   '/api/vehicles': {
     type: 'FeatureCollection',
-    features: [vehicle(1, '1', 'tram', tramColor), vehicle(2, '13A', 'bus', busColor)],
+    features: modes.map((mode, index) => ({
+      type: 'Feature',
+      id: index + 1,
+      properties: {
+        line: mode.line,
+        name: mode.line,
+        longName: null,
+        type: mode.type,
+        color: mode.color,
+        textColor: null,
+        headsign: null,
+      },
+      geometry: { type: 'Point', coordinates: at([mode.x, 250]) },
+    })),
   },
 };
 
@@ -129,6 +125,10 @@ test.beforeEach(async ({ context }) => {
   });
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
+    // District boundaries would cross the points the test reads, and the Worker test checks those files.
+    if (url.origin === origin && url.pathname.startsWith('/data/')) {
+      return route.fulfill({ json: { type: 'FeatureCollection', features: [] } });
+    }
     if (url.origin === origin) return route.continue();
     if (url.pathname === '/styles/positron') return route.fulfill({ json: style });
     if (url.pathname.startsWith('/fonts/')) return route.fulfill({ body: '' });
@@ -156,16 +156,18 @@ function colors(page) {
   }, points);
 }
 
-/** Waits until the map draws each point in its color, or the background when the point is hidden. */
+/** Waits until the map draws the features of the `shown` modes in their colors, and only those. */
 async function expectDrawn(page, shown) {
-  const expected = {
-    tramStop: shown.tram ? stopColor : background,
-    busStop: shown.bus ? stopColor : background,
-    tramLine: shown.tram ? tramColor : background,
-    busLine: shown.bus ? busColor : background,
-    tramVehicle: shown.tram ? tramColor : background,
-    busVehicle: shown.bus ? busColor : background,
-  };
+  const expected = Object.fromEntries(
+    modes.flatMap((mode) => {
+      const visible = shown.includes(mode.type);
+      return [
+        [`${mode.type}Stop`, visible ? stopColor : background],
+        [`${mode.type}Line`, visible ? mode.color : background],
+        [`${mode.type}Vehicle`, visible ? mode.color : background],
+      ];
+    }),
+  );
   await expect.poll(() => colors(page), { timeout: 20_000 }).toEqual(expected);
 }
 
@@ -177,16 +179,16 @@ test('draws the stops, lines and vehicles from the API and filters them by mode'
   });
 
   await page.goto(origin);
-  await expectDrawn(page, { tram: true, bus: true });
+  const all = modes.map((mode) => mode.type);
+  await expectDrawn(page, all);
 
-  await page.getByRole('button', { name: 'Tram' }).click();
-  await expectDrawn(page, { tram: true, bus: false });
-
-  await page.getByRole('button', { name: 'Bus' }).click();
-  await expectDrawn(page, { tram: false, bus: true });
+  for (const mode of modes) {
+    await page.getByRole('button', { name: mode.button }).click();
+    await expectDrawn(page, [mode.type]);
+  }
 
   await page.getByRole('button', { name: 'All' }).click();
-  await expectDrawn(page, { tram: true, bus: true });
+  await expectDrawn(page, all);
 
   expect(errors).toEqual([]);
 });
