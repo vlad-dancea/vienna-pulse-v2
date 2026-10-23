@@ -54,8 +54,9 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   Changes to it take effect only after merging.
 - CI runs the same mise tasks as local development, so a passing `mise run check` should mean
   passing `check` jobs. The backend workflow also packages the jar and builds the image, which
-  the local check does not. When CI fails where the local check passed, find the difference
-  before retrying.
+  the local check does not. The repository workflow gives zizmor a token for its online audits,
+  which run locally only with `GH_TOKEN=$(gh auth token) mise run lint`. When CI fails where the
+  local check passed, find the difference before retrying.
 - Keep it that way when editing workflows: one workflow per project and one for the repository
   (plus the frontend's preview workflow, which must be separate to run from `main`), CI steps
   that call mise tasks, read-only default permissions and actions pinned to full commit SHAs
