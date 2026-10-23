@@ -35,10 +35,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
-/// Imports the GTFS feed on the `pulse.importer.cron` schedule: download, validate, then store it
-/// in PostgreSQL. Each attempt is recorded in the [ImportHistory], each failure is logged once, and
-/// the downloaded feed is deleted when the import ends, whatever the outcome. A new database gets its
-/// first import right after startup.
+/// Downloads, validates and stores the GTFS feed on the `pulse.importer.cron` schedule, and right
+/// after startup into a new database, recording each attempt in the [ImportHistory].
 @Service
 @Slf4j
 @RequiredArgsConstructor
