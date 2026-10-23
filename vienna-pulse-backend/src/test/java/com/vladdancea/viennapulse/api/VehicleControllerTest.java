@@ -1,11 +1,8 @@
 package com.vladdancea.viennapulse.api;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -30,41 +26,19 @@ class VehicleControllerTest {
     // An L along the shape's three points: 1,000 m east, then 1,000 m north.
     private static final String SHAPE = "l-shape";
 
-    // Each test sets the time, which the application reads through the clock bean.
-    private static Clock now = Clock.systemUTC();
-
     @Autowired
     RestTestClient client;
 
     @Autowired
     JdbcClient jdbc;
 
-    // Never read: the field only names the bean that clock() replaces.
-    @TestBean
-    @Nullable
-    Clock clock;
-
-    static Clock clock() {
-        return new Clock() {
-            @Override
-            public ZoneOffset getZone() {
-                return ZoneOffset.UTC;
-            }
-
-            @Override
-            public Clock withZone(ZoneId zone) {
-                return now.withZone(zone);
-            }
-
-            @Override
-            public Instant instant() {
-                return now.instant();
-            }
-        };
-    }
+    @Autowired
+    TestClock clock;
 
     @BeforeEach
     void removeTheTimetable() {
+        // Five past midnight on DAY in Vienna.
+        clock.set("2026-10-19T22:05:00Z");
         for (var table : List.of(
                 "routes", "trips", "trip_spans", "stop_times", "shape_points", "service_calendars", "calendar_dates")) {
             jdbc.sql("DELETE FROM timetable." + table).update();
@@ -78,8 +52,6 @@ class VehicleControllerTest {
 
     @Test
     void placesEveryRunningTripAlongItsShape() {
-        // Five past midnight on DAY in Vienna.
-        now = Clock.fixed(Instant.parse("2026-10-19T22:05:00Z"), ZoneOffset.UTC);
         addWeeklyService("mondays", "monday", DAY.minusDays(1));
         addWeeklyService("tuesdays", "tuesday", DAY);
         addWeeklyService("removed", "tuesday", DAY);
@@ -161,7 +133,7 @@ class VehicleControllerTest {
     @Test
     void placesTomorrowsTripsOnTheEveningBeforeTheClocksGoForward() {
         // 23:30 on Saturday 2026-03-28, already 00:30 on Sunday's service day.
-        now = Clock.fixed(Instant.parse("2026-03-28T22:30:00Z"), ZoneOffset.UTC);
+        clock.set("2026-03-28T22:30:00Z");
         addWeeklyService("sundays", "sunday", LocalDate.parse("2026-03-29"));
         addTrip("sunday", "u1", "sundays", SHAPE, call(1, null, "00:00:00", 0), call(2, "01:00:00", null, 2000));
 

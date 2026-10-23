@@ -1,10 +1,8 @@
 package com.vladdancea.viennapulse.api;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -21,7 +19,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -38,18 +35,13 @@ class LineControllerTest {
     @Autowired
     JdbcClient jdbc;
 
-    // Never read: the field only names the bean that clock() replaces.
-    @TestBean
-    @Nullable
-    Clock clock;
-
-    // Half past midnight on DAY in Vienna, still the day before in UTC.
-    static Clock clock() {
-        return Clock.fixed(Instant.parse("2026-10-19T22:30:00Z"), ZoneOffset.UTC);
-    }
+    @Autowired
+    TestClock clock;
 
     @BeforeEach
     void removeTheTimetable() {
+        // Half past midnight on DAY in Vienna, still the day before in UTC.
+        clock.set("2026-10-19T22:30:00Z");
         for (var table : Set.of("routes", "trips", "shape_points", "service_calendars", "calendar_dates")) {
             jdbc.sql("DELETE FROM timetable." + table).update();
         }

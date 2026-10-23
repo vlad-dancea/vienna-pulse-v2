@@ -1,11 +1,8 @@
 package com.vladdancea.viennapulse.api;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
@@ -19,7 +16,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -32,41 +28,19 @@ class DepartureControllerTest {
     private static final String STOP = "at:49:1320";
     private static final String NEXT_STOP = "at:49:1350:0:1";
 
-    // Each test sets the time, which the application reads through the clock bean.
-    private static Clock now = Clock.systemUTC();
-
     @Autowired
     RestTestClient client;
 
     @Autowired
     JdbcClient jdbc;
 
-    // Never read: the field only names the bean that clock() replaces.
-    @TestBean
-    @Nullable
-    Clock clock;
-
-    static Clock clock() {
-        return new Clock() {
-            @Override
-            public ZoneOffset getZone() {
-                return ZoneOffset.UTC;
-            }
-
-            @Override
-            public Clock withZone(ZoneId zone) {
-                return now.withZone(zone);
-            }
-
-            @Override
-            public Instant instant() {
-                return now.instant();
-            }
-        };
-    }
+    @Autowired
+    TestClock clock;
 
     @BeforeEach
     void removeTheTimetable() {
+        // Half past midnight on DAY in Vienna.
+        clock.set("2026-10-19T22:30:00Z");
         for (var table : List.of("stops", "routes", "trips", "stop_times", "service_calendars", "calendar_dates")) {
             jdbc.sql("DELETE FROM timetable." + table).update();
         }
@@ -82,8 +56,6 @@ class DepartureControllerTest {
 
     @Test
     void servesTheNextDeparturesOfEveryPlatformAcrossMidnight() {
-        // Half past midnight on DAY in Vienna.
-        now = Clock.fixed(Instant.parse("2026-10-19T22:30:00Z"), ZoneOffset.UTC);
         addWeeklyService("mondays", "monday", DAY.minusDays(1));
         addWeeklyService("tuesdays", "tuesday", DAY);
         addWeeklyService("wednesdays", "wednesday", DAY.plusDays(1));
@@ -145,7 +117,7 @@ class DepartureControllerTest {
     @Test
     void countsTheTimesFromNoonMinusTwelveHoursWhenTheClocksGoBack() {
         // Sunday 2026-10-25, before the clocks go back at 03:00 summer time.
-        now = Clock.fixed(Instant.parse("2026-10-24T23:30:00Z"), ZoneOffset.UTC);
+        clock.set("2026-10-24T23:30:00Z");
         addWeeklyService("sundays", "sunday", LocalDate.parse("2026-10-25"));
         // 08:00 in winter time, nine hours after midnight in summer time.
         addDeparture("morning", "u1", "sundays", STOP + ":0:1", "08:00:00");
@@ -162,7 +134,6 @@ class DepartureControllerTest {
 
     @Test
     void servesTheFirstTwentyDepartures() {
-        now = Clock.fixed(Instant.parse("2026-10-19T22:30:00Z"), ZoneOffset.UTC);
         addWeeklyService("tuesdays", "tuesday", DAY);
         for (int minute = 20; minute >= 0; minute--) {
             addDeparture("trip-" + minute, "u1", "tuesdays", STOP + ":0:1", "06:%02d:00".formatted(minute));
