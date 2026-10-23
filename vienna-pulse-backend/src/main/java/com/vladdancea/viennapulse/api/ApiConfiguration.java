@@ -1,5 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
+import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +33,24 @@ class ApiConfiguration implements WebMvcConfigurer {
         // Tomcat only compresses responses whose ETag is weak, since a strong one promises the
         // exact bytes. A weak one promises the same content, which is all the hash checks.
         filter.setWriteWeakETag(true);
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.addUrlPatterns("/api/*");
+        return registration;
+    }
+
+    /// Sends the headers that OWASP's REST Security Cheat Sheet asks of an API. Responses from
+    /// `pulse-api.vladdancea.com` reach the browser without the site's `_headers` file, so the
+    /// backend sets them itself: no content sniffing, HTTPS only, and nothing to load or frame.
+    @Bean
+    FilterRegistrationBean<Filter> securityHeadersFilter() {
+        Filter filter = (request, response, chain) -> {
+            var headers = (HttpServletResponse) response;
+            headers.setHeader("X-Content-Type-Options", "nosniff");
+            headers.setHeader("Strict-Transport-Security", "max-age=31536000");
+            headers.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+            chain.doFilter(request, response);
+        };
+        // Tomcat keeps these when an exception without a handler is answered from /error.
         var registration = new FilterRegistrationBean<>(filter);
         registration.addUrlPatterns("/api/*");
         return registration;
