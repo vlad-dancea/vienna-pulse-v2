@@ -10,7 +10,7 @@ base="${SMOKE_URL:-https://pulse.vladdancea.com}"
 # Prints the body of the API response at the path, or fails unless it is a 200 of the media type.
 get() {
     local response
-    response="$(curl --silent --show-error --compressed --max-time 30 \
+    response="$(curl --silent --show-error --compressed --max-time 20 \
         --write-out '\n%{http_code} %{content_type}' "$base$1")" || return
     if [[ "${response##*$'\n'}" != "200 $2"* ]]; then
         echo "$1 answered ${response##*$'\n'}" >&2
@@ -52,11 +52,13 @@ smoke() {
 }
 
 # A new database imports the feed in the background after startup, so the API can take a minute
-# to serve everything.
-for attempt in $(seq 24); do
-    if smoke; then exit 0; fi
-    echo "The API is not ready (attempt $attempt/24)"
+# to serve everything. Retrying for three minutes, not a number of times, keeps an API whose
+# requests hang within the ten minutes the deploy jobs get: it gives up within 4.5 minutes.
+until smoke; do
+    if ((SECONDS >= 180)); then
+        echo "::error::The API at $base fails its smoke test"
+        exit 1
+    fi
+    echo "The API is not ready after ${SECONDS}s, trying again"
     sleep 5
 done
-echo "::error::The API at $base fails its smoke test"
-exit 1
