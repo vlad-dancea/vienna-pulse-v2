@@ -87,7 +87,9 @@ public final class FeedCsv {
 
     /// Parses every row of `file` and passes each record to `consumer` with the line its row starts
     /// on. A row that `parse` rejects with an [IllegalArgumentException] fails the read with a
-    /// [FeedFormatException] naming that line. Exceptions from `consumer` pass through unchanged.
+    /// [FeedFormatException] naming that line. An [UncheckedIOException], from reading the file or
+    /// from `consumer`, is unwrapped to its [IOException]. Other exceptions from `consumer` pass
+    /// through unchanged.
     static <T> void read(
             ZipFile feed, String file, Function<NamedCsvRecord, T> parse, ObjLongConsumer<? super T> consumer)
             throws IOException {
