@@ -106,7 +106,7 @@ a container, and its tests start their own.
 ```bash
 mise trust --all
 mise run dev     # backend at http://localhost:8080, frontend at http://localhost:4200
-mise run check   # everything CI checks, in every project
+mise run check   # the check task of every project, which CI runs too
 mise run format  # format the sources of every project
 ```
 
@@ -118,7 +118,8 @@ To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The backend checks formatting, compiler warnings, Error Prone, NullAway and its
 tests. The frontend checks formatting, typed ESLint rules, template accessibility, the
-production build, Vitest tests and Cloudflare runtime integration tests.
+production build, Vitest tests and Cloudflare runtime integration tests. The backend's CI
+workflow also packages the jar and builds the container image, which the local check does not.
 
 [`AGENTS.md`](AGENTS.md) holds the instructions for coding agents, and `CLAUDE.md` points Claude
 Code to it. `.mcp.json` and `.codex/config.toml` start the Angular CLI's MCP server for Claude
