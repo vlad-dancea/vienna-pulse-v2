@@ -3,19 +3,105 @@
 [![backend](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/backend.yml/badge.svg)](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/backend.yml)
 [![frontend](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml/badge.svg)](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml)
 
-A live map of the Vienna public transport network, built on the Wiener Linien GTFS feed.
+A live map of the Vienna public transport network, built on the Wiener Linien GTFS feed. It shows
+the stops, today's lines and every vehicle where its timetable puts it right now.
 
 | Folder | What it is |
 | --- | --- |
-| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON |
-| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops and scheduled routes |
+| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON, and a stop's next departures as JSON |
+| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops, scheduled routes and the running vehicles |
+| [`deploy`](deploy) | The production stack and how it is deployed |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    browser["Browser"]
+    tiles["OpenFreeMap<br/>map tiles"]
+    feed["Wiener Linien<br/>GTFS feed"]
+    subgraph cloudflare["Cloudflare"]
+        assets["Static files<br/>(Angular app)"]
+        worker["Worker"]
+    end
+    subgraph server["Hetzner server (Docker Compose)"]
+        cloudflared["cloudflared"]
+        backend["Spring Boot"]
+        postgres[("PostgreSQL")]
+    end
+    browser -->|"pages and scripts"| assets
+    browser -->|"/api"| worker
+    browser --> tiles
+    worker -->|"tunnel"| cloudflared
+    cloudflared --> backend
+    backend -->|"timetable schema"| postgres
+    feed -->|"daily import"| backend
+```
+
+### Frontend
+
+The Angular app is a set of static files, which Cloudflare serves from its edge with Workers
+Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it. The
+browser loads the base map from OpenFreeMap and everything about the network from `/api`. The
+map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+
+### Cloudflare Worker
+
+Only `/api` and `/api/*` run the [Worker](vienna-pulse-frontend/worker/index.ts), as configured in
+[`wrangler.json`](vienna-pulse-frontend/wrangler.json). In production it passes the request on
+unchanged, and Cloudflare sends it through the tunnel to the backend. A pull request Preview has
+no tunnel of its own, so its Worker sends API requests to production.
+
+### Tunnel and server
+
+The backend runs on one Hetzner server as the Docker Compose stack in
+[`deploy/compose.yaml`](deploy/compose.yaml): Spring Boot, PostgreSQL and cloudflared. cloudflared
+connects out to Cloudflare, which forwards `pulse.vladdancea.com/api/*` to the backend over that
+connection, so the server has no open ports to the internet. The database sits on an internal network without
+internet access. Administrators and CI reach the server over Tailscale.
+
+### Daily import
+
+At 07:00 Vienna time, [`ImportJob`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/ImportJob.java)
+downloads the feed's ZIP file and checks that it has every file the importer needs. It streams
+the routes, stops, shapes, trips, stop times, service calendars and their exceptions into a `staging` schema with
+PostgreSQL's `COPY`. Then it classifies every platform by the modes of the trips that let
+passengers board or alight there, and records when each trip leaves its first stop and reaches
+its last. In the same transaction, [`Store`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/store/Store.java)
+renames `timetable` to `timetable_old` and `staging` to `timetable`. Readers see either the
+previous timetable or the new one, never a mix, and a failed import leaves the previous one in
+place.
+
+Flyway migrations create the tables when the backend starts. A new database gets its first
+import right after startup, and so does one where an upgrade added stop modes, stop times or
+trip spans that are still empty.
+
+### API
+
+The [`api`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/api) package reads the
+`timetable` schema and shares no code with the importer. The feed lists each platform as a stop
+of its own, with ids like `at:49:1320:0:3`. The first three parts name the stop, and the API
+merges a stop's platforms into one point in their middle, with the id `at:49:1320`.
+
+| Endpoint | What it returns |
+| --- | --- |
+| `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
+| `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
+| `/api/vehicles` | A GeoJSON point for every trip running now, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
+| `/api/stops/{id}/departures` | The next 20 departures from any platform of the merged stop, each with its time in Vienna, its line, its headsign and its platform. An unknown stop gets a 404. The map does not show the departures yet. |
+
+A vehicle moves along its shape at an even speed between two stops and waits at a stop between
+its arrival and departure. Trips without a shape, or without distances along it, are left out. The trip spans
+the importer records find the running trips without reading every stop time.
+
+Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
+and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457.
 
 ## Run
 
 The toolchain is managed by [mise](https://mise.jdx.dev): the root `mise.toml` pins the tool
 versions for every project, and each project's `mise.toml` defines its own tasks. The backend
 also needs [Docker](https://docs.docker.com/engine/install/): it starts its PostgreSQL database in
-a container.
+a container, and its tests start their own.
 
 ```bash
 mise trust --all
@@ -25,51 +111,42 @@ mise run format  # format the sources of every project
 ```
 
 mise installs the pinned tools on first use. The frontend installs dependencies from its
-committed pnpm lockfile before running a task.
+committed pnpm lockfile before its tasks run. In development, the Angular dev server forwards
+`/api` to the backend on port 8080.
 
 To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
-`check` task. The frontend checks formatting, typed ESLint rules, template accessibility,
-the production build, Vitest tests and Cloudflare runtime integration tests.
+`check` task. The backend checks formatting, compiler warnings, Error Prone, NullAway and its
+tests. The frontend checks formatting, typed ESLint rules, template accessibility, the
+production build, Vitest tests and Cloudflare runtime integration tests.
 
-The repository root includes shared agent instructions and Angular MCP configuration for
-Claude Code, Codex and Agents. The MCP server uses the project's pinned CLI, install
-dependencies first with `mise run //vienna-pulse-frontend:install`.
+[`AGENTS.md`](AGENTS.md) holds the instructions for coding agents, and `CLAUDE.md` points Claude
+Code to it. `.mcp.json` and `.codex/config.toml` start the Angular CLI's MCP server for Claude
+Code and Codex with the project's pinned CLI. Install its dependencies first with
+`mise run //vienna-pulse-frontend:install`.
 
 ## Map view
 
-The frontend shows Vienna's public transport stops and today's scheduled routes on a full-screen
-map. [MapLibre GL JS](https://maplibre.org) draws the map with
+The frontend shows Vienna's public transport stops, today's scheduled routes and the running
+vehicles on a full-screen map. [MapLibre GL JS](https://maplibre.org) draws the map with
 [OpenFreeMap](https://openfreemap.org)'s light Positron style, which needs no API key. Stops come
 from `/api/stops` and routes from `/api/lines`, using today's service date in Vienna. The date
-updates within a minute of midnight and when a suspended tab resumes. Lines use
-the feed's colors, with fallback colors when none are supplied, and show their names at closer
-zoom levels. The All, U-Bahn, Tram and Bus controls filter routes and stops. Interchanges remain
+updates within a minute of midnight and when a suspended tab resumes. Lines use the feed's colors,
+with fallback colors when none are supplied, and show their names at closer zoom levels.
+
+Vehicles come from `/api/vehicles` every 15 seconds while the tab is visible, and again as soon
+as it becomes visible. Each one is a dot in its line's color that glides at an even pace to its
+next position over those 15 seconds, so the vehicles keep moving between two requests. With
+reduced motion turned on, they jump instead. These are positions from the timetable, not live
+ones.
+
+The All, U-Bahn, Tram and Bus controls filter routes, vehicles and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while
-routes run on today's service date. These are timetable routes, without live vehicle positions. Stop loading and upgrade status appear in the map panel only while needed, with a retry button
-when the stops request fails.
-
-Stop modes come from `stop_times.txt`, trips and routes. The importer stores every stop time and
-classifies every platform before swapping the timetable into place. An existing database starts a
-new import after a schema upgrade adds stop modes, stop times or trip spans. While the backend is
-upgrading or importing for the first time, the frontend keeps available stops visible and rechecks
-once a minute until classifications arrive.
-
-The backend also serves a stop's next 20 departures from the stored stop times at
-`/api/stops/{id}/departures`, with the merged stop id the map uses, such as `at:49:1320`. Each
-departure gives its time in Vienna, its line, its headsign and its platform. The map does not show
-them yet.
-
-`/api/vehicles` serves a GeoJSON point for every trip running now, where its timetable puts it,
-with the trip id as feature id and the line, its colors and the headsign as properties. A
-vehicle moves along its shape at an even speed between two stops and waits at a stop between
-its arrival and departure. These are scheduled positions, not live ones, and the map does not
-show them yet. To find the running trips without reading every call, the importer stores when
-each trip leaves its first stop and reaches its last.
-
-In development, the Angular dev server forwards `/api` to the backend on port 8080. The map keeps
-MapLibre's own mouse, touch and keyboard controls. The view is in
-[`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+routes run on today's service date. Stop loading and upgrade status appear in the map panel only
+while needed, with a retry button when the stops request fails. While the backend is upgrading or
+importing for the first time, the frontend keeps available stops visible and rechecks once a
+minute until classifications arrive. The map keeps MapLibre's own mouse, touch and keyboard
+controls.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
@@ -99,8 +176,10 @@ rm -r "$district_tmp"
 
 ## Deployment
 
-The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
-Static Assets. Frontend changes to `main` deploy after the checks pass, and each pull request
-that changes the frontend gets a preview at `pr-<number>.pulse.vladdancea.com`. `/api/*` continues
-to reach the backend on Hetzner through its Cloudflare tunnel. See [`deploy/README.md`](deploy/README.md)
-for credentials, previews, manual deployments and rollback.
+A merge to `main` ships to production. The frontend runs at
+[pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers Static Assets, and
+frontend changes deploy after the checks pass. Each pull request from a branch in this repository
+that changes the frontend gets a Preview at `pr-<number>.pulse.vladdancea.com`. Backend changes
+build a container image with signed provenance, which CI deploys to the server over Tailscale before it checks
+`/api/stops` through Cloudflare. See [`deploy/README.md`](deploy/README.md) for credentials,
+previews, manual deployments and rollback.
