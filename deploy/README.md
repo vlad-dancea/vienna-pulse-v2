@@ -16,11 +16,12 @@ tunnel. The server has no open ports to the internet:
 
 ## How a deploy works
 
-Every push to `main` that touches the frontend runs `.github/workflows/frontend.yml`:
+Every push to `main` that touches the frontend, or the backend's `openapi.json` its API types
+come from, runs `.github/workflows/frontend.yml`:
 
-1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, typed ESLint, Angular tests,
-   production build, Worker type checking and packaging, and integration tests in Cloudflare's
-   local runtime. The integration tests use a temporary local HTTP origin to verify API
+1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, generated API types, typed
+   ESLint, Angular tests, production build, Worker type checking and packaging, and integration
+   tests in Cloudflare's local runtime. The integration tests use a temporary local HTTP origin to verify API
    forwarding without depending on production.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
