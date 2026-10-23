@@ -30,7 +30,7 @@ public class LineController {
     private final LineService lineService;
     private final Clock clock;
     private final TimetableVersion timetable;
-    private final ResponseCache cache;
+    private final CachedResponses responses;
 
     /// The lines running on `date`, given as `YYYY-MM-DD` and today in Vienna if left out, as GeoJSON
     /// that is also served as plain JSON for MapLibre. Any other date, empty included, gets a 400,
@@ -48,7 +48,7 @@ public class LineController {
         if (!day.equals(today)) {
             return ResponseEntity.ok().cacheControl(CacheControl.noCache()).body(lineService.lines(day));
         }
-        return cache.get("lines", () -> new Timetable(timetable.current(), day), key -> lineService.lines(key.day()));
+        return responses.lines(timetable.current(), day).response();
     }
 
     private static LocalDate parse(String date) {
@@ -62,6 +62,4 @@ public class LineController {
         throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST, "The date must be a day written as YYYY-MM-DD, not '%s'".formatted(date));
     }
-
-    private record Timetable(long version, LocalDate day) {}
 }

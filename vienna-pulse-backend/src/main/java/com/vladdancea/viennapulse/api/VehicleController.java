@@ -2,7 +2,6 @@ package com.vladdancea.viennapulse.api;
 
 import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -14,13 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class VehicleController {
-    // Every map asks every 15 seconds and glides its vehicles over that time, so positions up to one
-    // step old do not show, and the database works out the vehicles at most once per step.
-    private static final Duration STEP = Duration.ofSeconds(5);
-
-    private final VehicleService vehicleService;
     private final Clock clock;
-    private final ResponseCache cache;
+    private final CachedResponses responses;
 
     /// Where the timetable puts every running vehicle at the start of the current five-second step,
     /// as GeoJSON points that are also served as plain JSON for MapLibre. Every request in a step
@@ -29,11 +23,11 @@ public class VehicleController {
             path = "/api/vehicles",
             produces = {FeatureCollection.MEDIA_TYPE, MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<byte[]> vehicles() {
-        return cache.get("vehicles", () -> stepStart(clock.instant()), vehicleService::vehicles);
+        return responses.vehicles(stepStart(clock.instant())).response();
     }
 
     private static Instant stepStart(Instant now) {
         var second = now.getEpochSecond();
-        return Instant.ofEpochSecond(second - Math.floorMod(second, STEP.toSeconds()));
+        return Instant.ofEpochSecond(second - Math.floorMod(second, ApiConfiguration.VEHICLE_STEP.toSeconds()));
     }
 }

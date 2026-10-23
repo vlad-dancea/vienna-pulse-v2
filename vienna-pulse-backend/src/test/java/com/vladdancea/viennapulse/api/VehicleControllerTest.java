@@ -1,5 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
+import static java.util.Objects.requireNonNull;
+
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import java.time.Clock;
 import java.time.Instant;
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -40,7 +43,7 @@ class VehicleControllerTest {
     JdbcClient jdbc;
 
     @Autowired
-    ResponseCache cache;
+    CacheManager caches;
 
     // Never read: the field only names the bean that clock() replaces.
     @TestBean
@@ -77,7 +80,9 @@ class VehicleControllerTest {
         addShapePoint(SHAPE, 1, 16.0, 48.0, 0.0);
         addShapePoint(SHAPE, 2, 16.1, 48.0, 1000.0);
         addShapePoint(SHAPE, 3, 16.1, 48.1, 2000.0);
-        cache.clear();
+        // Changes made without an import go unnoticed by the cached responses.
+        caches.getCacheNames()
+                .forEach(name -> requireNonNull(caches.getCache(name)).clear());
     }
 
     @Test

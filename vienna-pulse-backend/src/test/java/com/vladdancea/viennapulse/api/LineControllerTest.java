@@ -1,5 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
+import static java.util.Objects.requireNonNull;
+
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
 import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
@@ -25,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -47,7 +50,7 @@ class LineControllerTest {
     JdbcClient jdbc;
 
     @Autowired
-    ResponseCache cache;
+    CacheManager caches;
 
     @Autowired
     Store store;
@@ -67,7 +70,9 @@ class LineControllerTest {
         for (var table : Set.of("routes", "trips", "shape_points", "service_calendars", "calendar_dates")) {
             jdbc.sql("DELETE FROM timetable." + table).update();
         }
-        cache.clear();
+        // Changes made without an import go unnoticed by the cached responses.
+        caches.getCacheNames()
+                .forEach(name -> requireNonNull(caches.getCache(name)).clear());
     }
 
     @Test

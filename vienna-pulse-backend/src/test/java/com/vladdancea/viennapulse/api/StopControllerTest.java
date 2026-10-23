@@ -23,6 +23,7 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -43,7 +44,7 @@ class StopControllerTest {
     JdbcClient jdbc;
 
     @Autowired
-    ResponseCache cache;
+    CacheManager caches;
 
     @Autowired
     Store store;
@@ -55,7 +56,9 @@ class StopControllerTest {
     void removeAllStops() {
         jdbc.sql("DELETE FROM timetable.stops").update();
         jdbc.sql("DELETE FROM timetable.stop_modes").update();
-        cache.clear();
+        // Changes made without an import go unnoticed by the cached responses.
+        caches.getCacheNames()
+                .forEach(name -> requireNonNull(caches.getCache(name)).clear());
     }
 
     @Test

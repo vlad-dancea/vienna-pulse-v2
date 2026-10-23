@@ -11,9 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class StopController {
-    private final StopService stopService;
     private final TimetableVersion timetable;
-    private final ResponseCache cache;
+    private final CachedResponses responses;
 
     /// Every stop as a GeoJSON point, also served as plain JSON because MapLibre asks for that.
     /// The stops change only with an import, so they are read once per timetable and the ETag
@@ -22,6 +21,6 @@ public class StopController {
             path = "/api/stops",
             produces = {FeatureCollection.MEDIA_TYPE, MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<byte[]> stops() {
-        return cache.get("stops", timetable::current, version -> stopService.stops());
+        return responses.stops(timetable.current()).response();
     }
 }
