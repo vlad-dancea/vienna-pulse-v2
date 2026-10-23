@@ -1,6 +1,5 @@
 package com.vladdancea.viennapulse.importer;
 
-import com.vladdancea.viennapulse.importer.download.DownloadedFeed;
 import com.vladdancea.viennapulse.importer.download.FeedDownloader;
 import com.vladdancea.viennapulse.importer.download.FeedValidator;
 import com.vladdancea.viennapulse.importer.history.FeedFile;
@@ -82,7 +81,7 @@ public class ImportJob {
                 validator.validate(feed.path());
                 replaceTimetable(feed.path(), attempt);
             } finally {
-                delete(feed);
+                cleanUp(feed, "the downloaded feed " + feed.path());
             }
         } catch (RestClientException exception) {
             log.error("Feed download failed", exception);
@@ -100,18 +99,19 @@ public class ImportJob {
         }
     }
 
-    // A feed left behind only takes disk space until the next start deletes it, so it does not fail an
-    // import that may already have replaced the timetable.
-    private static void delete(DownloadedFeed feed) {
+    // Runs after the import may have replaced the timetable, so a failure is only logged: a feed left
+    // behind takes disk space until the next start deletes it, and the import has already succeeded.
+    private static void cleanUp(AutoCloseable resource, String name) {
         try {
-            feed.close();
-        } catch (IOException exception) {
-            log.warn("Could not delete the downloaded feed {}", feed.path(), exception);
+            resource.close();
+        } catch (Exception exception) {
+            log.warn("Could not close {}", name, exception);
         }
     }
 
     private void replaceTimetable(Path feed, ImportAttempt attempt) throws IOException {
-        try (var zip = new ZipFile(feed.toFile())) {
+        var zip = new ZipFile(feed.toFile());
+        try {
             store.replace(
                     staging -> {
                         staging.copy(
@@ -130,6 +130,8 @@ public class ImportJob {
                                 calendarDateReader.read(zip).values()::forEach);
                     },
                     rowCounts -> history.succeeded(attempt, rowCounts));
+        } finally {
+            cleanUp(zip, "the feed's ZIP file " + feed);
         }
         log.info("Stored the timetable from {}", feed);
     }
