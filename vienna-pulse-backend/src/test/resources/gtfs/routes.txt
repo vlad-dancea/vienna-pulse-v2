@@ -1,0 +1,3 @@
+﻿route_id,agency_id,route_short_name,route_long_name,route_type,route_color,route_text_color
+"21-U1-j26-1","04","U1","Oberlaa - Leopoldau","1","E3000F","FFFFFF"
+"22-2-j26-1","04","2","Dornbach - Friedrich-Engels-Platz","0","C00808","FFFFFF"
