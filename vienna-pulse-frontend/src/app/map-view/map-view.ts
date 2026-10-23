@@ -12,10 +12,10 @@ import {
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
 import { addDistricts } from './districts';
-import { RunningLines } from './running-lines';
-import { NetworkStops } from './network-stops';
+import { RunningLines } from '../timetable/running-lines';
+import { NetworkStops } from '../timetable/network-stops';
 import { MovingVehicles } from './moving-vehicles';
-import { RunningVehicles } from './running-vehicles';
+import { RunningVehicles } from '../timetable/running-vehicles';
 
 const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
   // Keep any other API route types visible with buses, below the tram and U-Bahn layers.

@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point, Position } from 'geojson';
 import type { GeoJSONSource } from 'maplibre-gl';
-import type { VehicleProperties } from './running-vehicles';
+import type { VehicleProperties } from '../timetable/running-vehicles';
 
 interface Glide {
   vehicle: Feature<Point, VehicleProperties>;

@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import type { FilterSpecification, LayerSpecification, LineLayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
-import { NetworkStops } from './network-stops';
+import { NetworkStops } from '../timetable/network-stops';
 
 const map = vi.hoisted(() => ({
   once: vi.fn(),

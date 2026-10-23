@@ -1,7 +1,7 @@
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { MovingVehicles } from './moving-vehicles';
-import type { VehicleProperties } from './running-vehicles';
+import type { VehicleProperties } from '../timetable/running-vehicles';
 
 function vehicle(id: string, longitude: number): Feature<Point, VehicleProperties> {
   return {
