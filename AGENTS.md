@@ -15,7 +15,8 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   your own shell too, because the pattern is in its command line, so a `pkill -f` or a `kill`
   loop over `pgrep -f` kills the shell running it. If you must find a process by pattern,
   bracket one letter, as in `pgrep -f '[n]g serve'`, and check each PID's command line with
-  `ps -o args= -p <pid>` before you kill it.
+  `ps -o args= -p <pid>` and its folder with `readlink /proc/<pid>/cwd` before you kill it,
+  because other worktrees run the same commands.
 - Run `mise run dev` in one worktree at a time. Its ports are fixed, and every worktree shares
   one Docker Compose project and database volume, named after the `vienna-pulse-backend` folder.
   `mise run check` starts its own database with Testcontainers, so it runs in parallel safely.
