@@ -56,6 +56,7 @@ export class MapView {
   private readonly lineRetry = viewChild<ElementRef<HTMLButtonElement>>('lineRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
   private readonly movingVehicles = signal<MovingVehicles | undefined>(undefined);
+  protected readonly styleFailed = signal(false);
   protected readonly stopRetryShown = computed(() => !!this.stops.stops.error() && !this.stops.latest());
   protected readonly lineRetryShown = computed(
     () => !!this.lines.routes.error() && !this.lines.latest() && !this.lines.unavailable(),
@@ -146,6 +147,16 @@ export class MapView {
           [16.1, 47.95],
           [16.65, 48.4],
         ],
+      });
+
+      // Without its style MapLibre never fires load, so the page would stay empty without a word.
+      // Later errors, such as a missing tile, leave a usable map.
+      const styleErrors = map.on('error', (event) => {
+        console.error(event.error);
+        this.styleFailed.set(true);
+      });
+      map.once('style.load', () => {
+        styleErrors.unsubscribe();
       });
 
       // Keep routes below stops so platforms stay visible at interchanges.

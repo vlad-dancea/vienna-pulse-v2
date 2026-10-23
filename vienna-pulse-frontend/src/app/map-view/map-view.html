@@ -21,6 +21,11 @@
       </button>
     }
   </div>
+  @if (styleFailed()) {
+    <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">
+      The map could not be loaded. Reload the page to try again.
+    </p>
+  }
   @if (!stops.classified()) {
     <p role="status" class="mt-3 max-w-64 text-sm text-slate-600">
       @if (stops.latest(); as latest) {

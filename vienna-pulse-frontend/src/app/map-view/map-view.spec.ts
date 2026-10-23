@@ -7,6 +7,7 @@ import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
 import { NetworkStops } from './network-stops';
 
 const map = vi.hoisted(() => ({
+  on: vi.fn(),
   once: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn<(layer: LayerSpecification, beforeId?: string) => void>(),
@@ -114,14 +115,25 @@ const expectedLayers: [string, FilterSpecification][] = [
 describe('MapView', () => {
   let http: HttpTestingController;
   let loadMap: () => void;
+  let loadStyle: () => void;
+  let errorListeners: Set<(event: { error: Error }) => void>;
   let setData: ReturnType<typeof vi.fn>;
   let setStops: ReturnType<typeof vi.fn>;
   let setVehicles: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    map.once.mockImplementation((_event: string, callback: () => void) => {
-      loadMap = callback;
+    map.once.mockImplementation((event: string, callback: () => void) => {
+      if (event === 'load') {
+        loadMap = callback;
+      } else {
+        loadStyle = callback;
+      }
+    });
+    errorListeners = new Set();
+    map.on.mockImplementation((_event: string, listener: (event: { error: Error }) => void) => {
+      errorListeners.add(listener);
+      return { unsubscribe: () => errorListeners.delete(listener) };
     });
     setData = vi.fn();
     setStops = vi.fn();
@@ -327,6 +339,37 @@ describe('MapView', () => {
       fixture.destroy();
       TestBed.resetTestingModule();
       vi.useRealTimers();
+    }
+  });
+
+  it('says so when the base map style fails, but not for errors after it loaded', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      http.expectOne((request) => request.url === '/api/lines').flush(routes);
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const message = 'The map could not be loaded. Reload the page to try again.';
+
+      loadStyle();
+      for (const listener of errorListeners) listener({ error: new Error('Tile failed') });
+      await fixture.whenStable();
+      expect(element.textContent).not.toContain(message);
+
+      fixture.destroy();
+      const failed = TestBed.createComponent(MapView);
+      TestBed.tick();
+      const error = new Error('Style failed');
+      for (const listener of errorListeners) listener({ error });
+      await failed.whenStable();
+      expect((failed.nativeElement as HTMLElement).textContent).toContain(message);
+      expect(consoleError).toHaveBeenCalledWith(error);
+      failed.destroy();
+    } finally {
+      consoleError.mockRestore();
     }
   });
 
