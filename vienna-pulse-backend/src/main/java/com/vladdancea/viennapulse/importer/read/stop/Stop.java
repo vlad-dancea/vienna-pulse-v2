@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.importer.read.stop;
 
+import com.vladdancea.viennapulse.importer.read.Coordinates;
 import org.jspecify.annotations.Nullable;
 
 /// One row of `stops.txt`. The constructor rejects a row that breaks the GTFS rules with an
@@ -18,13 +19,7 @@ public record Stop(
         if (name.isBlank()) {
             throw new IllegalArgumentException("stop " + id + " has a blank name");
         }
-        validateCoordinate("stop_lat", latitude, 90);
-        validateCoordinate("stop_lon", longitude, 180);
-    }
-
-    private static void validateCoordinate(String field, double value, int limit) {
-        if (!Double.isFinite(value) || value < -limit || value > limit) {
-            throw new IllegalArgumentException(field + " " + value + " is not between " + -limit + " and " + limit);
-        }
+        Coordinates.checkLatitude("stop_lat", latitude);
+        Coordinates.checkLongitude("stop_lon", longitude);
     }
 }
