@@ -5,8 +5,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
+import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -22,13 +22,29 @@ public class TestcontainersConfiguration {
             Pattern.compile("^\\s*image:\\s*(postgres:\\S+)\\s*$", Pattern.MULTILINE);
 
     // One container for every Spring context of the test run, which would otherwise each start their
-    // own. A closing context stops it, which Spring's context cache only does when the run ends.
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(postgresImage());
+    // own. It is no bean, because a context stops its container beans when it closes, as when the
+    // context cache evicts it, while other cached contexts still use them. Testcontainers removes it
+    // when the test run ends.
+    static final PostgreSQLContainer POSTGRES = startPostgres();
 
     @Bean
-    @ServiceConnection
-    PostgreSQLContainer postgres() {
-        return POSTGRES;
+    JdbcConnectionDetails postgres() {
+        return new JdbcConnectionDetails() {
+            @Override
+            public String getUsername() {
+                return POSTGRES.getUsername();
+            }
+
+            @Override
+            public String getPassword() {
+                return POSTGRES.getPassword();
+            }
+
+            @Override
+            public String getJdbcUrl() {
+                return POSTGRES.getJdbcUrl();
+            }
+        };
     }
 
     // Primary instead of a replacement for the application's clock, so that every test class shares
@@ -42,6 +58,12 @@ public class TestcontainersConfiguration {
     @Bean
     TimetableFixture timetableFixture(JdbcClient jdbc) {
         return new TimetableFixture(jdbc);
+    }
+
+    private static PostgreSQLContainer startPostgres() {
+        var postgres = new PostgreSQLContainer(postgresImage());
+        postgres.start();
+        return postgres;
     }
 
     private static DockerImageName postgresImage() {
