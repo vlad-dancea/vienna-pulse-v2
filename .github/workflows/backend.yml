@@ -186,8 +186,19 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     permissions:
+      contents: read # check out the smoke test
       id-token: write # log in to Tailscale with GitHub's identity token instead of a stored secret
     steps:
+      # The smoke test is a mise task that needs nothing but curl and jq, so mise installs no tools.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          install: false
+          cache: false
+
       - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           # Identify the federated identity in Tailscale. Neither is a secret.
@@ -213,20 +224,11 @@ jobs:
             -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 \
             "deploy@$HOST" "deploy $GITHUB_SHA $DIGEST"
 
-      # Through Cloudflare and the tunnel, as a visitor would. A new database imports the feed
-      # in the background after startup, so the stops can take a minute to appear.
+      # Through Cloudflare and the tunnel, as a visitor would.
       - name: Smoke test
-        run: |
-          for attempt in $(seq 24); do
-            if count=$(curl --fail --silent --show-error --compressed \
-                https://pulse.vladdancea.com/api/stops | jq '.features | length') && ((count > 0)); then
-              echo "The API serves $count stops"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::The API serves no stops through Cloudflare"
-          exit 1
+        run: mise run //vienna-pulse-backend:smoke
+        env:
+          MISE_TASK_RUN_AUTO_INSTALL: false
 
   # This stable check reports even when the project is unchanged, and fails closed when
   # detection, validation or packaging fails or is cancelled.

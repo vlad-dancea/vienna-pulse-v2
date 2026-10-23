@@ -186,8 +186,8 @@ rm -r "$district_tmp"
 The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
 Static Assets. A merge to `main` that changes the frontend deploys it after the checks pass. One
 that changes the backend or its production stack builds a container image with signed
-provenance, which CI deploys to the server over Tailscale before it checks `/api/stops` through
-Cloudflare. A merge that changes neither, such as one to this README, deploys nothing. Each pull
+provenance, which CI deploys to the server over Tailscale before it checks every API endpoint
+through Cloudflare. A merge that changes neither, such as one to this README, deploys nothing. Each pull
 request from a branch in this repository that changes the frontend gets a Preview at
 `pr-<number>.pulse.vladdancea.com`. See [`deploy/README.md`](deploy/README.md) for credentials,
 previews, manual deployments and rollback.
