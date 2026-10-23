@@ -16,8 +16,8 @@ tunnel. The server has no open ports to the internet:
 
 ## How a deploy works
 
-Every push to `main` that touches the frontend, or the backend's `openapi.json` its API types
-come from, runs `.github/workflows/frontend.yml`:
+Every push to `main` that touches the frontend or the backend's `openapi.json` runs
+`.github/workflows/frontend.yml`:
 
 1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, generated API types, typed
    ESLint, Angular tests, production build, Worker type checking and packaging, and integration
