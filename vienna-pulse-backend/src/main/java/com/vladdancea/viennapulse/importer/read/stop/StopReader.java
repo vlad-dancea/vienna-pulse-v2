@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.importer.read.stop;
 
+import static com.vladdancea.viennapulse.importer.read.FeedCsv.decimal;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.optional;
 import static com.vladdancea.viennapulse.importer.read.FeedCsv.required;
 
@@ -25,22 +26,13 @@ public class StopReader implements FeedFileReader<Stop> {
         return new Stop(
                 required(row, "stop_id"),
                 required(row, "stop_name"),
-                coordinate(row, "stop_lat"),
-                coordinate(row, "stop_lon"),
+                decimal(row, "stop_lat"),
+                decimal(row, "stop_lon"),
                 optional(row, "zone_id"));
     }
 
     @Override
     public String id(Stop stop) {
         return stop.id();
-    }
-
-    private static double coordinate(NamedCsvRecord row, String field) {
-        var value = required(row, field);
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(field + " " + value + " is not a number", exception);
-        }
     }
 }
