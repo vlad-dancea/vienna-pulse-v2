@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,10 +64,18 @@ class FeedDownloaderTest {
 
     @Test
     void stopsAnOversizedDownloadAndDeletesItsFile() {
+        // Sends until the client hangs up, or 256 MB if it reads on.
+        var sent = new AtomicLong();
         serve(exchange -> {
-            exchange.sendResponseHeaders(200, 0);
             try (var body = exchange.getResponseBody()) {
-                body.write(new byte[2 * 1024 * 1024]);
+                exchange.sendResponseHeaders(200, 0);
+                var chunk = new byte[64 * 1024];
+                while (sent.get() < 256 * 1024 * 1024) {
+                    body.write(chunk);
+                    sent.addAndGet(chunk.length);
+                }
+            } catch (IOException exception) {
+                // The client hung up.
             }
         });
 
@@ -76,6 +85,8 @@ class FeedDownloaderTest {
                 .isInstanceOf(RestClientException.class)
                 .hasMessage("GTFS download passed 1 MB and was stopped");
         assertThat(feedFiles()).isEqualTo(feedsBefore);
+        // Spring reads the rest of a response it closes, unless the downloader closed the body first.
+        assertThat(sent.get()).isLessThan(64 * 1024 * 1024);
     }
 
     @Test
