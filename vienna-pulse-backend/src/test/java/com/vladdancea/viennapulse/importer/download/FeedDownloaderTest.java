@@ -113,8 +113,6 @@ class FeedDownloaderTest {
         return new FeedDownloader(new ImporterProperties(url, DataSize.ofMegabytes(1), false), clientBuilder);
     }
 
-    // Other test runs on this machine share the directory, so this compares against the files
-    // that were there when the test started.
     private static List<Path> feedFiles() {
         var feeds = new ArrayList<Path>();
         try (var files = Files.newDirectoryStream(Path.of(System.getProperty("java.io.tmpdir")), "pulse-gtfs-*.zip")) {

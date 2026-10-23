@@ -67,4 +67,7 @@ tasks.javadoc {
 
 tasks.test {
     useJUnitPlatform()
+    // Tests write and delete feed files in the temporary directory, which test runs in other
+    // worktrees and the running app share otherwise.
+    systemProperty("java.io.tmpdir", temporaryDir.absolutePath)
 }
