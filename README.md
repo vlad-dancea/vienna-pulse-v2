@@ -119,8 +119,9 @@ To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The backend checks formatting, compiler warnings, Error Prone, NullAway and its
 tests. The frontend checks formatting, its generated API types, typed ESLint rules, template
-accessibility, the production build, Vitest tests and Cloudflare runtime integration tests. The backend's CI
-workflow also packages the jar and builds the container image, which the local check does not.
+accessibility, the production build, Vitest tests and Cloudflare runtime integration tests. The
+backend's CI workflow also packages the jar and builds the container image, which the local
+check does not.
 
 The backend's `openapi.json` describes what the API answers. A backend test fails when the
 controllers serve anything else, and the frontend generates its API types from the file, so a
