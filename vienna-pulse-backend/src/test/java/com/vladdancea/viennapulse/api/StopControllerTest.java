@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.TimetableFixture;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -38,16 +39,18 @@ class StopControllerTest {
     @LocalServerPort
     int port;
 
+    @Autowired
+    TimetableFixture timetable;
+
     @BeforeEach
     void removeAllStops() {
-        jdbc.sql("DELETE FROM timetable.stops").update();
-        jdbc.sql("DELETE FROM timetable.stop_modes").update();
+        timetable.clear();
     }
 
     @Test
     void servesEveryStopAsGeoJson() {
-        addStop("s2", "Stephansplatz", 48.20845, 16.37212);
-        addStop("s1", "Karlsplatz", 48.20024, 16.36951);
+        timetable.addStop("s2", "Stephansplatz", 48.20845, 16.37212);
+        timetable.addStop("s1", "Karlsplatz", 48.20024, 16.36951);
 
         // Ordered by id, and longitude before latitude.
         client.get()
@@ -75,10 +78,10 @@ class StopControllerTest {
     @Test
     void mergesThePlatformsOfAStopIntoOnePointInTheirMiddle() {
         // Ids and names from the feed; coordinates whose averages are exact in floating point.
-        addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
-        addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
-        addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
-        addStop("at:49:1320:0:1", "Stephansplatz", 48.20845, 16.37212);
+        timetable.addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
+        timetable.addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
+        timetable.addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
+        timetable.addStop("at:49:1320:0:1", "Stephansplatz", 48.20845, 16.37212);
 
         client.get()
                 .uri("/api/stops")
@@ -100,10 +103,10 @@ class StopControllerTest {
 
     @Test
     void combinesModesWithoutWeightingTheNameOrCentroidByModeCount() {
-        addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
-        addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
-        addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
-        addStop("unused", "Unused", 48.0, 16.0);
+        timetable.addStop("at:49:1349:0:1", "Hauptbahnhof", 48.25, 16.25);
+        timetable.addStop("at:49:1349:0:2", "Südtiroler Pl. - Hbf.", 48.5, 16.5);
+        timetable.addStop("at:49:1349:0:3", "Hauptbahnhof", 48.75, 16.75);
+        timetable.addStop("unused", "Unused", 48.0, 16.0);
         jdbc.sql("""
                 INSERT INTO timetable.stop_modes VALUES
                 ('at:49:1349:0:1', ARRAY['TRAM']),
@@ -135,7 +138,7 @@ class StopControllerTest {
 
     @Test
     void servesPlainJsonToClientsThatOnlyAcceptIt() {
-        addStop("s1", "Karlsplatz", 48.20024, 16.36951);
+        timetable.addStop("s1", "Karlsplatz", 48.20024, 16.36951);
 
         // What MapLibre sends when it loads a GeoJSON source.
         client.get()
@@ -150,7 +153,7 @@ class StopControllerTest {
 
     @Test
     void answersNotModifiedWhileTheStopsAreUnchanged() {
-        addStop("s1", "Karlsplatz", 48.20024, 16.36951);
+        timetable.addStop("s1", "Karlsplatz", 48.20024, 16.36951);
         var etag = etag();
 
         client.get()
@@ -165,9 +168,9 @@ class StopControllerTest {
 
     @Test
     void sendsTheNewStopsOnceTheyChange() {
-        addStop("s1", "Karlsplatz", 48.20024, 16.36951);
+        timetable.addStop("s1", "Karlsplatz", 48.20024, 16.36951);
         var before = etag();
-        addStop("s2", "Stephansplatz", 48.20845, 16.37212);
+        timetable.addStop("s2", "Stephansplatz", 48.20845, 16.37212);
 
         client.get()
                 .uri("/api/stops")
@@ -182,7 +185,7 @@ class StopControllerTest {
     void compressesTheResponse() throws IOException, InterruptedException {
         // Tomcat leaves responses under 2 KB uncompressed.
         for (int i = 0; i < 50; i++) {
-            addStop("s" + i, "Stop " + i, 48.2, 16.37);
+            timetable.addStop("s" + i, "Stop " + i, 48.2, 16.37);
         }
         // The test client unpacks compressed responses and drops the header, so the JDK client asks.
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/stops"))
@@ -194,12 +197,6 @@ class StopControllerTest {
             assertThat(response.headers().firstValue(HttpHeaders.CONTENT_ENCODING))
                     .hasValue("gzip");
         }
-    }
-
-    private void addStop(String id, String name, double latitude, double longitude) {
-        jdbc.sql("INSERT INTO timetable.stops (id, name, latitude, longitude) VALUES (?, ?, ?, ?)")
-                .params(id, name, latitude, longitude)
-                .update();
     }
 
     private String etag() {

@@ -23,7 +23,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 // The same setup as the controller tests, so that all of them share one application and database.
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -45,9 +44,6 @@ class DatabaseFailureTest {
     @Autowired
     JdbcClient jdbc;
 
-    @Autowired
-    PostgreSQLContainer postgres;
-
     // Without a limit the query would wait for the lock until the test gives up.
     @Test
     @Timeout(20)
@@ -68,6 +64,7 @@ class DatabaseFailureTest {
     @Test
     @Timeout(30)
     void answersWithA503WhileTheDatabaseIsFrozen() throws Exception {
+        var postgres = TestcontainersConfiguration.POSTGRES;
         var docker = postgres.getDockerClient();
         try (var lock = dataSource.getConnection()) {
             lock.setAutoCommit(false);
