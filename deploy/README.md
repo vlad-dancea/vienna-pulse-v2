@@ -2,16 +2,30 @@
 
 The frontend is served from Cloudflare Workers Static Assets at `https://pulse.vladdancea.com`.
 The Worker route in [`wrangler.json`](../vienna-pulse-frontend/wrangler.json) runs in front of the
-existing tunnel DNS record. Static files and Angular navigation stay at Cloudflare's edge;
-`/api` and `/api/*` go through the Worker to the tunnel. Explicit API routing prevents a browser
-navigation to an API endpoint from receiving Angular's HTML fallback.
+existing tunnel DNS record. Static files and Angular navigation stay at Cloudflare's edge.
+
+The site reads the API from `https://pulse-api.vladdancea.com/api/*`, a tunnel hostname with no
+Worker in front of it. On the Workers Free plan every request that runs a Worker counts against
+100,000 a day, reset at 00:00 UTC, and Cloudflare answers the rest with a 429. Static assets are
+free, but one open map polls `/api/vehicles` 5,760 times a day, so a few maps left open would use
+the quota up if the API went through the Worker. The backend allows GET and HEAD from
+`https://pulse.vladdancea.com` and `https://pr-*.pulse.vladdancea.com` with CORS, without
+credentials, and refuses other origins.
+
+`/api` and `/api/*` on `pulse.vladdancea.com` still go through the Worker to the tunnel, for tabs
+that loaded the JavaScript from before the API had its own hostname. Explicit API routing there
+keeps a browser navigation to an API endpoint from receiving Angular's HTML fallback. A route
+without a Worker for `pulse.vladdancea.com/api/*` does not bypass the Worker on this hostname:
+the Worker still ran for every request with one in place, most likely because of the preview-only
+custom domain below.
 
 The backend runs on one Hetzner Cloud server (CX23: 2 vCPU, 4 GB RAM, Debian 13, x86_64) as the
 Docker Compose stack in [`compose.yaml`](compose.yaml): the backend, PostgreSQL and a Cloudflare
 tunnel. The server has no open ports to the internet:
 
-- Visitors reach `https://pulse.vladdancea.com/api/*` through Cloudflare, which forwards over the
-  tunnel that cloudflared opened from the server. Cloudflare terminates TLS.
+- Visitors reach `https://pulse-api.vladdancea.com/api/*` (and the older
+  `https://pulse.vladdancea.com/api/*`) through Cloudflare, which forwards over the tunnel that
+  cloudflared opened from the server. Cloudflare terminates TLS.
 - Administrators and CI reach SSH over [Tailscale](https://tailscale.com).
 
 ## How a deploy works
@@ -24,8 +38,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
    forwarding without depending on production.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
-3. The smoke test checks that the public JavaScript and map worker match the build and that
-   `/api/stops` still serves GeoJSON through the tunnel.
+3. The smoke test checks that the public JavaScript and map worker match the build, that the
+   build calls `pulse-api.vladdancea.com`, and that `/api/stops` serves GeoJSON through the tunnel
+   on both hostnames, with the site's origin allowed on the API's.
 
 Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
 production deployment. Frontend deployments do not restart the backend.
@@ -67,9 +82,11 @@ A Preview is a separate copy of the same Worker, and production traffic never re
   (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
   with its own wildcard certificate, while the hostname itself keeps the production route and the
   tunnel CNAME.
-- A Preview hostname has no tunnel behind it, so the `previews` block sets `API_ORIGIN` and the
-  Worker sends `/api` requests to production. Previews show frontend changes against the
-  production API. Backend changes in the same pull request are not part of the Preview.
+- A Preview is built like production, so its JavaScript reads the production API at
+  `pulse-api.vladdancea.com`, which allows `pr-*` origins. Its own hostname has no tunnel behind
+  it, so the `previews` block sets `API_ORIGIN` and the Worker sends the old `/api` path to
+  production too. Previews show frontend changes against the production API. Backend changes in
+  the same pull request are not part of the Preview.
 - Previews are public. `public/_headers` sends `X-Robots-Tag: noindex` on Preview hostnames so
   search engines index production only.
 
@@ -172,9 +189,11 @@ These steps rebuild production from nothing. Everything else is in this reposito
    a repository that later takes the same name cannot match. Tailscale cannot change a
    credential's subject afterwards; a wrong one has to be revoked and created again.
 
-3. **Cloudflare tunnel.** A remotely managed tunnel with one route, `pulse.vladdancea.com` path
-   `^/api/` to `http://backend:8080`, then `http_status:404` for everything else, and a proxied
-   CNAME from `pulse.vladdancea.com` to `<tunnel id>.cfargotunnel.com`.
+3. **Cloudflare tunnel.** A remotely managed tunnel with two routes, `pulse-api.vladdancea.com`
+   and `pulse.vladdancea.com`, each with path `^/api/` to `http://backend:8080`, then
+   `http_status:404` for everything else, and a proxied CNAME from each hostname to
+   `<tunnel id>.cfargotunnel.com`. The API's hostname sits one level below the zone, so
+   Universal SSL covers it, and outside `*.pulse.vladdancea.com`, which belongs to Previews.
 
 4. **Secrets.** Files in `/opt/vienna-pulse/secrets/` (folder `0700`, files `0444`, so the
    containers' unprivileged users can read them). Never overwrite the database passwords: the
