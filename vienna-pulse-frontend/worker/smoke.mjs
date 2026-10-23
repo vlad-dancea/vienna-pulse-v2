@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { setTimeout } from 'node:timers/promises';
-import { assertSiteHeaders } from './headers.mjs';
+import { assertRevalidated, assertSiteHeaders } from './headers.mjs';
 
 const production = 'https://pulse.vladdancea.com';
 // Previews pass their own URL; the default checks production.
@@ -23,6 +23,9 @@ for (let attempt = 1; ; attempt++) {
       assert.equal(response.headers.get('X-Robots-Tag'), base === production ? null : 'noindex', `${path} indexing`);
       assert.equal(await response.text(), path === '/' ? index : await readFile(`${directory}${path}`, 'utf8'));
     }
+    // A chunk removed by a deploy gets the SPA fallback, which must not be cached as the chunk.
+    const removed = await fetch(`${base}/chunk-REMOVED1.js`, { signal: AbortSignal.timeout(15_000) });
+    assertRevalidated('/chunk-REMOVED1.js', removed.headers);
     const response = await fetch(`${base}/api/stops`, {
       headers: { 'Sec-Fetch-Mode': 'navigate' },
       signal: AbortSignal.timeout(15_000),

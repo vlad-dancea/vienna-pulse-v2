@@ -17,7 +17,11 @@ export function assertSiteHeaders(path, headers) {
   for (const [name, value] of Object.entries(securityHeaders))
     assert.equal(headers.get(name), value, `${path} ${name}`);
   const hashed = /^\/[^/]+-[A-Z0-9]{8}\.(js|css)$/.test(path);
-  const cacheControl = headers.get('Cache-Control');
-  if (hashed) assert.equal(cacheControl, 'public, max-age=31536000, immutable', `${path} caching`);
-  else assert.doesNotMatch(cacheControl ?? '', /max-age=[1-9]|immutable/, `${path} caching`);
+  if (hashed) assert.equal(headers.get('Cache-Control'), 'public, max-age=31536000, immutable', `${path} caching`);
+  else assertRevalidated(path, headers);
+}
+
+/** Checks that a response must be revalidated before it is reused. */
+export function assertRevalidated(path, headers) {
+  assert.doesNotMatch(headers.get('Cache-Control') ?? '', /max-age=[1-9]|immutable/, `${path} caching`);
 }

@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
 import { createTestHarness } from 'wrangler';
 import config from '../wrangler.json' with { type: 'json' };
-import { assertSiteHeaders } from './headers.mjs';
+import { assertRevalidated, assertSiteHeaders } from './headers.mjs';
 
 const origin = createServer(async (request, response) => {
   const chunks = [];
@@ -66,6 +66,12 @@ test('serves the production shell, styles, lazy JavaScript and map worker with t
     assert.match(response.headers.get('Content-Type'), path.endsWith('.css') ? /text\/css/ : /javascript/);
     assertSiteHeaders(path, response.headers);
     assert.equal(await response.text(), await readFile(`dist/vienna-pulse-frontend/browser${path}`, 'utf8'));
+  }
+  // A tab from the previous deploy can still request its old chunks, which the SPA fallback answers.
+  for (const path of ['/chunk-REMOVED1.js', '/styles-REMOVED1.css']) {
+    const response = await server.fetch(path, { headers: { 'Sec-Fetch-Mode': 'cors' } });
+    assert.match(response.headers.get('Content-Type'), /text\/html/);
+    assertRevalidated(path, response.headers);
   }
 });
 

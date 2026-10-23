@@ -7,12 +7,8 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), midi=(), display-capture=(), browsing-topics=()
 
-# Built JavaScript and CSS carry a content hash in their names, so a changed file gets a new URL.
-/*.js
-  Cache-Control: public, max-age=31536000, immutable
-/*.css
-  Cache-Control: public, max-age=31536000, immutable
-
 # Previews are public for review, but search engines must only index production.
 https://:preview.pulse.vladdancea.com/*
   X-Robots-Tag: noindex
+
+# worker/cache-headers.mjs appends the long-lived caching rules for the built files.
