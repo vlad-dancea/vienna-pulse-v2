@@ -11,9 +11,8 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-/// The `timetable` health component: DOWN when the last successful import is more than 36 hours
-/// old or no service of the timetable runs tomorrow in Vienna, which would leave the map without
-/// lines or vehicles. The readiness group leaves it out, because an old timetable still beats no API.
+/// The `timetable` health component, DOWN when the last successful import is more than 36 hours old
+/// or no service runs tomorrow in Vienna, which would leave the map without lines or vehicles.
 @Component
 @RequiredArgsConstructor
 public class TimetableHealthIndicator extends AbstractHealthIndicator {

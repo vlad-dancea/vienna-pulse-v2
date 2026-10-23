@@ -36,9 +36,8 @@ public class Store {
         void into(Staging staging) throws IOException;
     }
 
-    /// Runs inside the import transaction after the swap, with the rows loaded into each table by
-    /// table name. Whatever it writes commits with the new timetable, and if it fails, the previous
-    /// timetable stays.
+    /// Runs in the import transaction after the swap with the rows loaded into each table, by table
+    /// name, so whatever it writes commits with the new timetable or rolls back with it.
     @FunctionalInterface
     public interface Swapped {
         void with(Map<String, Long> rowCounts);
