@@ -49,32 +49,10 @@ public class LineService {
                                 WHERE exception_type = 'ADDED'
                             ) AS days
                         ),
-                        services AS (
-                            (SELECT service_id
-                             FROM timetable.service_calendars
-                             WHERE CAST(:date AS date) BETWEEN start_date AND end_date
-                               AND CASE extract(isodow FROM CAST(:date AS date))
-                                       WHEN 1 THEN monday
-                                       WHEN 2 THEN tuesday
-                                       WHEN 3 THEN wednesday
-                                       WHEN 4 THEN thursday
-                                       WHEN 5 THEN friday
-                                       WHEN 6 THEN saturday
-                                       WHEN 7 THEN sunday
-                                   END
-                             EXCEPT
-                             SELECT service_id
-                             FROM timetable.calendar_dates
-                             WHERE date = :date AND exception_type = 'REMOVED')
-                            UNION
-                            SELECT service_id
-                            FROM timetable.calendar_dates
-                            WHERE date = :date AND exception_type = 'ADDED'
-                        ),
                         route_shapes AS (
                             SELECT DISTINCT route_id, shape_id
                             FROM timetable.trips
-                            WHERE service_id IN (SELECT service_id FROM services)
+                            WHERE service_id IN (SELECT service_id FROM pulse.running_services(CAST(:date AS date)))
                         ),
                         -- One index lookup per shape: joining scans all of the points instead.
                         -- Rounding in double precision instead of numeric halves the time, and only

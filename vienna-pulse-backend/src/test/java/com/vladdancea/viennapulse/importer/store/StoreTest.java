@@ -122,6 +122,18 @@ class StoreTest {
         assertThat(stopModes()).containsExactly("s2:{SUBWAY,TRAM}");
     }
 
+    // The rules name the tables of the timetable, which each import replaces and then drops.
+    @Test
+    void appliesTheTimetableRulesToTheCurrentTimetable() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
+        load(ROUTES_AFTER, STOPS_AFTER, SHAPE_POINTS_AFTER, TRIPS_AFTER, CALENDARS_AFTER, DATES_AFTER);
+
+        // A Saturday of T2, a Monday T0 is added on and a Sunday T2 is removed from.
+        assertThat(runningServices(LocalDate.of(2026, 10, 24))).containsExactly("T2");
+        assertThat(runningServices(LocalDate.of(2026, 10, 26))).containsExactly("T0");
+        assertThat(runningServices(LocalDate.of(2026, 11, 1))).isEmpty();
+    }
+
     @Test
     void keepsThePreviousTimetableWhenTheLoadFails() throws IOException {
         load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
@@ -308,6 +320,13 @@ class StoreTest {
         assertThat(store.needsImport()).isFalse();
         jdbc.sql("DELETE FROM timetable.stop_times").update();
         assertThat(store.needsImport()).isTrue();
+    }
+
+    private List<@Nullable String> runningServices(LocalDate day) {
+        return jdbc.sql("SELECT service_id FROM pulse.running_services(:day) ORDER BY service_id")
+                .param("day", day)
+                .query(String.class)
+                .list();
     }
 
     private List<@Nullable String> stopModes() {

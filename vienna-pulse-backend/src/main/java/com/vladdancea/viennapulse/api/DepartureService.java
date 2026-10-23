@@ -45,8 +45,7 @@ public class DepartureService {
                         days AS (
                             SELECT shift,
                                    CAST(:today AS date) + shift AS day,
-                                   (CAST(:today AS date) + shift + time '12:00') AT TIME ZONE 'Europe/Vienna'
-                                       - interval '12 hours' AS origin
+                                   pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
                             FROM generate_series(-1, 2) AS shift
                         ),
                         -- Each service day with the seconds of its times that fall between now and the end of
@@ -60,27 +59,8 @@ public class DepartureService {
                             WHERE shift <= 1
                         ),
                         running AS (
-                            (SELECT d.day, c.service_id
-                             FROM service_days d
-                             JOIN timetable.service_calendars c
-                               ON d.day BETWEEN c.start_date AND c.end_date
-                              AND CASE extract(isodow FROM d.day)
-                                      WHEN 1 THEN c.monday
-                                      WHEN 2 THEN c.tuesday
-                                      WHEN 3 THEN c.wednesday
-                                      WHEN 4 THEN c.thursday
-                                      WHEN 5 THEN c.friday
-                                      WHEN 6 THEN c.saturday
-                                      WHEN 7 THEN c.sunday
-                                  END
-                             EXCEPT
-                             SELECT date, service_id
-                             FROM timetable.calendar_dates
-                             WHERE exception_type = 'REMOVED' AND date IN (SELECT day FROM service_days))
-                            UNION
-                            SELECT date, service_id
-                            FROM timetable.calendar_dates
-                            WHERE exception_type = 'ADDED' AND date IN (SELECT day FROM service_days)
+                            SELECT d.day, r.service_id
+                            FROM service_days d CROSS JOIN LATERAL pulse.running_services(d.day) AS r
                         ),
                         -- The stop's calls come from the stop_id index first. Left to itself, the planner, which
                         -- expects about one running service where there are hundreds, reads every call of every

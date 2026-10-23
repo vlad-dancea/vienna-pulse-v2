@@ -34,8 +34,7 @@ public class VehicleService {
         var features = jdbc.sql("""
                         WITH days AS (
                             SELECT CAST(:today AS date) + shift AS day,
-                                   (CAST(:today AS date) + shift + time '12:00') AT TIME ZONE 'Europe/Vienna'
-                                       - interval '12 hours' AS origin
+                                   pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
                             FROM generate_series(-1, 1) AS shift
                         ),
                         -- Each service day with the second of its times that is now.
@@ -44,27 +43,8 @@ public class VehicleService {
                             FROM days
                         ),
                         running AS (
-                            (SELECT m.day, c.service_id
-                             FROM moments m
-                             JOIN timetable.service_calendars c
-                               ON m.day BETWEEN c.start_date AND c.end_date
-                              AND CASE extract(isodow FROM m.day)
-                                      WHEN 1 THEN c.monday
-                                      WHEN 2 THEN c.tuesday
-                                      WHEN 3 THEN c.wednesday
-                                      WHEN 4 THEN c.thursday
-                                      WHEN 5 THEN c.friday
-                                      WHEN 6 THEN c.saturday
-                                      WHEN 7 THEN c.sunday
-                                  END
-                             EXCEPT
-                             SELECT date, service_id
-                             FROM timetable.calendar_dates
-                             WHERE exception_type = 'REMOVED' AND date IN (SELECT day FROM moments))
-                            UNION
-                            SELECT date, service_id
-                            FROM timetable.calendar_dates
-                            WHERE exception_type = 'ADDED' AND date IN (SELECT day FROM moments)
+                            SELECT m.day, r.service_id
+                            FROM moments m CROSS JOIN LATERAL pulse.running_services(m.day) AS r
                         ),
                         -- The spans find the running trips without reading the calls of the tens of thousands
                         -- that run on the day but not now.
