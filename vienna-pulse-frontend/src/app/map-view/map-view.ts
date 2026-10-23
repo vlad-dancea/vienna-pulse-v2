@@ -150,13 +150,14 @@ export class MapView {
       });
 
       // Without its style MapLibre never fires load, so the page would stay empty without a word.
-      // Later errors, such as a missing tile, leave a usable map.
+      // A style that loads after an error, and later errors such as a missing tile, leave a usable map.
       const styleErrors = map.on('error', (event) => {
         console.error(event.error);
         this.styleFailed.set(true);
       });
       map.once('style.load', () => {
         styleErrors.unsubscribe();
+        this.styleFailed.set(false);
       });
 
       // Keep routes below stops so platforms stay visible at interchanges.

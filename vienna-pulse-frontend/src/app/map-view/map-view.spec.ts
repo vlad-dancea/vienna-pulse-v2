@@ -342,7 +342,7 @@ describe('MapView', () => {
     }
   });
 
-  it('says so when the base map style fails, but not for errors after it loaded', async () => {
+  it('says so when the base map style fails, but not once it loaded', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const fixture = TestBed.createComponent(MapView);
     try {
@@ -354,7 +354,12 @@ describe('MapView', () => {
       const element = fixture.nativeElement as HTMLElement;
       const message = 'The map could not be loaded. Reload the page to try again.';
 
+      for (const listener of errorListeners) listener({ error: new Error('Early error') });
+      await fixture.whenStable();
+      expect(element.textContent).toContain(message);
       loadStyle();
+      await fixture.whenStable();
+      expect(element.textContent).not.toContain(message);
       for (const listener of errorListeners) listener({ error: new Error('Tile failed') });
       await fixture.whenStable();
       expect(element.textContent).not.toContain(message);
