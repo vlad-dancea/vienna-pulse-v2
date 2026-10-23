@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,11 +36,20 @@ public class Store {
         void into(Staging staging) throws IOException;
     }
 
-    /// Loads a new timetable with `load` and swaps it in. Fails with [CannotAcquireLockException] if
-    /// another import is running, and with [IllegalStateException] if `load` leaves a table unloaded.
-    public void replace(Load load) throws IOException {
+    /// Runs inside the import transaction after the swap, with the rows loaded into each table by
+    /// table name. Whatever it writes commits with the new timetable, and if it fails, the previous
+    /// timetable stays.
+    @FunctionalInterface
+    public interface Swapped {
+        void with(Map<String, Long> rowCounts);
+    }
+
+    /// Loads a new timetable with `load`, swaps it in and calls `swapped`. Fails with
+    /// [CannotAcquireLockException] if another import is running, and with [IllegalStateException] if
+    /// `load` leaves a table unloaded.
+    public void replace(Load load, Swapped swapped) throws IOException {
         try {
-            transaction.executeWithoutResult(status -> swapIn(load));
+            transaction.executeWithoutResult(status -> swapIn(load, swapped));
         } catch (UncheckedIOException exception) {
             throw exception.getCause();
         }
@@ -57,7 +67,7 @@ public class Store {
                         """).query(Boolean.class).single();
     }
 
-    private void swapIn(Load load) {
+    private void swapIn(Load load, Swapped swapped) {
         var locked = jdbc.sql("SELECT pg_try_advisory_xact_lock(:lock)")
                 .param("lock", IMPORT_LOCK)
                 .query(Boolean.class)
@@ -75,14 +85,16 @@ public class Store {
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+        var rowCounts = staging.rowCounts();
         var unloaded = new ArrayList<>(tables);
-        unloaded.removeAll(staging.loadedTables());
+        unloaded.removeAll(rowCounts.keySet());
         if (!unloaded.isEmpty()) {
             throw new IllegalStateException("The import loaded nothing into " + unloaded);
         }
 
         jdbc.sql("ALTER SCHEMA timetable RENAME TO timetable_old").update();
         jdbc.sql("ALTER SCHEMA staging RENAME TO timetable").update();
+        swapped.with(rowCounts);
     }
 
     // Copies every table of the live timetable, so the Flyway migrations stay the only place that
