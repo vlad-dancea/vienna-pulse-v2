@@ -96,6 +96,11 @@ the importer records find the running trips without reading every stop time.
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
 and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457.
 
+When the database is slow or down, the API answers with a 503, `Cache-Control: no-store` and
+`Retry-After: 5`. It waits at most 2 seconds for a database connection, cancels any query that
+runs for more than 5 seconds and gives up after 10 seconds on a database that stops answering
+altogether. Other database errors get a 500.
+
 ## Run
 
 The toolchain is managed by [mise](https://mise.jdx.dev): the root `mise.toml` pins the tool

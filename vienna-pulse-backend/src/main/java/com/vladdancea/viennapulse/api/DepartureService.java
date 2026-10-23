@@ -23,6 +23,7 @@ public class DepartureService {
     private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
     private static final int LIMIT = 20;
 
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// The first 20 departures at or after `now` from any platform of the stop whose merged id, like

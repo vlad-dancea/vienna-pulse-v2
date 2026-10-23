@@ -18,6 +18,7 @@ public class VehicleService {
     // The time zone the timetable's days and times are written in.
     private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
 
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// A point for every trip that has left its first stop and not yet reached its last at `now`,
