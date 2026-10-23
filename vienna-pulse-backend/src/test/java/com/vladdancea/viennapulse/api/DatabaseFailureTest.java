@@ -74,16 +74,24 @@ class DatabaseFailureTest {
             // Two at once, because PgJDBC sends their cancellations one after the other.
             var first = CompletableFuture.supplyAsync(() -> timeUnavailable("/api/stops"));
             var second = CompletableFuture.supplyAsync(() -> timeUnavailable("/api/stops"));
-            await().until(() -> stopsQueriesWaitingForTheLock() == 2);
-            docker.pauseContainerCmd(postgres.getContainerId()).exec();
             try {
-                // A frozen database answers neither the queries nor their cancellations.
-                assertThat(first.get()).isBetween(NETWORK_LIMIT, NETWORK_LIMIT.plus(MARGIN));
-                assertThat(second.get()).isBetween(NETWORK_LIMIT, NETWORK_LIMIT.plus(MARGIN));
-                // The pool checks its idle connections before handing one out, and gives up on them all.
-                assertThat(timeUnavailable("/api/stops")).isBetween(CONNECTION_WAIT, CONNECTION_WAIT.plus(MARGIN));
+                await().until(() -> stopsQueriesWaitingForTheLock() == 2);
+                docker.pauseContainerCmd(postgres.getContainerId()).exec();
+                try {
+                    // A frozen database answers neither the queries nor their cancellations.
+                    assertThat(first.get()).isBetween(NETWORK_LIMIT, NETWORK_LIMIT.plus(MARGIN));
+                    assertThat(second.get()).isBetween(NETWORK_LIMIT, NETWORK_LIMIT.plus(MARGIN));
+                    // The pool checks its idle connections before handing one out, and gives up on them all.
+                    assertThat(timeUnavailable("/api/stops")).isBetween(CONNECTION_WAIT, CONNECTION_WAIT.plus(MARGIN));
+                } finally {
+                    docker.unpauseContainerCmd(postgres.getContainerId()).exec();
+                }
             } finally {
-                docker.unpauseContainerCmd(postgres.getContainerId()).exec();
+                // A request still running after a failure would hold a connection into the next test. The
+                // query limit ends it while the lock is still held.
+                CompletableFuture.allOf(first, second)
+                        .handle((ignored, failure) -> null)
+                        .join();
             }
             lock.rollback();
         }
