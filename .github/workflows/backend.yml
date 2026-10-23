@@ -217,7 +217,7 @@ jobs:
       # in the background after startup, so the stops can take a minute to appear.
       - name: Smoke test
         run: |
-          for attempt in $(seq 24); do
+          for _ in $(seq 24); do
             if count=$(curl --fail --silent --show-error --compressed \
                 https://pulse.vladdancea.com/api/stops | jq '.features | length') && ((count > 0)); then
               echo "The API serves $count stops"
