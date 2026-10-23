@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import tools.jackson.databind.json.JsonMapper;
 
 // The container healthcheck in production asks the readiness probe on the management port, and the
 // internet only reaches the server port.
@@ -32,6 +33,18 @@ class HealthEndpointTest {
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo("{\"status\":\"UP\"}");
+    }
+
+    // The test database has never been imported into, so its timetable is too old for any clock.
+    @Test
+    void reportsAnOldTimetableOnlyOutsideReadiness() throws IOException, InterruptedException {
+        var response = get(managementPort, "/actuator/health");
+
+        assertThat(response.statusCode()).isEqualTo(503);
+        var timetable = JsonMapper.shared().readTree(response.body()).at("/components/timetable/status");
+        assertThat(timetable.asString()).isEqualTo("DOWN");
+        assertThat(get(managementPort, "/actuator/health/readiness").statusCode())
+                .isEqualTo(200);
     }
 
     @Test
