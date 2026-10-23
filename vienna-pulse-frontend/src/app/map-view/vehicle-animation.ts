@@ -8,7 +8,7 @@ interface Glide {
 }
 
 /** Draws vehicles into a map source, moving each one at an even pace to its latest position. */
-export class MovingVehicles {
+export class VehicleAnimation {
   private glides: Glide[] = [];
   private start = 0;
   private duration = 0;

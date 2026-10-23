@@ -14,7 +14,7 @@ import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineL
 import { addDistricts } from './districts';
 import { RunningLines } from '../timetable/running-lines';
 import { NetworkStops } from '../timetable/network-stops';
-import { MovingVehicles } from './moving-vehicles';
+import { VehicleAnimation } from './vehicle-animation';
 import { RunningVehicles } from '../timetable/running-vehicles';
 
 const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
@@ -53,7 +53,7 @@ export class MapView {
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
   private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
-  private readonly movingVehicles = signal<MovingVehicles | undefined>(undefined);
+  private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
 
   protected retryStops() {
     // The error and retry button disappear after success, so focus the panel's persistent heading.
@@ -93,12 +93,15 @@ export class MapView {
     });
 
     effect(() => {
-      const moving = this.movingVehicles();
+      const animation = this.vehicleAnimation();
       const vehicles = this.vehicles.latest();
-      if (moving) {
+      if (animation) {
         // Gliding for the whole time between two refreshes keeps the vehicles moving.
         const reduceMotion = document.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        moving.show(vehicles ?? { type: 'FeatureCollection', features: [] }, reduceMotion ? 0 : this.vehicles.interval);
+        animation.show(
+          vehicles ?? { type: 'FeatureCollection', features: [] },
+          reduceMotion ? 0 : this.vehicles.interval,
+        );
       }
     });
 
@@ -220,14 +223,14 @@ export class MapView {
         addDistricts(map);
         const vehicles = map.getSource<GeoJSONSource>('vehicles');
         if (vehicles && document.defaultView) {
-          this.movingVehicles.set(new MovingVehicles(vehicles, document.defaultView));
+          this.vehicleAnimation.set(new VehicleAnimation(vehicles, document.defaultView));
         }
         this.map.set(map);
       });
 
       // Releases the map's WebGL context and listeners when the view goes away.
       destroyRef.onDestroy(() => {
-        this.movingVehicles()?.stop();
+        this.vehicleAnimation()?.stop();
         map.remove();
       });
     });
