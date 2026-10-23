@@ -29,17 +29,19 @@ public class StopService {
     public FeatureCollection<StopProperties> stops() {
         var features = jdbc.sql("""
                         WITH grouped AS (
-                            SELECT array_to_string((string_to_array(id, ':'))[1:3], ':') AS id,
+                            SELECT merged_id AS id,
                                mode() WITHIN GROUP (ORDER BY name) AS name,
                                avg(latitude) AS latitude,
                                avg(longitude) AS longitude
                             FROM timetable.stops
-                            GROUP BY 1
+                            GROUP BY merged_id
                         ), modes AS (
-                            SELECT array_to_string((string_to_array(stop_id, ':'))[1:3], ':') AS id,
+                            SELECT s.merged_id AS id,
                                    array_agg(DISTINCT lower(type) ORDER BY lower(type)) AS modes
-                            FROM timetable.stop_modes CROSS JOIN LATERAL unnest(types) AS type
-                            GROUP BY 1
+                            FROM timetable.stop_modes m
+                            JOIN timetable.stops s ON s.id = m.stop_id
+                            CROSS JOIN LATERAL unnest(m.types) AS type
+                            GROUP BY s.merged_id
                         )
                         SELECT g.*, CASE WHEN EXISTS (SELECT FROM timetable.stop_modes)
                                          THEN coalesce(m.modes, ARRAY[]::text[]) END AS modes

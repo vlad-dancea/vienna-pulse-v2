@@ -3,7 +3,6 @@ package com.vladdancea.viennapulse.api;
 import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequiredArgsConstructor
 public class LineController {
-    // The day of the timetable, not of the server's time zone.
-    private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
     // Spring's ISO date format also takes an offset, like 2026-10-20Z, and years past 9999 that
     // PostgreSQL cannot store, so the date is checked by hand.
     private static final Pattern DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
@@ -40,7 +37,7 @@ public class LineController {
             produces = {FeatureCollection.MEDIA_TYPE, MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<FeatureCollection<LineProperties>> lines(
             @RequestParam(required = false) @Nullable String date) {
-        var day = date != null ? parse(date) : LocalDate.now(clock.withZone(VIENNA));
+        var day = date != null ? parse(date) : LocalDate.now(clock.withZone(Timetable.ZONE));
         return ResponseEntity.ok().cacheControl(CacheControl.noCache()).body(lineService.lines(day));
     }
 

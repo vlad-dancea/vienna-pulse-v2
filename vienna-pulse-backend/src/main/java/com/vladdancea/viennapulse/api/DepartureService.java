@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +18,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class DepartureService {
-    // The time zone the timetable's days and times are written in.
-    private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
     private static final int LIMIT = 20;
 
     @ApiDatabase
@@ -43,14 +40,12 @@ public class DepartureService {
                         WITH platforms AS (
                             SELECT id, name
                             FROM timetable.stops
-                            -- The space keeps :3 from reading as a parameter.
-                            WHERE array_to_string((string_to_array(id, ':'))[1 : 3], ':') = :stop
+                            WHERE merged_id = :stop
                         ),
                         days AS (
                             SELECT shift,
                                    CAST(:today AS date) + shift AS day,
-                                   (CAST(:today AS date) + shift + time '12:00') AT TIME ZONE 'Europe/Vienna'
-                                       - interval '12 hours' AS origin
+                                   pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
                             FROM generate_series(-1, 2) AS shift
                         ),
                         -- Each service day with the seconds of its times that fall between now and the end of
@@ -64,27 +59,8 @@ public class DepartureService {
                             WHERE shift <= 1
                         ),
                         running AS (
-                            (SELECT d.day, c.service_id
-                             FROM service_days d
-                             JOIN timetable.service_calendars c
-                               ON d.day BETWEEN c.start_date AND c.end_date
-                              AND CASE extract(isodow FROM d.day)
-                                      WHEN 1 THEN c.monday
-                                      WHEN 2 THEN c.tuesday
-                                      WHEN 3 THEN c.wednesday
-                                      WHEN 4 THEN c.thursday
-                                      WHEN 5 THEN c.friday
-                                      WHEN 6 THEN c.saturday
-                                      WHEN 7 THEN c.sunday
-                                  END
-                             EXCEPT
-                             SELECT date, service_id
-                             FROM timetable.calendar_dates
-                             WHERE exception_type = 'REMOVED' AND date IN (SELECT day FROM service_days))
-                            UNION
-                            SELECT date, service_id
-                            FROM timetable.calendar_dates
-                            WHERE exception_type = 'ADDED' AND date IN (SELECT day FROM service_days)
+                            SELECT d.day, r.service_id
+                            FROM service_days d CROSS JOIN LATERAL pulse.running_services(d.day) AS r
                         ),
                         -- The stop's calls come from the stop_id index first. Left to itself, the planner, which
                         -- expects about one running service where there are hundreds, reads every call of every
@@ -130,11 +106,11 @@ public class DepartureService {
                                next.route_id,
                                next.headsign,
                                next.stop_id,
-                               coalesce(r.short_name, r.long_name) AS name,
+                               r.short_name,
                                r.long_name,
-                               lower(r.type) AS type,
-                               '#' || r.color AS color,
-                               '#' || r.text_color AS text_color
+                               r.type,
+                               r.color,
+                               r.text_color
                         -- The name comes in every row, and alone in one when nothing leaves; it is null
                         -- only when no platform belongs to the stop.
                         FROM (SELECT mode() WITHIN GROUP (ORDER BY name) AS name FROM platforms) AS stop
@@ -143,7 +119,7 @@ public class DepartureService {
                         ORDER BY next.time, next.trip_id, next.sequence
                         """)
                 .param("stop", stopId)
-                .param("today", LocalDate.ofInstant(now, VIENNA))
+                .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
                 .param("limit", LIMIT)
                 .query((row, number) -> new Row(row.getString("stop_name"), departure(row)))
@@ -163,15 +139,8 @@ public class DepartureService {
             return null;
         }
         return new Departure(
-                time.atZoneSameInstant(VIENNA).toOffsetDateTime(),
-                new Line(
-                        row.getString("route_id"),
-                        new LineProperties(
-                                row.getString("name"),
-                                row.getString("long_name"),
-                                row.getString("type"),
-                                row.getString("color"),
-                                row.getString("text_color"))),
+                time.atZoneSameInstant(Timetable.ZONE).toOffsetDateTime(),
+                new Line(row.getString("route_id"), LineProperties.from(row)),
                 row.getString("headsign"),
                 row.getString("stop_id"));
     }

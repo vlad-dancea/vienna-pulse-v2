@@ -5,7 +5,6 @@ import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import com.vladdancea.viennapulse.api.geojson.Point;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -15,9 +14,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class VehicleService {
-    // The time zone the timetable's days and times are written in.
-    private static final ZoneId VIENNA = ZoneId.of("Europe/Vienna");
-
     @ApiDatabase
     private final JdbcClient jdbc;
 
@@ -39,8 +35,7 @@ public class VehicleService {
         var features = jdbc.sql("""
                         WITH days AS (
                             SELECT CAST(:today AS date) + shift AS day,
-                                   (CAST(:today AS date) + shift + time '12:00') AT TIME ZONE 'Europe/Vienna'
-                                       - interval '12 hours' AS origin
+                                   pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
                             FROM generate_series(-1, 1) AS shift
                         ),
                         -- Each service day with the second of its times that is now.
@@ -49,27 +44,8 @@ public class VehicleService {
                             FROM days
                         ),
                         running AS (
-                            (SELECT m.day, c.service_id
-                             FROM moments m
-                             JOIN timetable.service_calendars c
-                               ON m.day BETWEEN c.start_date AND c.end_date
-                              AND CASE extract(isodow FROM m.day)
-                                      WHEN 1 THEN c.monday
-                                      WHEN 2 THEN c.tuesday
-                                      WHEN 3 THEN c.wednesday
-                                      WHEN 4 THEN c.thursday
-                                      WHEN 5 THEN c.friday
-                                      WHEN 6 THEN c.saturday
-                                      WHEN 7 THEN c.sunday
-                                  END
-                             EXCEPT
-                             SELECT date, service_id
-                             FROM timetable.calendar_dates
-                             WHERE exception_type = 'REMOVED' AND date IN (SELECT day FROM moments))
-                            UNION
-                            SELECT date, service_id
-                            FROM timetable.calendar_dates
-                            WHERE exception_type = 'ADDED' AND date IN (SELECT day FROM moments)
+                            SELECT m.day, r.service_id
+                            FROM moments m CROSS JOIN LATERAL pulse.running_services(m.day) AS r
                         ),
                         -- The spans find the running trips without reading the calls of the tens of thousands
                         -- that run on the day but not now.
@@ -145,11 +121,11 @@ public class VehicleService {
                         SELECT v.trip_id,
                                v.route_id,
                                v.headsign,
-                               coalesce(r.short_name, r.long_name) AS name,
+                               r.short_name,
                                r.long_name,
-                               lower(r.type) AS type,
-                               '#' || r.color AS color,
-                               '#' || r.text_color AS text_color,
+                               r.type,
+                               r.color,
+                               r.text_color,
                                -- Rounded like the lines, to six decimals (about 10 cm).
                                round((v.longitude_before + (v.longitude_after - v.longitude_before) * v.share) * 1e6)
                                    / 1e6 AS longitude,
@@ -159,20 +135,13 @@ public class VehicleService {
                         JOIN timetable.routes r ON r.id = v.route_id
                         ORDER BY v.trip_id
                         """)
-                .param("today", LocalDate.ofInstant(now, VIENNA))
+                .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
                 .query((row, number) -> new Feature<>(
                         row.getString("trip_id"),
                         new Point(row.getDouble("longitude"), row.getDouble("latitude")),
                         new VehicleProperties(
-                                row.getString("route_id"),
-                                new LineProperties(
-                                        row.getString("name"),
-                                        row.getString("long_name"),
-                                        row.getString("type"),
-                                        row.getString("color"),
-                                        row.getString("text_color")),
-                                row.getString("headsign"))))
+                                row.getString("route_id"), LineProperties.from(row), row.getString("headsign"))))
                 .list();
         return new FeatureCollection<>(features);
     }
