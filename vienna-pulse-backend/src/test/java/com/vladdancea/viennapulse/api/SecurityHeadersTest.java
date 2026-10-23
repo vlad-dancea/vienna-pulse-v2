@@ -3,6 +3,7 @@ package com.vladdancea.viennapulse.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.TimetableFixture;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,7 +21,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,19 +34,17 @@ class SecurityHeadersTest {
             "content-security-policy", "default-src 'none'; frame-ancestors 'none'");
 
     @Autowired
-    JdbcClient jdbc;
+    TimetableFixture timetable;
 
     @LocalServerPort
     int port;
 
     @BeforeEach
     void addEnoughStopsToCompress() {
-        jdbc.sql("DELETE FROM timetable.stops").update();
+        timetable.clear();
         // Tomcat leaves responses under 2 KB uncompressed.
         for (int i = 0; i < 50; i++) {
-            jdbc.sql("INSERT INTO timetable.stops (id, name, latitude, longitude) VALUES (?, ?, 48.2, 16.37)")
-                    .params("s" + i, "Stop " + i)
-                    .update();
+            timetable.addStop("s" + i, "Stop " + i);
         }
     }
 
@@ -93,6 +91,7 @@ class SecurityHeadersTest {
                 (name, value) -> assertThat(headers.allValues(name)).as(name).containsExactly(value));
     }
 
+    // The endpoint gives this class a Spring context of its own, on the shared database.
     @TestConfiguration(proxyBeanMethods = false)
     static class FailingEndpoint {
         @Bean
