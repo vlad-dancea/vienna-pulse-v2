@@ -68,15 +68,17 @@ public class TimetableFixture {
     /// Swaps in an empty timetable through `store`, the way the daily import swaps in the next one, so
     /// that the API sees a new timetable version.
     public void importNothing(Store store) throws IOException {
-        store.replace(staging -> {
-            staging.copy("routes", Route.class, row -> {});
-            staging.copy("stops", Stop.class, row -> {});
-            staging.copy("shape_points", ShapePoint.class, row -> {});
-            staging.copy("trips", Trip.class, row -> {});
-            staging.copy("service_calendars", ServiceCalendar.class, row -> {});
-            staging.copy("calendar_dates", CalendarDate.class, row -> {});
-            staging.stopTimes(row -> {});
-        });
+        store.replace(
+                staging -> {
+                    staging.copy("routes", Route.class, row -> {});
+                    staging.copy("stops", Stop.class, row -> {});
+                    staging.copy("shape_points", ShapePoint.class, row -> {});
+                    staging.copy("trips", Trip.class, row -> {});
+                    staging.copy("service_calendars", ServiceCalendar.class, row -> {});
+                    staging.copy("calendar_dates", CalendarDate.class, row -> {});
+                    staging.stopTimes(row -> {});
+                },
+                rowCounts -> {});
     }
 
     /// Adds a stop in the centre of Vienna.

@@ -3,7 +3,6 @@ package com.vladdancea.viennapulse.api;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Clock;
 import java.time.Duration;
 import org.springframework.boot.cache.autoconfigure.CacheManagerCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -92,11 +91,5 @@ class ApiConfiguration implements WebMvcConfigurer {
         var registration = new FilterRegistrationBean<>(filter);
         registration.addUrlPatterns("/api/*");
         return registration;
-    }
-
-    /// The current time, as a bean so that tests can fix it.
-    @Bean
-    Clock clock() {
-        return Clock.systemUTC();
     }
 }
