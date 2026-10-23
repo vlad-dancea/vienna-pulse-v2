@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { setTimeout } from 'node:timers/promises';
+import { assertSiteHeaders } from './headers.mjs';
 
 const production = 'https://pulse.vladdancea.com';
 // Previews pass their own URL; the default checks production.
@@ -17,6 +18,7 @@ for (let attempt = 1; ; attempt++) {
       assert.equal(response.status, 200, `${path} status`);
       const contentType = path === '/' ? /text\/html/ : path.endsWith('.css') ? /text\/css/ : /javascript/;
       assert.match(response.headers.get('Content-Type'), contentType);
+      assertSiteHeaders(path, response.headers);
       // Only production may be indexed by search engines.
       assert.equal(response.headers.get('X-Robots-Tag'), base === production ? null : 'noindex', `${path} indexing`);
       assert.equal(await response.text(), path === '/' ? index : await readFile(`${directory}${path}`, 'utf8'));

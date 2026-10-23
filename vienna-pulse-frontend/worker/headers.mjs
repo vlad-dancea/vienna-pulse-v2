@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+
+/** Headers that public/_headers must send with every page and file of the site. */
+export const securityHeaders = {
+  'Content-Security-Policy':
+    "default-src 'self'; connect-src 'self' https://tiles.openfreemap.org; img-src 'self' data: blob:; " +
+    "object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy':
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), midi=(), ' +
+    'display-capture=(), browsing-topics=()',
+};
+
+/** Checks the security headers, and that only hashed JavaScript and CSS may be cached without revalidating. */
+export function assertSiteHeaders(path, headers) {
+  for (const [name, value] of Object.entries(securityHeaders))
+    assert.equal(headers.get(name), value, `${path} ${name}`);
+  const hashed = /^\/[^/]+-[A-Z0-9]{8}\.(js|css)$/.test(path);
+  const cacheControl = headers.get('Cache-Control');
+  if (hashed) assert.equal(cacheControl, 'public, max-age=31536000, immutable', `${path} caching`);
+  else assert.doesNotMatch(cacheControl ?? '', /max-age=[1-9]|immutable/, `${path} caching`);
+}

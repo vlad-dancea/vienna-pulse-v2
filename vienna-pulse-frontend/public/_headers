@@ -1,3 +1,18 @@
+# default-src covers scripts, workers, styles and fonts. Map tiles, glyphs and sprites come from
+# OpenFreeMap, and MapLibre draws images from data: and blob: URLs. index.html has no inline
+# script or style because angular.json turns off critical CSS inlining.
+/*
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://tiles.openfreemap.org; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), midi=(), display-capture=(), browsing-topics=()
+
+# Built JavaScript and CSS carry a content hash in their names, so a changed file gets a new URL.
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
 # Previews are public for review, but search engines must only index production.
 https://:preview.pulse.vladdancea.com/*
   X-Robots-Tag: noindex
