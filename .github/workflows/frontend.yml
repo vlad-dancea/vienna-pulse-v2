@@ -22,6 +22,8 @@ on:
       - .editorconfig
       - .gitattributes
       - .github/workflows/frontend.yml
+      # The frontend's API types are generated from the backend's description.
+      - vienna-pulse-backend/openapi.json
   pull_request:
 
 # Pull request checks can be replaced; a production deployment must finish.
@@ -57,7 +59,7 @@ jobs:
         run: |
           if [ "$EVENT" != pull_request ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE_SHA...$HEAD_SHA" -- 'vienna-pulse-frontend' 'mise.toml' '.github/workflows/frontend.yml' '.editorconfig' '.gitattributes'; then
+          elif git diff --quiet "$BASE_SHA...$HEAD_SHA" -- 'vienna-pulse-frontend' 'mise.toml' '.github/workflows/frontend.yml' '.editorconfig' '.gitattributes' 'vienna-pulse-backend/openapi.json'; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             status=$?

@@ -22,6 +22,7 @@ mise trust --all
 mise run dev     # backend at http://localhost:8080, frontend at http://localhost:4200
 mise run check   # everything CI checks, in every project
 mise run format  # format the sources of every project
+mise run openapi # update the API description and the frontend types made from it
 ```
 
 mise installs the pinned tools on first use. The frontend installs dependencies from its
@@ -31,6 +32,10 @@ To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The frontend checks formatting, typed ESLint rules, template accessibility,
 the production build, Vitest tests and Cloudflare runtime integration tests.
+
+The backend's `openapi.json` describes what the API answers. A backend test fails when the
+controllers serve anything else, and the frontend generates its API types from the file, so a
+renamed or removed field fails a check in the pull request that makes it.
 
 The repository root includes shared agent instructions and Angular MCP configuration for
 Claude Code, Codex and Agents. The MCP server uses the project's pinned CLI, install
