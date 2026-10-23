@@ -2,21 +2,19 @@ package com.vladdancea.viennapulse.importer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.importer.download.FeedServer;
 import com.vladdancea.viennapulse.importer.read.TestFeed;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AutoClose;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,7 +27,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -60,19 +57,20 @@ class ImportJobTest {
     @TempDir
     Path dir;
 
-    // Never read: the field only names the bean that clock() replaces.
-    @TestBean
-    @Nullable
-    Clock clock;
+    @Autowired
+    TestClock clock;
 
-    // 08:03 on Tuesday 2026-10-20 in Vienna.
-    static Clock clock() {
-        return Clock.fixed(Instant.parse("2026-10-20T06:03:00Z"), ZoneOffset.UTC);
-    }
-
+    // The downloader reads the URL from the properties, so this class gets a Spring context of its
+    // own, which still shares the test run's database.
     @DynamicPropertySource
     static void feedUrl(DynamicPropertyRegistry registry) {
         registry.add("pulse.importer.feed-url", SERVER::uri);
+    }
+
+    @BeforeEach
+    void setTheClock() {
+        // 08:03 on Tuesday 2026-10-20 in Vienna.
+        clock.set("2026-10-20T06:03:00Z");
     }
 
     @Test
