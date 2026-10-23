@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AutoClose;
 import org.junit.jupiter.api.Test;
@@ -169,19 +171,19 @@ class ImportJobTest {
     @Test
     void keepsTheTimetableWhenTheDownloadFails(CapturedOutput output) throws IOException {
         importFeed(TestFeed.fixture());
-        var stops = stops();
+        var timetable = timetable();
         SERVER.fail(503);
 
         importJob.run();
 
         assertThat(output).contains("Feed download failed", "GTFS download failed with HTTP 503");
-        assertThat(stops()).isEqualTo(stops);
+        assertThat(timetable()).isEqualTo(timetable);
     }
 
     @Test
     void keepsTheTimetableAndDeletesTheDownloadWhenTheFeedLacksAFile(CapturedOutput output) throws IOException {
         importFeed(TestFeed.fixture());
-        var stops = stops();
+        var timetable = timetable();
         var files = changedFeed();
         files.remove("stop_times.txt");
 
@@ -189,13 +191,13 @@ class ImportJobTest {
 
         assertThat(output).contains("Feed import failed", "GTFS ZIP is missing a file: stop_times.txt");
         assertThat(FeedServer.downloads()).isEmpty();
-        assertThat(stops()).isEqualTo(stops);
+        assertThat(timetable()).isEqualTo(timetable);
     }
 
     @Test
     void keepsTheTimetableAndDeletesTheDownloadWhenTheDatabaseRejectsTheFeed(CapturedOutput output) throws IOException {
         importFeed(TestFeed.fixture());
-        var stops = stops();
+        var timetable = timetable();
         var files = changedFeed();
         files.merge(
                 "trips.txt",
@@ -206,13 +208,15 @@ class ImportJobTest {
 
         assertThat(output).contains("Storing the timetable failed", "Key (id)=(1.T2.22-2-j26-1.1.H) already exists.");
         assertThat(FeedServer.downloads()).isEmpty();
-        assertThat(stops()).isEqualTo(stops);
+        assertThat(timetable()).isEqualTo(timetable);
     }
 
-    // The fixture with Karlsplatz renamed, which /api/stops would show if the import went through.
+    // The fixture with Karlsplatz renamed and the U1 recoloured, which the API would show if the
+    // import went through.
     private static Map<String, String> changedFeed() {
         var files = TestFeed.fixture();
-        files.replaceAll((file, content) -> content.replace("\"Karlsplatz\"", "\"Karlsplatz neu\""));
+        files.replaceAll((file, content) ->
+                content.replace("\"Karlsplatz\"", "\"Karlsplatz neu\"").replace("\"E3000F\"", "\"FF0000\""));
         return files;
     }
 
@@ -226,13 +230,18 @@ class ImportJobTest {
         importJob.run();
     }
 
-    private @Nullable String stops() {
-        return client.get()
-                .uri("/api/stops")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .returnResult(String.class)
-                .getResponseBody();
+    // What the API answers from the timetable at the fixed clock.
+    private List<String> timetable() {
+        return Stream.of("/api/stops", "/api/lines", "/api/vehicles", "/api/stops/at:49:1198/departures")
+                .map(path -> Objects.requireNonNull(
+                        client.get()
+                                .uri(path)
+                                .exchange()
+                                .expectStatus()
+                                .isOk()
+                                .returnResult(String.class)
+                                .getResponseBody(),
+                        path))
+                .toList();
     }
 }
