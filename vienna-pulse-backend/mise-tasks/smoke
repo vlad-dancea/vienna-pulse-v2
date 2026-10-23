@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#MISE description="Verify every API endpoint of the deployed backend through Cloudflare (SMOKE_URL picks a Preview)"
+#
+# Both deploy workflows run this. A release whose queries fail still has a healthy container,
+# which is all pulse-deploy checks before it keeps a release, so only these requests notice.
+set -euo pipefail
+
+base="${SMOKE_URL:-https://pulse.vladdancea.com}"
+
+# Prints the body of the API response at the path, or fails unless it is a 200 of the media type.
+get() {
+    local response
+    response="$(curl --silent --show-error --compressed --max-time 30 \
+        --write-out '\n%{http_code} %{content_type}' "$base$1")" || return
+    if [[ "${response##*$'\n'}" != "200 $2"* ]]; then
+        echo "$1 answered ${response##*$'\n'}" >&2
+        return 1
+    fi
+    printf '%s' "${response%$'\n'*}"
+}
+
+# Fails with the message unless jq, given the remaining arguments, finds the JSON on stdin true.
+expect() {
+    local message="$1"
+    shift
+    jq --exit-status "$@" >/dev/null || { echo "$message" >&2; return 1; }
+}
+
+# Every command ends in `|| return`, because errexit does not apply inside a function that runs
+# as a condition.
+smoke() {
+    local stops lines vehicles stop departures
+    # jq's length also counts the characters of a string, so the type comes first.
+    local some='.type == "FeatureCollection" and (.features | type == "array" and length > 0)'
+    stops="$(get /api/stops application/geo+json)" || return
+    expect 'The API serves no stops' "$some" <<<"$stops" || return
+    lines="$(get /api/lines application/geo+json)" || return
+    expect 'The API serves no lines today' "$some" <<<"$lines" || return
+    # No vehicle runs at night, so an empty collection passes.
+    vehicles="$(get /api/vehicles application/geo+json)" || return
+    expect 'The vehicles are not a FeatureCollection' '.type == "FeatureCollection" and (.features | type) == "array"' \
+        <<<"$vehicles" || return
+    stop="$(jq --raw-output '.features[0].id' <<<"$stops")" || return
+    departures="$(get "/api/stops/$(jq --null-input --raw-output --arg stop "$stop" '$stop | @uri')/departures" \
+        application/json)" || return
+    # shellcheck disable=SC2016 # jq expands $stop, not the shell.
+    expect "The departures are not those of $stop" --arg stop "$stop" \
+        '.stop.id == $stop and (.departures | type) == "array"' <<<"$departures" || return
+    echo "The API at $base serves $(jq '.features | length' <<<"$stops") stops," \
+        "$(jq '.features | length' <<<"$lines") lines, $(jq '.features | length' <<<"$vehicles") vehicles" \
+        "and $(jq '.departures | length' <<<"$departures") departures from $stop"
+}
+
+# A new database imports the feed in the background after startup, so the API can take a minute
+# to serve everything.
+for attempt in $(seq 24); do
+    if smoke; then exit 0; fi
+    echo "The API is not ready (attempt $attempt/24)"
+    sleep 5
+done
+echo "::error::The API at $base fails its smoke test"
+exit 1

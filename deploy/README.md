@@ -39,8 +39,11 @@ Every push to `main` that touches the backend runs `.github/workflows/backend.ym
 3. `deploy` joins the tailnet as `tag:ci` and runs `ssh deploy@<server> "deploy <commit> <digest>"`.
    The deploy user's key can only run [`vps/pulse-deploy`](vps/pulse-deploy), which checks that the
    commit is on `main`, fetches `compose.yaml` from that commit, pulls the images, starts them, waits
-   until every container is healthy and rolls back if they are not. The job then checks the public
-   API through Cloudflare.
+   until every container is healthy and rolls back if they are not. The job then runs the
+   backend's `smoke` task through Cloudflare. It checks that `/api/stops` and `/api/lines` serve
+   features, that `/api/vehicles` serves a FeatureCollection (empty at night) and that the first
+   stop's departures answer. A failed smoke test fails the job, but the release stays live:
+   `pulse-deploy` rolls back only when a container's health check fails.
 
 A deploy interrupts the API for about ten seconds, while the new backend starts. Database migrations run when the backend starts, and
 a rollback only swaps the image back, so migrations must keep working with the previous release.
@@ -87,6 +90,8 @@ mise run //vienna-pulse-frontend:check
 mise run //vienna-pulse-frontend:deploy
 mise run //vienna-pulse-frontend:smoke
 ```
+
+`mise run //vienna-pulse-backend:smoke` checks every API endpoint and needs no credentials.
 
 A Preview can also be deployed and removed by hand:
 
