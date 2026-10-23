@@ -218,6 +218,12 @@ class LineControllerTest {
                 .returnResult()
                 .getResponseHeaders()
                 .getETag();
+        client.get()
+                .uri("/api/lines?date=2026-10-21")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("tram-62"));
 
         // Only an import changes the lines, so a route added behind its back is not read for today.
         addRoute("bus-13a", "13A", null, "BUS", null, null);
