@@ -30,7 +30,8 @@ committed pnpm lockfile before running a task.
 To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The frontend checks formatting, typed ESLint rules, template accessibility,
-the production build, Vitest tests and Cloudflare runtime integration tests.
+the production build, Vitest tests, Cloudflare runtime integration tests and a Playwright test
+that opens the built map in headless Chromium.
 
 The repository root includes shared agent instructions and Angular MCP configuration for
 Claude Code, Codex and Agents. The MCP server uses the project's pinned CLI, install
