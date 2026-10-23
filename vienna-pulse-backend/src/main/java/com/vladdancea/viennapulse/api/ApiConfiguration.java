@@ -4,7 +4,6 @@ import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.Clock;
 import javax.sql.DataSource;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -79,12 +78,6 @@ class ApiConfiguration implements WebMvcConfigurer {
         var registration = new FilterRegistrationBean<>(filter);
         registration.addUrlPatterns("/api/*");
         return registration;
-    }
-
-    /// The current time, as a bean so that tests can fix it.
-    @Bean
-    Clock clock() {
-        return Clock.systemUTC();
     }
 
     // Hikari sets a borrowed connection's network timeout back to the pool's when it returns, so the
