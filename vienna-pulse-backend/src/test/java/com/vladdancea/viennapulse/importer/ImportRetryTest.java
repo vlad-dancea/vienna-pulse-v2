@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.importer.download.DownloadedFeed;
 import com.vladdancea.viennapulse.importer.download.FeedDownloader;
 import com.vladdancea.viennapulse.importer.download.FeedValidator;
@@ -23,10 +24,8 @@ import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
@@ -45,6 +44,8 @@ import org.springframework.web.client.RestClientException;
 
 class ImportRetryTest {
     private static final Instant NOW = Instant.parse("2026-10-23T05:00:00Z");
+
+    private final TestClock clock = new TestClock();
 
     private final FeedDownloader downloader = mock();
     private final FeedValidator validator = mock();
@@ -76,7 +77,8 @@ class ImportRetryTest {
 
     @BeforeEach
     void recordRetries() {
-        when(scheduler.getClock()).thenReturn(Clock.fixed(NOW, ZoneOffset.UTC));
+        clock.set(NOW.toString());
+        when(scheduler.getClock()).thenReturn(clock);
         when(scheduler.schedule(any(Runnable.class), any(Instant.class))).thenAnswer(invocation -> {
             retries.add(invocation.getArgument(0));
             retryTimes.add(invocation.getArgument(1));
@@ -111,7 +113,9 @@ class ImportRetryTest {
 
         assertThat(retryTimes)
                 .containsExactly(
-                        NOW.plus(Duration.ofMinutes(10)), NOW.plus(Duration.ofHours(1)), NOW.plus(Duration.ofHours(3)));
+                        NOW.plus(Duration.ofMinutes(10)),
+                        NOW.plus(Duration.ofMinutes(70)),
+                        NOW.plus(Duration.ofMinutes(250)));
         verify(downloader, times(4)).download();
     }
 
@@ -153,8 +157,10 @@ class ImportRetryTest {
     }
 
     // Runs each retry when it comes due, as the scheduler would, including the ones it schedules.
+    // Each pause starts when the attempt before it fails.
     private void runRetries() {
         for (var i = 0; i < retries.size(); i++) {
+            clock.set(retryTimes.get(i).toString());
             retries.get(i).run();
         }
     }
