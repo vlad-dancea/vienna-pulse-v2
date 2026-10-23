@@ -1,0 +1,4 @@
+﻿route_id,service_id,trip_id,shape_id,trip_headsign,direction_id,block_id
+"21-U1-j26-1","T2","1.T2.21-U1-j26-1.6.R","21-U1-j26-1.6.R","Wien Oberlaa","1",""
+"21-U1-j26-1","T3","1.T3.21-U1-j26-1.6.R","21-U1-j26-1.6.R","Wien Oberlaa","1",""
+"22-2-j26-1","T2","1.T2.22-2-j26-1.1.H","22-2-j26-1.1.H","Wien Friedrich-Engels-Platz","0",""
