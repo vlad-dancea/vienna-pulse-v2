@@ -1,12 +1,16 @@
 package com.vladdancea.viennapulse.importer.read;
 
+import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.CsvReader;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.function.Function;
+import java.util.function.ObjLongConsumer;
 import java.util.regex.Pattern;
 import java.util.zip.ZipFile;
 import org.jspecify.annotations.Nullable;
@@ -19,8 +23,8 @@ public final class FeedCsv {
 
     private FeedCsv() {}
 
-    /// Opens one CSV entry; closing the reader leaves the ZIP open.
-    public static CsvReader<NamedCsvRecord> open(ZipFile feed, String file) throws IOException {
+    // Closing the reader leaves the ZIP open.
+    private static CsvReader<NamedCsvRecord> open(ZipFile feed, String file) throws IOException {
         var entry = feed.getEntry(file);
         if (entry == null) {
             throw new FeedFormatException("GTFS feed is missing " + file);
@@ -79,6 +83,31 @@ public final class FeedCsv {
     public static @Nullable Integer optionalInteger(NamedCsvRecord row, String field) {
         var value = optional(row, field);
         return value == null ? null : parseInteger(field, value);
+    }
+
+    /// Parses every row of `file` and passes each record to `consumer` with the line its row starts
+    /// on. A row that `parse` rejects with an [IllegalArgumentException] fails the read with a
+    /// [FeedFormatException] naming that line. Exceptions from `consumer` pass through unchanged.
+    static <T> void read(
+            ZipFile feed, String file, Function<NamedCsvRecord, T> parse, ObjLongConsumer<? super T> consumer)
+            throws IOException {
+        try (var csv = open(feed, file)) {
+            for (var row : csv) {
+                consumer.accept(parseLine(file, row, parse), row.getStartingLineNumber());
+            }
+        } catch (CsvParseException exception) {
+            throw new FeedFormatException(file + " is not valid CSV", exception);
+        } catch (UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+    }
+
+    private static <T> T parseLine(String file, NamedCsvRecord row, Function<NamedCsvRecord, T> parse) {
+        try {
+            return parse.apply(row);
+        } catch (IllegalArgumentException exception) {
+            throw FeedFormatException.at(file, row.getStartingLineNumber(), exception);
+        }
     }
 
     private static double parseDecimal(String field, String value) {
