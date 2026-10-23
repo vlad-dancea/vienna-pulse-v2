@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
@@ -26,6 +27,16 @@ class TimetableHealthIndicatorTest {
 
     @Autowired
     JdbcClient jdbc;
+
+    // Every service the tests run has a trip, so that only the reason a test names turns it DOWN.
+    @BeforeEach
+    void giveEachServiceATrip() {
+        jdbc.sql("""
+                        INSERT INTO timetable.trips (id, route_id, service_id)
+                        VALUES ('t0', 'U1', 'T0'), ('t1', 'U1', 'T1'), ('weekdays', 'U1', 'weekdays'),
+                               ('daily', 'U1', 'daily')
+                        """).update();
+    }
 
     @Test
     void isUpWhileTheLastSuccessIsRecentAndTheTimetableCoversTomorrow() {
@@ -114,6 +125,24 @@ class TimetableHealthIndicatorTest {
                         .withDetail("lastSuccessfulImport", lastSuccess.toString())
                         .withDetail("coveredFrom", FIRST_DAY.toString())
                         .withDetail("coveredUntil", lastDay.toString())
+                        .build());
+    }
+
+    // The lines endpoint draws no line for a service without trips.
+    @Test
+    void isDownWhenTheServiceThatRunsTomorrowHasNoTrips() {
+        var lastSuccess = NOW.minus(Duration.ofHours(1));
+        recordImport("SUCCEEDED", lastSuccess);
+        runsUntil(TODAY);
+        jdbc.sql("INSERT INTO timetable.calendar_dates VALUES ('tripless', :date, 'ADDED')")
+                .param("date", TOMORROW)
+                .update();
+
+        assertThat(health())
+                .isEqualTo(Health.down()
+                        .withDetail("lastSuccessfulImport", lastSuccess.toString())
+                        .withDetail("coveredFrom", FIRST_DAY.toString())
+                        .withDetail("coveredUntil", TOMORROW.toString())
                         .build());
     }
 

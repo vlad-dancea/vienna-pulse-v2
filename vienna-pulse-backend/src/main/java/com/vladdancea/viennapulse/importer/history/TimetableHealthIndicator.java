@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 /// The `timetable` health component, DOWN when the last successful import is more than 36 hours old
-/// or no service runs tomorrow in Vienna, which would leave the map without lines or vehicles.
+/// or no trip runs tomorrow in Vienna, which would leave the map without lines or vehicles.
 @Component
 @RequiredArgsConstructor
 public class TimetableHealthIndicator extends AbstractHealthIndicator {
@@ -47,31 +47,33 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
         }
     }
 
-    // Whether any service runs on `day`, decided like the lines endpoint decides which lines to draw.
+    // Whether a trip runs on `day`, decided like the lines endpoint decides which lines to draw. A
+    // service without trips draws nothing.
     private boolean runsOn(LocalDate day) {
         return jdbc.sql("""
-                        SELECT EXISTS (
-                            SELECT service_id
-                            FROM timetable.service_calendars
-                            WHERE CAST(:day AS date) BETWEEN start_date AND end_date
-                              AND CASE extract(isodow FROM CAST(:day AS date))
-                                      WHEN 1 THEN monday
-                                      WHEN 2 THEN tuesday
-                                      WHEN 3 THEN wednesday
-                                      WHEN 4 THEN thursday
-                                      WHEN 5 THEN friday
-                                      WHEN 6 THEN saturday
-                                      WHEN 7 THEN sunday
-                                  END
-                            EXCEPT
-                            SELECT service_id
-                            FROM timetable.calendar_dates
-                            WHERE date = :day AND exception_type = 'REMOVED'
+                        WITH services AS (
+                            (SELECT service_id
+                             FROM timetable.service_calendars
+                             WHERE CAST(:day AS date) BETWEEN start_date AND end_date
+                               AND CASE extract(isodow FROM CAST(:day AS date))
+                                       WHEN 1 THEN monday
+                                       WHEN 2 THEN tuesday
+                                       WHEN 3 THEN wednesday
+                                       WHEN 4 THEN thursday
+                                       WHEN 5 THEN friday
+                                       WHEN 6 THEN saturday
+                                       WHEN 7 THEN sunday
+                                   END
+                             EXCEPT
+                             SELECT service_id
+                             FROM timetable.calendar_dates
+                             WHERE date = :day AND exception_type = 'REMOVED')
                             UNION
                             SELECT service_id
                             FROM timetable.calendar_dates
                             WHERE date = :day AND exception_type = 'ADDED'
                         )
+                        SELECT EXISTS (SELECT FROM timetable.trips WHERE service_id IN (SELECT service_id FROM services))
                         """).param("day", day).query(Boolean.class).single();
     }
 
