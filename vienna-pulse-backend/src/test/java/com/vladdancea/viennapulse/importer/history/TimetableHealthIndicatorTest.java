@@ -29,7 +29,8 @@ class TimetableHealthIndicatorTest {
 
     @Test
     void isUpWhileTheLastSuccessIsRecentAndTheTimetableCoversTomorrow() {
-        var lastSuccess = NOW.minus(Duration.ofHours(35));
+        // Exactly as old as allowed.
+        var lastSuccess = NOW.minus(Duration.ofHours(36));
         recordImport("SUCCEEDED", lastSuccess);
         recordImport("FAILED", NOW.minus(Duration.ofHours(1)));
         runsUntil(TODAY);

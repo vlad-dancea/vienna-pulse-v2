@@ -32,7 +32,8 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
         var now = clock.instant();
         var lastSuccess = history.lastSuccess();
         var coverage = coverage();
-        var fresh = lastSuccess.filter(time -> time.isAfter(now.minus(MAX_AGE))).isPresent();
+        var fresh =
+                lastSuccess.filter(time -> !time.isBefore(now.minus(MAX_AGE))).isPresent();
         var running = runsOn(LocalDate.ofInstant(now, VIENNA).plusDays(1));
 
         if (fresh && running) {
