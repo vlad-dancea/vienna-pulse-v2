@@ -24,8 +24,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
    forwarding without depending on production.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
-3. The smoke test checks that the public JavaScript and map worker match the build and that
-   `/api/stops` still serves GeoJSON through the tunnel.
+3. The frontend's smoke test checks that the public JavaScript and map worker match the build and
+   that `/api/stops` still serves GeoJSON through the tunnel. The backend's smoke test then checks
+   every API endpoint, as after a backend deploy.
 
 Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
 production deployment. Frontend deployments do not restart the backend.
@@ -39,8 +40,11 @@ Every push to `main` that touches the backend runs `.github/workflows/backend.ym
 3. `deploy` joins the tailnet as `tag:ci` and runs `ssh deploy@<server> "deploy <commit> <digest>"`.
    The deploy user's key can only run [`vps/pulse-deploy`](vps/pulse-deploy), which checks that the
    commit is on `main`, fetches `compose.yaml` from that commit, pulls the images, starts them, waits
-   until every container is healthy and rolls back if they are not. The job then checks the public
-   API through Cloudflare.
+   until every container is healthy and rolls back if they are not. The job then runs the
+   backend's `smoke` task through Cloudflare. It checks that `/api/stops` and `/api/lines` serve
+   features, that `/api/vehicles` serves a FeatureCollection (empty at night) and that the first
+   stop's departures answer. A failed smoke test fails the job, but the release stays live:
+   `pulse-deploy` rolls back only when a container's health check fails.
 
 A deploy interrupts the API for about ten seconds, while the new backend starts. Database migrations run when the backend starts, and
 a rollback only swaps the image back, so migrations must keep working with the previous release.
@@ -87,6 +91,8 @@ mise run //vienna-pulse-frontend:check
 mise run //vienna-pulse-frontend:deploy
 mise run //vienna-pulse-frontend:smoke
 ```
+
+`mise run //vienna-pulse-backend:smoke` checks every API endpoint and needs no credentials.
 
 A Preview can also be deployed and removed by hand:
 
