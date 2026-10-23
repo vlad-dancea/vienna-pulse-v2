@@ -3,6 +3,7 @@ package com.vladdancea.viennapulse.importer.history;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.importer.ImportJob;
 import com.vladdancea.viennapulse.importer.ImporterProperties;
@@ -16,10 +17,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,14 +64,13 @@ class ImportHistoryTest {
     @Autowired
     JdbcClient jdbc;
 
-    // Never read: the fields only name the beans that the methods of the same name replace.
+    @Autowired
+    TestClock clock;
+
+    // Never read: the field only names the bean that downloader() replaces.
     @TestBean
     @Nullable
     FeedDownloader downloader;
-
-    @TestBean
-    @Nullable
-    Clock clock;
 
     static FeedDownloader downloader() {
         return new FeedDownloader(
@@ -87,12 +85,9 @@ class ImportHistoryTest {
         };
     }
 
-    static Clock clock() {
-        return Clock.fixed(NOW, ZoneOffset.UTC);
-    }
-
     @BeforeEach
     void forgetEarlierImports() {
+        clock.set(NOW.toString());
         jdbc.sql("DELETE FROM public.imports").update();
     }
 

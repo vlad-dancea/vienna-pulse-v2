@@ -9,11 +9,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
 // The container healthcheck in production asks the readiness probe on the management port, and the
@@ -27,6 +29,12 @@ class HealthEndpointTest {
     @LocalManagementPort
     int managementPort;
 
+    @Autowired
+    TimetableFixture timetable;
+
+    @Autowired
+    JdbcClient jdbc;
+
     @Test
     void reportsReadinessOnTheManagementPort() throws IOException, InterruptedException {
         var response = get(managementPort, "/actuator/health/readiness");
@@ -35,9 +43,12 @@ class HealthEndpointTest {
         assertThat(response.body()).isEqualTo("{\"status\":\"UP\"}");
     }
 
-    // The test database has never been imported into, so its timetable is too old for any clock.
     @Test
     void reportsAnOldTimetableOnlyOutsideReadiness() throws IOException, InterruptedException {
+        // Without any import or timetable, the timetable is too old for any clock.
+        timetable.clear();
+        jdbc.sql("DELETE FROM public.imports").update();
+
         var response = get(managementPort, "/actuator/health");
 
         assertThat(response.statusCode()).isEqualTo(503);

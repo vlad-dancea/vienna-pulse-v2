@@ -3,6 +3,7 @@ package com.vladdancea.viennapulse.importer.history;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.TimetableFixture;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,9 +29,15 @@ class TimetableHealthIndicatorTest {
     @Autowired
     JdbcClient jdbc;
 
-    // Every service the tests run has a trip, so that only the reason a test names turns it DOWN.
+    @Autowired
+    TimetableFixture timetable;
+
+    // Other tests share the database, and every service the tests run has a trip, so that only the
+    // reason a test names turns it DOWN.
     @BeforeEach
-    void giveEachServiceATrip() {
+    void startFromOneTripPerService() {
+        timetable.clear();
+        jdbc.sql("DELETE FROM public.imports").update();
         jdbc.sql("""
                         INSERT INTO timetable.trips (id, route_id, service_id)
                         VALUES ('t0', 'U1', 'T0'), ('t1', 'U1', 'T1'), ('weekdays', 'U1', 'weekdays'),
