@@ -1,9 +1,7 @@
 package com.vladdancea.viennapulse.importer.read;
 
-import de.siegmar.fastcsv.reader.CsvParseException;
 import de.siegmar.fastcsv.reader.NamedCsvRecord;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.SequencedMap;
@@ -24,27 +22,12 @@ public interface FeedFileReader<T> {
     /// bad row, naming its line.
     default SequencedMap<String, T> read(ZipFile feed) throws IOException {
         var records = new LinkedHashMap<String, T>();
-        try (var csv = FeedCsv.open(feed, file())) {
-            for (var row : csv) {
-                var record = parseLine(row);
-                var id = id(record);
-                if (records.putIfAbsent(id, record) != null) {
-                    throw FeedFormatException.at(file(), row.getStartingLineNumber(), "duplicate id " + id);
-                }
+        FeedCsv.read(feed, file(), this::parse, (record, line) -> {
+            var id = id(record);
+            if (records.putIfAbsent(id, record) != null) {
+                throw FeedFormatException.at(file(), line, "duplicate id " + id);
             }
-        } catch (CsvParseException exception) {
-            throw new FeedFormatException(file() + " is not valid CSV", exception);
-        } catch (UncheckedIOException exception) {
-            throw exception.getCause();
-        }
+        });
         return Collections.unmodifiableSequencedMap(records);
-    }
-
-    private T parseLine(NamedCsvRecord row) {
-        try {
-            return parse(row);
-        } catch (IllegalArgumentException exception) {
-            throw FeedFormatException.at(file(), row.getStartingLineNumber(), exception);
-        }
     }
 }
