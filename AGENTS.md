@@ -31,7 +31,7 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
 - A merge to `main` ships to production. The backend publishes a signed image to the GitHub
   Container Registry, deploys it to the server over Tailscale and runs the backend's `smoke`
   task, which checks every API endpoint through Cloudflare. The frontend deploys the checked
-  build to Cloudflare and runs its own `smoke` task.
+  build to Cloudflare and runs its own `smoke` task, then the backend's.
 - `.github/workflows/frontend-preview.yml` deploys a pull request's checked frontend build as a
   Cloudflare Preview at `pr-<number>.pulse.vladdancea.com`, links it at the top of the pull
   request description and deletes it when the pull request closes. It runs from `main` and

@@ -24,8 +24,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
    forwarding without depending on production.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
-3. The smoke test checks that the public JavaScript and map worker match the build and that
-   `/api/stops` still serves GeoJSON through the tunnel.
+3. The frontend's smoke test checks that the public JavaScript and map worker match the build and
+   that `/api/stops` still serves GeoJSON through the tunnel. The backend's smoke test then checks
+   every API endpoint, as after a backend deploy.
 
 Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
 production deployment. Frontend deployments do not restart the backend.
