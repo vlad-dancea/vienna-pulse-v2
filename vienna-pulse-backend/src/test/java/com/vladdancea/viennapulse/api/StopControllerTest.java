@@ -4,6 +4,13 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
+import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
+import com.vladdancea.viennapulse.importer.read.route.Route;
+import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
+import com.vladdancea.viennapulse.importer.read.stop.Stop;
+import com.vladdancea.viennapulse.importer.read.trip.Trip;
+import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -35,6 +42,12 @@ class StopControllerTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    ResponseCache cache;
+
+    @Autowired
+    Store store;
+
     @LocalServerPort
     int port;
 
@@ -42,6 +55,7 @@ class StopControllerTest {
     void removeAllStops() {
         jdbc.sql("DELETE FROM timetable.stops").update();
         jdbc.sql("DELETE FROM timetable.stop_modes").update();
+        cache.clear();
     }
 
     @Test
@@ -127,10 +141,6 @@ class StopControllerTest {
                    "properties":{"name":"Unused","modes":[]}}
                 ]}
                 """, JsonCompareMode.STRICT);
-        var before = etag();
-        jdbc.sql("UPDATE timetable.stop_modes SET types = ARRAY['SUBWAY'] WHERE stop_id LIKE 'at:%'")
-                .update();
-        assertThat(etag()).isNotEqualTo(before);
     }
 
     @Test
@@ -164,18 +174,35 @@ class StopControllerTest {
     }
 
     @Test
-    void sendsTheNewStopsOnceTheyChange() {
+    void readsTheStopsOncePerTimetable() throws IOException {
         addStop("s1", "Karlsplatz", 48.20024, 16.36951);
         var before = etag();
-        addStop("s2", "Stephansplatz", 48.20845, 16.37212);
 
+        // Only an import changes the stops, so a stop added behind its back is not read.
+        addStop("s2", "Stephansplatz", 48.20845, 16.37212);
         client.get()
                 .uri("/api/stops")
                 .ifNoneMatch(before)
                 .exchange()
                 .expectStatus()
-                .isOk();
-        assertThat(etag()).isNotEqualTo(before);
+                .isNotModified();
+
+        importNothing();
+        addStop("s3", "Schwedenplatz", 48.21178, 16.37798);
+        client.get()
+                .uri("/api/stops")
+                .ifNoneMatch(before)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json("""
+                        {"type": "FeatureCollection", "features": [
+                          {"type": "Feature", "id": "s3",
+                           "geometry": {"type": "Point", "coordinates": [16.37798, 48.21178]},
+                           "properties": {"name": "Schwedenplatz", "modes": null}}
+                        ]}
+                        """, JsonCompareMode.STRICT);
     }
 
     @Test
@@ -200,6 +227,19 @@ class StopControllerTest {
         jdbc.sql("INSERT INTO timetable.stops (id, name, latitude, longitude) VALUES (?, ?, ?, ?)")
                 .params(id, name, latitude, longitude)
                 .update();
+    }
+
+    // Swaps in an empty timetable the way the daily import swaps in the next one.
+    private void importNothing() throws IOException {
+        store.replace(staging -> {
+            staging.copy("routes", Route.class, row -> {});
+            staging.copy("stops", Stop.class, row -> {});
+            staging.copy("shape_points", ShapePoint.class, row -> {});
+            staging.copy("trips", Trip.class, row -> {});
+            staging.copy("service_calendars", ServiceCalendar.class, row -> {});
+            staging.copy("calendar_dates", CalendarDate.class, row -> {});
+            staging.stopTimes(row -> {});
+        });
     }
 
     private String etag() {

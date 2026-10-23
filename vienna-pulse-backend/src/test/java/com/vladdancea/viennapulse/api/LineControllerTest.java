@@ -38,6 +38,9 @@ class LineControllerTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    ResponseCache cache;
+
     // Never read: the field only names the bean that clock() replaces.
     @TestBean
     @Nullable
@@ -53,6 +56,7 @@ class LineControllerTest {
         for (var table : Set.of("routes", "trips", "shape_points", "service_calendars", "calendar_dates")) {
             jdbc.sql("DELETE FROM timetable." + table).update();
         }
+        cache.clear();
     }
 
     @Test
@@ -181,6 +185,39 @@ class LineControllerTest {
                 .expectBody()
                 .jsonPath("$.features[*].id")
                 .isEqualTo(List.of("night"));
+    }
+
+    @Test
+    void readsTodaysLinesOncePerTimetableAndOtherDaysEveryTime() {
+        addWeeklyService("daily", "tuesday", DAY, DAY.plusDays(1));
+        jdbc.sql("UPDATE timetable.service_calendars SET wednesday = true").update();
+        addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        addRoute("tram-62", "62", null, "TRAM", null, null);
+        addTrip("t1", "tram-62", "daily", "shape");
+        var etag = client.get()
+                .uri("/api/lines")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult()
+                .getResponseHeaders()
+                .getETag();
+
+        // Only an import changes the lines, so a route added behind its back is not read for today.
+        addRoute("bus-13a", "13A", null, "BUS", null, null);
+        addTrip("t2", "bus-13a", "daily", "shape");
+        client.get()
+                .uri("/api/lines?date=2026-10-20")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isNotModified();
+        client.get()
+                .uri("/api/lines?date=2026-10-21")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("bus-13a", "tram-62"));
     }
 
     @Test
