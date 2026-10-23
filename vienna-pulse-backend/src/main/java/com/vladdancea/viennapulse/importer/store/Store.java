@@ -14,6 +14,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /// Replaces the timetable in PostgreSQL. The new timetable is loaded into a `staging` schema, which
@@ -121,7 +122,8 @@ public class Store {
                 jdbc.sql("SET LOCAL lock_timeout = '10s'").update();
                 jdbc.sql("DROP SCHEMA timetable_old CASCADE").update();
             });
-        } catch (DataAccessException exception) {
+        } catch (DataAccessException | TransactionException exception) {
+            // The new timetable has committed, so this failure must not fail the import.
             log.warn("Could not drop the previous timetable, the next import will", exception);
         }
     }
