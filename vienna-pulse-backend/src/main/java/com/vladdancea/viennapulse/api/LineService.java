@@ -49,32 +49,10 @@ public class LineService {
                                 WHERE exception_type = 'ADDED'
                             ) AS days
                         ),
-                        services AS (
-                            (SELECT service_id
-                             FROM timetable.service_calendars
-                             WHERE CAST(:date AS date) BETWEEN start_date AND end_date
-                               AND CASE extract(isodow FROM CAST(:date AS date))
-                                       WHEN 1 THEN monday
-                                       WHEN 2 THEN tuesday
-                                       WHEN 3 THEN wednesday
-                                       WHEN 4 THEN thursday
-                                       WHEN 5 THEN friday
-                                       WHEN 6 THEN saturday
-                                       WHEN 7 THEN sunday
-                                   END
-                             EXCEPT
-                             SELECT service_id
-                             FROM timetable.calendar_dates
-                             WHERE date = :date AND exception_type = 'REMOVED')
-                            UNION
-                            SELECT service_id
-                            FROM timetable.calendar_dates
-                            WHERE date = :date AND exception_type = 'ADDED'
-                        ),
                         route_shapes AS (
                             SELECT DISTINCT route_id, shape_id
                             FROM timetable.trips
-                            WHERE service_id IN (SELECT service_id FROM services)
+                            WHERE service_id IN (SELECT service_id FROM pulse.running_services(CAST(:date AS date)))
                         ),
                         -- One index lookup per shape: joining scans all of the points instead.
                         -- Rounding in double precision instead of numeric halves the time, and only
@@ -100,7 +78,7 @@ public class LineService {
                         SELECT coverage.first_date,
                                coverage.last_date,
                                line.id,
-                               line.name,
+                               line.short_name,
                                line.long_name,
                                line.type,
                                line.color,
@@ -111,11 +89,11 @@ public class LineService {
                         FROM coverage
                         LEFT JOIN (
                             SELECT r.id,
-                                   coalesce(r.short_name, r.long_name) AS name,
+                                   r.short_name,
                                    r.long_name,
-                                   lower(r.type) AS type,
-                                   '#' || r.color AS color,
-                                   '#' || r.text_color AS text_color,
+                                   r.type,
+                                   r.color,
+                                   r.text_color,
                                    p.first_shape_id,
                                    p.longitudes,
                                    p.latitudes
@@ -150,12 +128,7 @@ public class LineService {
         var latitudes = row.getArray("latitudes");
         return new RoutePath(
                 row.getString("id"),
-                new LineProperties(
-                        row.getString("name"),
-                        row.getString("long_name"),
-                        row.getString("type"),
-                        row.getString("color"),
-                        row.getString("text_color")),
+                LineProperties.from(row),
                 longitudes == null || latitudes == null ? List.of() : positions(longitudes, latitudes));
     }
 
