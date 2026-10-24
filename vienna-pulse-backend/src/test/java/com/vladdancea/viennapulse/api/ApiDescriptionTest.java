@@ -78,7 +78,7 @@ class ApiDescriptionTest {
         OpenAPI openApi() {
             return new OpenAPI()
                     .info(new Info().title("Vienna Pulse API").version("1"))
-                    .servers(List.of(new Server().url("https://pulse.vladdancea.com")));
+                    .servers(List.of(new Server().url("https://pulse-api.vladdancea.com")));
         }
     }
 }

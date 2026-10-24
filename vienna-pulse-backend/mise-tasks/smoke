@@ -5,7 +5,7 @@
 # which is all pulse-deploy checks before it keeps a release, so only these requests notice.
 set -euo pipefail
 
-base="${SMOKE_URL:-https://pulse.vladdancea.com}"
+base="${SMOKE_URL:-https://pulse-api.vladdancea.com}"
 
 # Prints the body of the API response at the path, or fails unless it is a 200 of the media type.
 get() {

@@ -128,8 +128,11 @@ jobs:
 
       - run: mise run //vienna-pulse-frontend:smoke
 
-      # The same API checks as after a backend deploy, through the Worker that was just deployed.
+      # The same API checks as after a backend deploy, through the Worker that was just deployed,
+      # which still forwards /api for tabs opened before the site switched to pulse-api.
       - run: mise run //vienna-pulse-backend:smoke
+        env:
+          SMOKE_URL: https://pulse.vladdancea.com
 
   # This stable check reports even when the project is unchanged, and fails closed when
   # detection, validation or packaging fails or is cancelled.
