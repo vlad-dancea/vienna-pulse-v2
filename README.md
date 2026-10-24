@@ -42,7 +42,9 @@ flowchart LR
 The Angular app is a set of static files, which Cloudflare serves from its edge with Workers
 Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it and sends a path it does not know to the map. The
 browser loads the base map from OpenFreeMap and everything about the network from `/api`. The
-map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts). The API types and
+the services that load them are in [`timetable/`](vienna-pulse-frontend/src/app/timetable), which
+lint keeps free of MapLibre.
 
 [`public/_headers`](vienna-pulse-frontend/public/_headers) sends a Content-Security-Policy that
 allows scripts only from the site itself and connections to it and OpenFreeMap, plus the other
