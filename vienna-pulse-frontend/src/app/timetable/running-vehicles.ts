@@ -1,7 +1,8 @@
 import { httpResource } from '@angular/common/http';
-import { DestroyRef, DOCUMENT, inject, linkedSignal, Service } from '@angular/core';
-import type { FeatureCollection, Point } from 'geojson';
+import { DOCUMENT, inject, Service } from '@angular/core';
+import { latestValue } from './latest-value';
 import type { components } from './openapi';
+import { refreshEvery } from './refresh-every';
 
 /** Describes a running vehicle by its line, drawn like that line, and where its trip is headed. */
 export type VehicleProperties = components['schemas']['VehicleProperties'];
@@ -15,13 +16,7 @@ export class RunningVehicles {
     () => '/api/vehicles',
   );
   /** The last vehicles that loaded, kept on the map when a refresh fails. */
-  readonly latest = linkedSignal<
-    FeatureCollection<Point, VehicleProperties> | undefined,
-    FeatureCollection<Point, VehicleProperties> | undefined
-  >({
-    source: () => (this.vehicles.hasValue() ? this.vehicles.value() : undefined),
-    computation: (next, previous) => next ?? previous?.value,
-  }).asReadonly();
+  readonly latest = latestValue(this.vehicles);
 
   constructor() {
     const document = inject(DOCUMENT);
@@ -32,11 +27,6 @@ export class RunningVehicles {
         this.vehicles.reload();
       }
     };
-    const timer = setInterval(refresh, this.interval);
-    document.addEventListener('visibilitychange', refresh);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-    });
+    refreshEvery(this.interval, refresh, ['visibilitychange']);
   }
 }

@@ -10,6 +10,8 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import type { Signal, WritableResource } from '@angular/core';
+import type { FeatureCollection } from 'geojson';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource } from 'maplibre-gl';
 import { NetworkStops } from '../timetable/network-stops';
@@ -21,6 +23,9 @@ import { lineProperty, stopProperty } from './properties';
 import { stopsLayer } from './stops';
 import { VehicleAnimation } from './vehicle-animation';
 import { vehiclesLayer } from './vehicles';
+
+/** What a map source draws before its features load. */
+const noFeatures: FeatureCollection<never, never> = { type: 'FeatureCollection', features: [] };
 
 /** Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls. */
 @Component({
@@ -42,8 +47,6 @@ export class MapView {
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
-  private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
-  private readonly lineRetry = viewChild<ElementRef<HTMLButtonElement>>('lineRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
   private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
   protected readonly styleFailed = signal(false);
@@ -51,16 +54,16 @@ export class MapView {
   protected readonly lineRetryShown = computed(
     () => !!this.lines.routes.error() && !this.lines.latest() && !this.lines.unavailable(),
   );
+  /** The loads that can fail with nothing to show instead, in the order of their retry buttons. */
+  protected readonly retries = [
+    { name: 'stops', shown: this.stopRetryShown, resource: this.stops.stops },
+    { name: 'lines', shown: this.lineRetryShown, resource: this.lines.routes },
+  ];
 
-  protected retryStops() {
+  protected reload(resource: WritableResource<unknown>) {
     // The error and retry button disappear after success, so focus the panel's persistent heading.
     this.heading().nativeElement.focus();
-    this.stops.stops.reload();
-  }
-
-  protected retryLines() {
-    this.heading().nativeElement.focus();
-    this.lines.routes.reload();
+    resource.reload();
   }
 
   constructor() {
@@ -68,31 +71,15 @@ export class MapView {
     const document = inject(DOCUMENT);
 
     effect(() => {
-      const retries = [
-        { shown: this.stopRetryShown(), button: this.stopRetry()?.nativeElement },
-        { shown: this.lineRetryShown(), button: this.lineRetry()?.nativeElement },
-      ];
+      const hidden = this.retries.filter((retry) => !retry.shown());
       // Polling also removes a retry button, so preserve focus before Angular updates the view.
-      if (retries.some(({ shown, button }) => !shown && button && document.activeElement === button)) {
+      if (hidden.some((retry) => document.activeElement?.id === `retry-${retry.name}`)) {
         this.heading().nativeElement.focus();
       }
     });
 
-    effect(() => {
-      const map = this.map();
-      const stops = this.stops.latest();
-      if (map) {
-        void map.getSource<GeoJSONSource>('stops')?.setData(stops ?? { type: 'FeatureCollection', features: [] });
-      }
-    });
-
-    effect(() => {
-      const map = this.map();
-      const routes = this.lines.latest();
-      if (map) {
-        void map.getSource<GeoJSONSource>('lines')?.setData(routes ?? { type: 'FeatureCollection', features: [] });
-      }
-    });
+    this.drawLatest('stops', this.stops.latest);
+    this.drawLatest('lines', this.lines.latest);
 
     effect(() => {
       const animation = this.vehicleAnimation();
@@ -100,10 +87,7 @@ export class MapView {
       if (animation) {
         // Gliding for the whole time between two refreshes keeps the vehicles moving.
         const reduceMotion = document.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        animation.show(
-          vehicles ?? { type: 'FeatureCollection', features: [] },
-          reduceMotion ? 0 : this.vehicles.interval,
-        );
+        animation.show(vehicles ?? noFeatures, reduceMotion ? 0 : this.vehicles.interval);
       }
     });
 
@@ -154,18 +138,15 @@ export class MapView {
 
       // Keep routes below stops so platforms stay visible at interchanges.
       map.once('load', () => {
-        map.addSource('lines', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        });
+        map.addSource('lines', { type: 'geojson', data: noFeatures });
         for (const layer of lineLayers) {
           map.addLayer(layer);
         }
-        map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addSource('stops', { type: 'geojson', data: noFeatures });
         map.addLayer(stopsLayer);
         map.addLayer(lineNamesLayer);
         // Vehicles go above the line names, because they are what changes on the map.
-        map.addSource('vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addSource('vehicles', { type: 'geojson', data: noFeatures });
         map.addLayer(vehiclesLayer);
         addDistricts(map);
         const vehicles = map.getSource<GeoJSONSource>('vehicles');
@@ -180,6 +161,15 @@ export class MapView {
         this.vehicleAnimation()?.stop();
         map.remove();
       });
+    });
+  }
+
+  /** Draws the last features that loaded into a map source once the map has loaded. */
+  private drawLatest(source: string, features: Signal<FeatureCollection | undefined>) {
+    effect(() => {
+      const map = this.map();
+      const data = features() ?? noFeatures;
+      void map?.getSource<GeoJSONSource>(source)?.setData(data);
     });
   }
 }
