@@ -131,6 +131,8 @@ On the server (`ssh hetzner`), in `/opt/vienna-pulse`:
 | State of the stack | `docker compose ps` |
 | Backend logs (JSON, one line per event) | `docker compose logs --tail 100 backend` |
 | Deploy history | `cat deploys.log`, full output in `/var/log/pulse-deploy.log` |
+| Recent imports | `docker compose exec postgres psql -U pulse -d pulse -c 'SELECT id, finished_at, outcome, error FROM imports ORDER BY id DESC LIMIT 5'` |
+| Health, with the timetable's age | `docker compose exec backend bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081 && printf "GET /actuator/health HTTP/1.0\r\n\r\n" >&3 && cat <&3'` |
 | Memory use | `docker stats --no-stream` |
 | Query the database | `docker compose exec postgres psql -U pulse -d pulse` |
 | Redeploy a commit by hand | `SSH_ORIGINAL_COMMAND="deploy <commit> <digest>" /usr/local/sbin/pulse-deploy` |

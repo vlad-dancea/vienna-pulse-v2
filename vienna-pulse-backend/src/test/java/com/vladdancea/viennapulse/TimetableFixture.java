@@ -1,20 +1,35 @@
 package com.vladdancea.viennapulse;
 
+import static java.util.Objects.requireNonNull;
+
+import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
 import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
+import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
+import com.vladdancea.viennapulse.importer.read.route.Route;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
+import com.vladdancea.viennapulse.importer.read.shape.ShapePoint;
+import com.vladdancea.viennapulse.importer.read.stop.Stop;
 import com.vladdancea.viennapulse.importer.read.stoptime.PickupDropOffType;
+import com.vladdancea.viennapulse.importer.read.trip.Trip;
+import com.vladdancea.viennapulse.importer.store.Store;
+import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Locale;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /// Writes the timetable rows a test needs straight into the database, without an import.
 public class TimetableFixture {
     private final JdbcClient jdbc;
+    // Slice tests such as @JdbcTest have no caches.
+    private final ObjectProvider<CacheManager> caches;
 
-    public TimetableFixture(JdbcClient jdbc) {
+    public TimetableFixture(JdbcClient jdbc, ObjectProvider<CacheManager> caches) {
         this.jdbc = jdbc;
+        this.caches = caches;
     }
 
     /// A call of a trip, with times written as in the feed, where hours can pass 24.
@@ -36,8 +51,11 @@ public class TimetableFixture {
     }
 
     /// Empties every table of the timetable, found the way the import finds them, so a table added
-    /// later is emptied too.
+    /// later is emptied too. Also forgets the API's cached responses, which only an import refreshes
+    /// and which every test class shares through one Spring context.
     public void clear() {
+        caches.ifAvailable(manager -> manager.getCacheNames()
+                .forEach(name -> requireNonNull(manager.getCache(name)).clear()));
         var tables = jdbc.sql("""
                         SELECT table_name FROM information_schema.tables
                         WHERE table_schema = 'timetable' AND table_type = 'BASE TABLE'
@@ -45,6 +63,22 @@ public class TimetableFixture {
                 .query((row, number) -> "timetable." + row.getString("table_name"))
                 .list();
         jdbc.sql("TRUNCATE " + String.join(", ", tables)).update();
+    }
+
+    /// Swaps in an empty timetable through `store`, the way the daily import swaps in the next one, so
+    /// that the API sees a new timetable version.
+    public void importNothing(Store store) throws IOException {
+        store.replace(
+                staging -> {
+                    staging.copy("routes", Route.class, row -> {});
+                    staging.copy("stops", Stop.class, row -> {});
+                    staging.copy("shape_points", ShapePoint.class, row -> {});
+                    staging.copy("trips", Trip.class, row -> {});
+                    staging.copy("service_calendars", ServiceCalendar.class, row -> {});
+                    staging.copy("calendar_dates", CalendarDate.class, row -> {});
+                    staging.stopTimes(row -> {});
+                },
+                rowCounts -> {});
     }
 
     /// Adds a stop in the centre of Vienna.

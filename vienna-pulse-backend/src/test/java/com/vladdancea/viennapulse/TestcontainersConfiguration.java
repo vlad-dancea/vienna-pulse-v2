@@ -5,8 +5,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -24,8 +26,8 @@ public class TestcontainersConfiguration {
     // One container for every Spring context of the test run, which would otherwise each start their
     // own. It is no bean, because a context stops its container beans when it closes, as when the
     // context cache evicts it, while other cached contexts still use them. Testcontainers removes it
-    // when the test run ends.
-    static final PostgreSQLContainer POSTGRES = startPostgres();
+    // when the test run ends. Public for the tests that freeze the database.
+    public static final PostgreSQLContainer POSTGRES = startPostgres();
 
     @Bean
     JdbcConnectionDetails postgres() {
@@ -56,12 +58,16 @@ public class TestcontainersConfiguration {
     }
 
     @Bean
-    TimetableFixture timetableFixture(JdbcClient jdbc) {
-        return new TimetableFixture(jdbc);
+    TimetableFixture timetableFixture(JdbcClient jdbc, ObjectProvider<CacheManager> caches) {
+        return new TimetableFixture(jdbc, caches);
     }
 
     private static PostgreSQLContainer startPostgres() {
-        var postgres = new PostgreSQLContainer(postgresImage());
+        // The user production and compose.yaml connect as, whose name matches the `pulse` schema.
+        var postgres = new PostgreSQLContainer(postgresImage())
+                .withDatabaseName("pulse")
+                .withUsername("pulse")
+                .withPassword("pulse");
         postgres.start();
         return postgres;
     }
