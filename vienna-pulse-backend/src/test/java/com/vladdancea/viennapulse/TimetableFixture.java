@@ -137,22 +137,34 @@ public class TimetableFixture {
     /// Adds a trip with its headsign named after it, its calls, and the span the import derives from
     /// them.
     public void addTrip(String id, String route, String service, @Nullable String shape, Call... calls) {
-        addTrip(id, id, route, service, shape, calls);
+        addTrip(id, id, null, route, service, shape, calls);
     }
 
     /// Adds a trip like [#addTrip], but towards a headsign that other trips can share and without a shape.
     public void addTripTowards(String id, String headsign, String route, String service, Call... calls) {
-        addTrip(id, headsign, route, service, null, calls);
+        addTrip(id, headsign, null, route, service, null, calls);
+    }
+
+    /// Adds a trip like [#addTripTowards], in the direction with the id `direction`, 0 or 1.
+    public void addTripTowards(String id, String headsign, int direction, String route, String service, Call... calls) {
+        addTrip(id, headsign, direction, route, service, null, calls);
     }
 
     private void addTrip(
-            String id, String headsign, String route, String service, @Nullable String shape, Call... calls) {
+            String id,
+            String headsign,
+            @Nullable Integer direction,
+            String route,
+            String service,
+            @Nullable String shape,
+            Call... calls) {
         jdbc.sql("""
-                        INSERT INTO timetable.trips (id, route_id, service_id, shape_id, headsign)
-                        VALUES (:id, :route, :service, :shape, :headsign)
+                        INSERT INTO timetable.trips (id, route_id, service_id, shape_id, headsign, direction_id)
+                        VALUES (:id, :route, :service, :shape, :headsign, :direction)
                         """)
                 .param("id", id)
                 .param("headsign", headsign)
+                .param("direction", direction)
                 .param("route", route)
                 .param("service", service)
                 .param("shape", shape)

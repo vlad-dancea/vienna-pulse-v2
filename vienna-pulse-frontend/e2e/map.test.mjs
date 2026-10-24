@@ -77,8 +77,10 @@ const leaving = [4, 9].map((minutes) => new Date(Date.now() + minutes * 60_000))
 const u1 = { id: 'u1', name: 'U1', longName: null, type: 'subway', color: '#E3000F', textColor: '#FFFFFF' };
 api['/api/stops/at:49:1/departures'] = {
   stop: { id: 'at:49:1', name: 'U-Bahn stop' },
+  liveStatus: 'unavailable',
   departures: leaving.map((time) => ({
-    time: time.toISOString(),
+    plannedTime: time.toISOString(),
+    liveTime: null,
     line: u1,
     headsign: 'Wien Leopoldau',
     platform: 'at:49:1:0:1',

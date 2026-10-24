@@ -20,7 +20,8 @@ const bus13a: DepartureLine = { ...bus4a, id: 'bus-13a', name: '13A' };
 /** A departure at `minute` past 18:00 in Vienna on 2026-10-24. */
 function departure(line: DepartureLine, headsign: string | null, minute: number): Departure {
   return {
-    time: `2026-10-24T18:${String(minute).padStart(2, '0')}:00+02:00`,
+    plannedTime: `2026-10-24T18:${String(minute).padStart(2, '0')}:00+02:00`,
+    liveTime: null,
     line,
     headsign,
     platform: 'at:49:657:0:1',
