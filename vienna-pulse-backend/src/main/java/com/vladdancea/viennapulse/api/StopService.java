@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class StopService {
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// Every stop, ordered by id, with its platforms merged into one point in their middle. A fixed
