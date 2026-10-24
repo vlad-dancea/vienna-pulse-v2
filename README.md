@@ -69,7 +69,14 @@ passengers board or alight there, and records when each trip leaves its first st
 its last. In the same transaction, [`Store`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/store/Store.java)
 renames `timetable` to `timetable_old` and `staging` to `timetable`. Readers see either the
 previous timetable or the new one, never a mix, and a failed import leaves the previous one in
-place.
+place. A failed import tries again after 10 minutes, 1 hour and 3 hours, then waits for the next
+morning. The download stops at 500 MB.
+
+Every attempt leaves a row in `public.imports`, outside the schema the import replaces: its
+outcome, the error of a failure, the feed's size and SHA-256, and the rows loaded into each table.
+A success's row commits with its swap. The `timetable` health component on the management port
+turns DOWN when the last success is more than 36 hours old or no trip runs tomorrow.
+Readiness leaves it out, because an old timetable still beats no API.
 
 Flyway migrations create the tables when the backend starts. A new database gets its first
 import right after startup, and so does one where an upgrade added stop modes, stop times or
@@ -80,13 +87,16 @@ trip spans that are still empty.
 The [`api`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/api) package reads the
 `timetable` schema and shares no code with the importer. The feed lists each platform as a stop
 of its own, with ids like `at:49:1320:0:3`. The first three parts name the stop, and the API
-merges a stop's platforms into one point in their middle, with the id `at:49:1320`.
+merges a stop's platforms into one point in their middle, with the id `at:49:1320`, which the
+`stops` table stores as `merged_id`. The rules every query follows, which services run on a day
+and where a service day's times start, are SQL functions in a `pulse` schema that imports leave
+alone.
 
 | Endpoint | What it returns |
 | --- | --- |
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
-| `/api/vehicles` | A GeoJSON point for every trip running now, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
+| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
 | `/api/stops/{id}/departures` | The next 20 departures from any platform of the merged stop, each with its time in Vienna, its line, its headsign and its platform. An unknown stop gets a 404. The map does not show the departures yet. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
@@ -95,6 +105,17 @@ the importer records find the running trips without reading every stop time.
 
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
 and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457.
+
+The backend keeps the stops and today's lines, serialized with their ETag, until an import
+replaces the timetable, which it notices because every import renames a new schema to `timetable`.
+It works out the vehicles once per step for every map. Other days' lines and the departures are
+read on each request.
+
+When the database is slow or down, a request that needs it is answered with a 503,
+`Cache-Control: no-store` and `Retry-After: 5`. The stops and lines need it on every request to
+check the timetable version, and the vehicles once per step. The API waits at most 2 seconds for
+a database connection, cancels any query that runs for more than 5 seconds and gives up after 10
+seconds on a database that stops answering altogether. Other database errors get a 500.
 
 ## Run
 
@@ -184,8 +205,8 @@ rm -r "$district_tmp"
 The frontend runs at [pulse.vladdancea.com](https://pulse.vladdancea.com) on Cloudflare Workers
 Static Assets. A merge to `main` that changes the frontend deploys it after the checks pass. One
 that changes the backend or its production stack builds a container image with signed
-provenance, which CI deploys to the server over Tailscale before it checks `/api/stops` through
-Cloudflare. A merge that changes neither, such as one to this README, deploys nothing. Each pull
+provenance, which CI deploys to the server over Tailscale before it checks every API endpoint
+through Cloudflare. A merge that changes neither, such as one to this README, deploys nothing. Each pull
 request from a branch in this repository that changes the frontend gets a Preview at
 `pr-<number>.pulse.vladdancea.com`. See [`deploy/README.md`](deploy/README.md) for credentials,
 previews, manual deployments and rollback.

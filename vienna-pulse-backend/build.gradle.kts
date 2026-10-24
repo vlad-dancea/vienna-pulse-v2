@@ -25,6 +25,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-restclient")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("de.siegmar:fastcsv:4.4.0")
     implementation("org.postgresql:postgresql")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
@@ -67,4 +69,9 @@ tasks.javadoc {
 
 tasks.test {
     useJUnitPlatform()
+    // Every checkout's tests and the app in development share /tmp, where the importer downloads
+    // the feed and deletes the leftovers of others. A directory of their own keeps them apart.
+    val tmpdir = layout.buildDirectory.dir("tmp/test-java-tmpdir").get().asFile
+    systemProperty("java.io.tmpdir", tmpdir.absolutePath)
+    doFirst { tmpdir.mkdirs() }
 }

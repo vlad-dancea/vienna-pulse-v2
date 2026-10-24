@@ -1,0 +1,2 @@
+﻿agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_fare_url
+"04","Wiener Linien GmbH & Co KG","https://www.wienerlinien.at","Europe/Vienna","DE","https://shop.wienmobil.at/products"
