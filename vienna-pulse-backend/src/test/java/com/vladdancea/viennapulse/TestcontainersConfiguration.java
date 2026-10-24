@@ -61,7 +61,11 @@ public class TestcontainersConfiguration {
     }
 
     private static PostgreSQLContainer startPostgres() {
-        var postgres = new PostgreSQLContainer(postgresImage());
+        // The user production and compose.yaml connect as, whose name matches the `pulse` schema.
+        var postgres = new PostgreSQLContainer(postgresImage())
+                .withDatabaseName("pulse")
+                .withUsername("pulse")
+                .withPassword("pulse");
         postgres.start();
         return postgres;
     }
