@@ -27,6 +27,9 @@
           {{ nothingLeaves() }}
         }
       </p>
+    } @else if (pending()) {
+      <!-- The loaders in the rows are hidden from screen readers, which hear this instead. -->
+      <p class="sr-only">Loading live times...</p>
     }
   </div>
   @if (retryShown()) {
@@ -82,6 +85,12 @@
                 <time [attr.datetime]="departure.time" [class.text-red-700]="departure.late">{{
                   departure.clock
                 }}</time>
+                @if (pending()) {
+                  <span
+                    aria-hidden="true"
+                    class="size-2.5 shrink-0 rounded-full border-[1.5px] border-slate-500 border-t-transparent motion-safe:animate-spin"
+                  ></span>
+                }
               </span>
             </span>
           }

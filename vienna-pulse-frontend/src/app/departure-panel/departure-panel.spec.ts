@@ -154,6 +154,43 @@ describe('DeparturePanel', () => {
     ]);
   });
 
+  it('shows loaders and asks again every 15 seconds until the live times arrive, also after a failed refresh', async () => {
+    const loaders = () => element.querySelectorAll('li span[aria-hidden="true"]').length;
+    TestBed.tick();
+    http
+      .expectOne(karlsplatz)
+      .flush(answer([departure(u3, 'Wien Ottakring', 4), departure(u3, 'Wien Ottakring', 9)], 'pending'));
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring 4 min 18:04 9 min 18:09');
+    expect(loaders()).toBe(2);
+    expect(text('[role="status"]')).toBe('Loading live times...');
+
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectOne(karlsplatz).flush({}, { status: 503, statusText: 'Unavailable' });
+    await fixture.whenStable();
+    expect(loaders()).toBe(2);
+    expect(text('[role="status"]')).toBe('Loading live times...');
+
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http
+      .expectOne(karlsplatz)
+      .flush(answer([departure(u3, 'Wien Ottakring', 4, 4.5), departure(u3, 'Wien Ottakring', 9, 12)], 'live'));
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring live 4 min 18:04 live 11 min planned 18:09 expected 18:12');
+    expect(loaders()).toBe(0);
+    expect(text('[role="status"]')).toBe('');
+
+    // With the live times there, the next refresh is 30 seconds later.
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectNone(karlsplatz);
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectOne(karlsplatz);
+  });
+
   it('counts down, drops departures that left and refreshes every 30 seconds, keeping them when a refresh fails', async () => {
     TestBed.tick();
     http.expectOne(karlsplatz).flush(answer([departure(u3, 'Wien Ottakring', 0), departure(u3, 'Wien Ottakring', 1)]));

@@ -279,6 +279,9 @@ and from the timetable otherwise. A green signal marks the live times. When the 
 minute or more away from the planned one, the planned time appears struck through beside it, and
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
+The first answer for a stop the backend has not fetched recently has planned times only, so each
+time shows a loader, and the panel asks again after 15 seconds instead of 30, since the backend
+fetches the stop in its next round, at most 15 seconds later (see [Live departures](#live-departures)).
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
