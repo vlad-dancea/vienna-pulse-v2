@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { RunningLines } from './running-lines';
 
@@ -41,6 +42,27 @@ describe('RunningLines service date', () => {
     http.expectNone((request) => request.url === '/api/lines');
     TestBed.resetTestingModule();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([503, 404])('retries a failed load with HTTP %s once a minute until it succeeds', async (status) => {
+    vi.setSystemTime(new Date('2026-10-19T12:00:00Z'));
+    const lines = TestBed.inject(RunningLines);
+    const routes = { type: 'FeatureCollection', features: [] };
+    TestBed.tick();
+    http.expectOne('/api/lines?date=2026-10-19').flush({}, { status, statusText: 'Unavailable' });
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(lines.unavailable()).toBe(status === 404);
+
+    vi.advanceTimersByTime(60_000);
+    TestBed.tick();
+    http.expectOne('/api/lines?date=2026-10-19').flush(routes);
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(lines.latest()).toEqual(routes);
+    expect(lines.unavailable()).toBe(false);
+
+    vi.advanceTimersByTime(60_000);
+    TestBed.tick();
+    http.expectNone((request) => request.url === '/api/lines');
   });
 
   it.each(['visibilitychange', 'focus'])('refreshes on %s after a suspended tab returns', (event) => {

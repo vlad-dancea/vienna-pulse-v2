@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springdoc.core.service.GenericResponseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,6 +66,11 @@ class ApiDescriptionTest {
         @Bean
         RecordSchemas recordSchemas() {
             return new RecordSchemas();
+        }
+
+        @Bean
+        CachedBodies cachedBodies(GenericResponseService responses) {
+            return new CachedBodies(responses);
         }
 
         // Without a server, springdoc writes the test's random port into the description.

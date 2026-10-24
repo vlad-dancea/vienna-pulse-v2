@@ -7,6 +7,7 @@ import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
 import { NetworkStops } from './network-stops';
 
 const map = vi.hoisted(() => ({
+  on: vi.fn(),
   once: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn<(layer: LayerSpecification, beforeId?: string) => void>(),
@@ -114,14 +115,25 @@ const expectedLayers: [string, FilterSpecification][] = [
 describe('MapView', () => {
   let http: HttpTestingController;
   let loadMap: () => void;
+  let loadStyle: () => void;
+  let errorListeners: Set<(event: { error: Error }) => void>;
   let setData: ReturnType<typeof vi.fn>;
   let setStops: ReturnType<typeof vi.fn>;
   let setVehicles: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    map.once.mockImplementation((_event: string, callback: () => void) => {
-      loadMap = callback;
+    map.once.mockImplementation((event: string, callback: () => void) => {
+      if (event === 'load') {
+        loadMap = callback;
+      } else {
+        loadStyle = callback;
+      }
+    });
+    errorListeners = new Set();
+    map.on.mockImplementation((_event: string, listener: (event: { error: Error }) => void) => {
+      errorListeners.add(listener);
+      return { unsubscribe: () => errorListeners.delete(listener) };
     });
     setData = vi.fn();
     setStops = vi.fn();
@@ -272,7 +284,10 @@ describe('MapView', () => {
     expect(layerIds.indexOf('district-names')).toBeGreaterThan(layerIds.indexOf('line-names'));
   });
 
-  it.each([404, 503])('keeps the map empty and mode controls usable after HTTP %s', async (status) => {
+  it.each([
+    [404, 'There is no timetable for today.'],
+    [503, 'Lines could not be loaded. Retry lines'],
+  ])('says why the map has no lines and keeps mode controls usable after HTTP %s', async (status, message) => {
     const fixture = TestBed.createComponent(MapView);
     TestBed.tick();
     loadMap();
@@ -284,7 +299,7 @@ describe('MapView', () => {
     const buttons = Array.from(element.querySelectorAll('button'));
     expect(element.querySelector('h2')?.textContent).toBe('Filters');
     expect(element.querySelector('section')?.textContent.replace(/\s+/g, ' ').trim()).toBe(
-      'Filters All U-Bahn Tram Bus',
+      `Filters All U-Bahn Tram Bus ${message}`,
     );
     buttons.find((button) => button.textContent.trim() === 'Tram')?.click();
     await fixture.whenStable();
@@ -295,6 +310,74 @@ describe('MapView', () => {
       ['==', ['get', 'type'], 'tram'],
     ]);
   });
+  it.each([
+    [404, 'Filters All U-Bahn Tram Bus There is no timetable for today.'],
+    [503, 'Filters All U-Bahn Tram Bus'],
+  ])('keeps the lines on the map while the next day loads and after HTTP %s', async (status, panel) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.setSystemTime(new Date('2026-10-19T21:59:30Z'));
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      loadMap();
+      http.expectOne('/api/lines?date=2026-10-19').flush(routes);
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+
+      vi.advanceTimersByTime(60_000);
+      TestBed.tick();
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      const nextDay = http.expectOne('/api/lines?date=2026-10-20');
+      expect(setData).toHaveBeenLastCalledWith(routes);
+      nextDay.flush({}, { status, statusText: 'Unavailable' });
+      await fixture.whenStable();
+      expect(setData).toHaveBeenLastCalledWith(routes);
+      const element = fixture.nativeElement as HTMLElement;
+      expect(element.querySelector('section')?.textContent.replace(/\s+/g, ' ').trim()).toBe(panel);
+    } finally {
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      vi.useRealTimers();
+    }
+  });
+
+  it('says so when the base map style fails, but not once it loaded', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      http.expectOne((request) => request.url === '/api/lines').flush(routes);
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const message = 'The map could not be loaded. Reload the page to try again.';
+
+      for (const listener of errorListeners) listener({ error: new Error('Early error') });
+      await fixture.whenStable();
+      expect(element.textContent).toContain(message);
+      loadStyle();
+      await fixture.whenStable();
+      expect(element.textContent).not.toContain(message);
+      for (const listener of errorListeners) listener({ error: new Error('Tile failed') });
+      await fixture.whenStable();
+      expect(element.textContent).not.toContain(message);
+
+      fixture.destroy();
+      const failed = TestBed.createComponent(MapView);
+      TestBed.tick();
+      const error = new Error('Style failed');
+      for (const listener of errorListeners) listener({ error });
+      await failed.whenStable();
+      expect((failed.nativeElement as HTMLElement).textContent).toContain(message);
+      expect(consoleError).toHaveBeenCalledWith(error);
+      failed.destroy();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it.each([undefined, null])(
     'keeps stops visible against unclassified API modes %s, then applies the selected mode',
     async (modes) => {
@@ -370,33 +453,91 @@ describe('MapView', () => {
     expect(element.textContent).not.toContain('Stops could not be loaded');
     fixture.destroy();
   });
-  it.each([true, false])(
-    'preserves keyboard focus during automatic recovery (retry focused: %s)',
-    async (focusRetry) => {
-      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-      const fixture = TestBed.createComponent(MapView);
-      try {
-        TestBed.tick();
-        loadMap();
-        http.expectOne((request) => request.url === '/api/lines').flush(routes);
-        http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
-        http.expectOne('/api/vehicles').flush(noVehicles);
-        await fixture.whenStable();
-        const element = fixture.nativeElement as HTMLElement;
-        const buttons = Array.from(element.querySelectorAll('button'));
-        buttons.find((button) => button.textContent.trim() === (focusRetry ? 'Retry stops' : 'U-Bahn'))?.focus();
-        vi.advanceTimersByTime(60_000);
-        TestBed.tick();
-        http.expectOne('/api/stops').flush(stops);
-        http.expectOne('/api/vehicles').flush(noVehicles);
-        await fixture.whenStable();
-        expect(document.activeElement?.textContent.trim()).toBe(focusRetry ? 'Filters' : 'U-Bahn');
-        expect(element.textContent).not.toContain('Stops could not be loaded');
-      } finally {
-        fixture.destroy();
-        TestBed.resetTestingModule();
-        vi.useRealTimers();
-      }
-    },
-  );
+  it('retries failed lines from the panel while keeping keyboard focus in it', async () => {
+    const fixture = TestBed.createComponent(MapView);
+    TestBed.tick();
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush({}, { status: 503, statusText: 'Unavailable' });
+    http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const retry = Array.from(element.querySelectorAll('button')).find(
+      (button) => button.textContent.trim() === 'Retry lines',
+    );
+    const status = element.querySelector('[role="status"]');
+    expect(status?.textContent.trim()).toBe('Lines could not be loaded.');
+    retry?.focus();
+    retry?.click();
+    TestBed.tick();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    await fixture.whenStable();
+    expect(document.activeElement?.textContent).toBe('Filters');
+    // The same live region stays, so screen readers announce its next message.
+    expect(element.querySelector('[role="status"]')).toBe(status);
+    expect(status?.textContent.trim()).toBe('');
+    expect(setData).toHaveBeenLastCalledWith(routes);
+    fixture.destroy();
+  });
+
+  it('keeps keyboard focus in the Filters panel when retried lines find no timetable', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      loadMap();
+      http.expectOne((request) => request.url === '/api/lines').flush({}, { status: 503, statusText: 'Unavailable' });
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      Array.from(element.querySelectorAll('button'))
+        .find((button) => button.textContent.trim() === 'Retry lines')
+        ?.focus();
+      vi.advanceTimersByTime(60_000);
+      TestBed.tick();
+      http.expectOne((request) => request.url === '/api/lines').flush({}, { status: 404, statusText: 'Not Found' });
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      expect(element.textContent).toContain('There is no timetable for today.');
+      expect(document.activeElement?.textContent).toBe('Filters');
+    } finally {
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['Retry stops', 'Filters'],
+    ['Retry lines', 'Filters'],
+    ['U-Bahn', 'U-Bahn'],
+  ])('preserves keyboard focus during automatic recovery with %s focused', async (focused, expected) => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const fixture = TestBed.createComponent(MapView);
+    try {
+      TestBed.tick();
+      loadMap();
+      http.expectOne((request) => request.url === '/api/lines').flush({}, { status: 503, statusText: 'Unavailable' });
+      http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      const element = fixture.nativeElement as HTMLElement;
+      const buttons = Array.from(element.querySelectorAll('button'));
+      buttons.find((button) => button.textContent.trim() === focused)?.focus();
+      vi.advanceTimersByTime(60_000);
+      TestBed.tick();
+      http.expectOne((request) => request.url === '/api/lines').flush(routes);
+      http.expectOne('/api/stops').flush(stops);
+      http.expectOne('/api/vehicles').flush(noVehicles);
+      await fixture.whenStable();
+      expect(document.activeElement?.textContent.trim()).toBe(expected);
+      expect(element.textContent).not.toContain('could not be loaded');
+      expect(setData).toHaveBeenLastCalledWith(routes);
+    } finally {
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      vi.useRealTimers();
+    }
+  });
 });
