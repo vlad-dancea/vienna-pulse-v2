@@ -29,7 +29,8 @@
       "parameters": {
         "required_status_checks": [
           { "context": "backend-required", "integration_id": 15368 },
-          { "context": "frontend-required", "integration_id": 15368 }
+          { "context": "frontend-required", "integration_id": 15368 },
+          { "context": "repository-required", "integration_id": 15368 }
         ],
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false

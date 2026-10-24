@@ -134,7 +134,7 @@ a container, and its tests start their own.
 ```bash
 mise trust --all
 mise run dev     # backend at http://localhost:8080, frontend at http://localhost:4200
-mise run check   # the check task of every project, which CI runs too
+mise run check   # the lint and the check task of every project, which CI runs too
 mise run format  # format the sources of every project
 mise run openapi # update the API description and the frontend types made from it
 ```
@@ -150,6 +150,10 @@ tests. The frontend checks formatting, its generated API types, typed ESLint rul
 accessibility, the production build, Vitest tests, Cloudflare runtime integration tests and a
 Playwright test that opens the built map in headless Chromium. The backend's CI workflow also
 packages the jar and builds the container image, which the local check does not.
+A third workflow runs `mise run lint` on the files that belong to neither project: actionlint
+and zizmor check the workflows, and shellcheck checks the deploy scripts and mise file tasks.
+In CI, zizmor also runs its online audits, which look up the pinned actions on GitHub. Run
+`GH_TOKEN=$(gh auth token) mise run lint` to include them locally.
 
 The backend's `openapi.json` describes what the API answers. A backend test fails when the
 controllers serve anything else, and the frontend generates its API types from the file, so a

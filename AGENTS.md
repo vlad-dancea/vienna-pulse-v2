@@ -38,9 +38,14 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   request. A `changes` job compares the whole pull request diff with the project's paths and
   runs `mise run //project-name:check` only when something relevant changed. The backend also
   builds its container image, which proves the Dockerfile.
-- `main` requires the `backend-required` and `frontend-required` checks. They pass when the
-  project built or was unchanged, and fail on detection errors, failed jobs or cancellation.
-  A new job that must block merging belongs in the `needs` of its project's required job.
+- `.github/workflows/repository.yml` does the same for the files that belong to neither
+  project. It runs the root `lint` task (actionlint and zizmor for the workflows, shellcheck for
+  `deploy/vps/` and the mise file tasks) when one of them or the root `mise.toml` changed.
+  Fix what the linters find, or ignore a finding inline with the reason.
+- `main` requires the `backend-required`, `frontend-required` and `repository-required` checks.
+  They pass when the job succeeded or nothing relevant changed, and fail on detection errors,
+  failed jobs or cancellation. A new job that must block merging belongs in the `needs` of its
+  workflow's required job.
 - A merge to `main` ships to production. The backend publishes a signed image to the GitHub
   Container Registry, deploys it to the server over Tailscale and runs the backend's `smoke`
   task, which checks every API endpoint through Cloudflare. The frontend deploys the checked
@@ -52,12 +57,13 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   Changes to it take effect only after merging.
 - CI runs the same mise tasks as local development, so a passing `mise run check` should mean
   passing `check` jobs. The backend workflow also packages the jar and builds the image, which
-  the local check does not. When CI fails where the local check passed, find the difference
-  before retrying.
-- Keep it that way when editing workflows: one workflow per project (plus the frontend's
-  preview workflow, which must be separate to run from `main`), CI steps that call mise tasks,
-  read-only default permissions and actions pinned to full commit SHAs with the release in a
-  trailing comment.
+  the local check does not. The repository workflow gives zizmor a token for its online audits,
+  which run locally only with `GH_TOKEN=$(gh auth token) mise run lint`. When CI fails where the
+  local check passed, find the difference before retrying.
+- Keep it that way when editing workflows: one workflow per project and one for the repository
+  (plus the frontend's preview workflow, which must be separate to run from `main`), CI steps
+  that call mise tasks, read-only default permissions and actions pinned to full commit SHAs
+  with the release in a trailing comment.
 - Renovate opens dependency pull requests every Monday morning, Vienna time, for releases at
   least three days old. Minor and patch updates share one pull request. Java and Node major
   updates are disabled on purpose.
