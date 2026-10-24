@@ -17,6 +17,7 @@
       "previews_enabled": true
     }
   ],
+  "previews": {},
   "assets": {
     "directory": "./dist/vienna-pulse-frontend/browser",
     "not_found_handling": "single-page-application"

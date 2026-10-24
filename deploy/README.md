@@ -77,6 +77,8 @@ to `frontend-preview.yml` therefore takes effect only after it is merged.
 
 A Preview is a separate copy of the same Worker, and production traffic never reaches it.
 
+- `wrangler preview` refuses a configuration without a `previews` block, so `wrangler.json` keeps
+  an empty one. Previews have no settings of their own.
 - `wrangler.json` enables `pulse.vladdancea.com` as a *preview-only* custom domain
   (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
   with its own wildcard certificate, while the hostname itself keeps the production route and the
