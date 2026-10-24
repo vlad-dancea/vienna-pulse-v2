@@ -15,7 +15,7 @@ the stops, today's lines and the running vehicles where the timetable puts them 
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     browser["Browser"]
     tiles["OpenFreeMap<br/>map tiles"]
     feed["Wiener Linien<br/>GTFS feed"]
@@ -35,6 +35,8 @@ flowchart LR
     cloudflared --> backend
     backend -->|"timetable schema"| postgres
     feed -->|"daily import"| backend
+    %% Draws no line. It puts the feed below Cloudflare, which keeps the diagram narrow.
+    api ~~~ feed
 ```
 
 ### Frontend
