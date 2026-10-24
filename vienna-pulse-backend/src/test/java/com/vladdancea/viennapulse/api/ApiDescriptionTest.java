@@ -73,6 +73,11 @@ class ApiDescriptionTest {
             return new CachedBodies(responses);
         }
 
+        @Bean
+        ErrorResponses errorResponses() {
+            return new ErrorResponses();
+        }
+
         // Without a server, springdoc writes the test's random port into the description.
         @Bean
         OpenAPI openApi() {

@@ -117,7 +117,8 @@ its arrival and departure. Trips without a shape, or without distances along it,
 the importer records find the running trips without reading every stop time.
 
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
-and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457.
+and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457, and
+[`openapi.json`](vienna-pulse-backend/openapi.json) lists the ones each endpoint can answer.
 
 The backend keeps the stops and today's lines, serialized with their ETag, until an import
 replaces the timetable, which it notices because every import renames a new schema to `timetable`.
@@ -163,7 +164,10 @@ In CI, zizmor also runs its online audits, which look up the pinned actions on G
 
 The backend's `openapi.json` describes what the API answers. A backend test fails when the
 controllers serve anything else, and the frontend generates its API types from the file, so a
-renamed or removed field fails a check in the pull request that makes it.
+renamed or removed field fails a check in the pull request that makes it. springdoc cannot see the
+errors, which the services throw, so
+[`ErrorResponses`](vienna-pulse-backend/src/test/java/com/vladdancea/viennapulse/api/ErrorResponses.java)
+in the tests lists them, and a new error needs a line there.
 
 [`AGENTS.md`](AGENTS.md) holds the instructions for coding agents, and `CLAUDE.md` points Claude
 Code to it. `.mcp.json` and `.codex/config.toml` start the Angular CLI's MCP server for Claude
