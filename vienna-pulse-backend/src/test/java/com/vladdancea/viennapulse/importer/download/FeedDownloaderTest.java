@@ -26,7 +26,10 @@ class FeedDownloaderTest {
     @AutoClose
     final FeedServer server = FeedServer.start();
 
-    final FeedDownloader downloader = downloader(RestClient.builder());
+    // The client the application uses. Spring would pick Apache HttpClient, which reads the rest of a
+    // response the downloader stops.
+    final FeedDownloader downloader = downloader(RestClient.builder()
+            .requestFactory(ClientHttpRequestFactoryBuilder.jdk().build()));
 
     @BeforeEach
     void removeEarlierDownloads() throws IOException {
@@ -80,9 +83,9 @@ class FeedDownloaderTest {
     void stopsASlowDownloadWithoutLeavingAFile() throws IOException {
         // Each byte arrives well within the read timeout, but all of them would take ten seconds.
         server.trickle(100, Duration.ofMillis(100));
-        // Only the read timeout bounds the whole download, as Spring Boot applies it to the client
-        // it detects. Another HTTP client may apply it to each read instead and fail this test.
-        var factory = ClientHttpRequestFactoryBuilder.detect()
+        // Only the read timeout bounds the whole download, as the JDK's client, which the application
+        // uses, applies it to the whole response. Another HTTP client may apply it to each read instead.
+        var factory = ClientHttpRequestFactoryBuilder.jdk()
                 .build(HttpClientSettings.defaults().withReadTimeout(Duration.ofSeconds(1)));
 
         assertThatThrownBy(downloader(RestClient.builder().requestFactory(factory))::download)
