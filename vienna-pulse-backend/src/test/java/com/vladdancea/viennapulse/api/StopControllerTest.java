@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.TimetableFixture;
+import com.vladdancea.viennapulse.importer.store.Store;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -41,6 +42,9 @@ class StopControllerTest {
 
     @Autowired
     TimetableFixture timetable;
+
+    @Autowired
+    Store store;
 
     @BeforeEach
     void removeAllStops() {
@@ -130,10 +134,6 @@ class StopControllerTest {
                    "properties":{"name":"Unused","modes":[]}}
                 ]}
                 """, JsonCompareMode.STRICT);
-        var before = etag();
-        jdbc.sql("UPDATE timetable.stop_modes SET types = ARRAY['SUBWAY'] WHERE stop_id LIKE 'at:%'")
-                .update();
-        assertThat(etag()).isNotEqualTo(before);
     }
 
     @Test
@@ -167,18 +167,35 @@ class StopControllerTest {
     }
 
     @Test
-    void sendsTheNewStopsOnceTheyChange() {
+    void readsTheStopsOncePerTimetable() throws IOException {
         timetable.addStop("s1", "Karlsplatz", 48.20024, 16.36951);
         var before = etag();
-        timetable.addStop("s2", "Stephansplatz", 48.20845, 16.37212);
 
+        // Only an import changes the stops, so a stop added behind its back is not read.
+        timetable.addStop("s2", "Stephansplatz", 48.20845, 16.37212);
         client.get()
                 .uri("/api/stops")
                 .ifNoneMatch(before)
                 .exchange()
                 .expectStatus()
-                .isOk();
-        assertThat(etag()).isNotEqualTo(before);
+                .isNotModified();
+
+        timetable.importNothing(store);
+        timetable.addStop("s3", "Schwedenplatz", 48.21178, 16.37798);
+        client.get()
+                .uri("/api/stops")
+                .ifNoneMatch(before)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json("""
+                        {"type": "FeatureCollection", "features": [
+                          {"type": "Feature", "id": "s3",
+                           "geometry": {"type": "Point", "coordinates": [16.37798, 48.21178]},
+                           "properties": {"name": "Schwedenplatz", "modes": null}}
+                        ]}
+                        """, JsonCompareMode.STRICT);
     }
 
     @Test

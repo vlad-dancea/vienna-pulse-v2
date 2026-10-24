@@ -5,6 +5,8 @@ import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.TimetableFixture;
 import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
+import com.vladdancea.viennapulse.importer.store.Store;
+import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
@@ -39,6 +41,9 @@ class LineControllerTest {
 
     @Autowired
     TestClock clock;
+
+    @Autowired
+    Store store;
 
     @BeforeEach
     void removeTheTimetable() {
@@ -173,6 +178,62 @@ class LineControllerTest {
                 .expectBody()
                 .jsonPath("$.features[*].id")
                 .isEqualTo(List.of("night"));
+    }
+
+    @Test
+    void readsTodaysLinesOncePerTimetableAndOtherDaysEveryTime() throws IOException {
+        timetable.addWeeklyService("tuesdays", DayOfWeek.TUESDAY, DAY, DAY.plusDays(1));
+        timetable.addWeeklyService("wednesdays", DayOfWeek.WEDNESDAY, DAY, DAY.plusDays(1));
+        timetable.addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        timetable.addRoute("tram-62", "62", null, RouteType.TRAM, null, null);
+        timetable.addTrip("t1", "tram-62", "tuesdays", "shape");
+        timetable.addTrip("w1", "tram-62", "wednesdays", "shape");
+        var etag = client.get()
+                .uri("/api/lines")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult()
+                .getResponseHeaders()
+                .getETag();
+        client.get()
+                .uri("/api/lines?date=2026-10-21")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("tram-62"));
+
+        // Only an import changes the lines, so a route added behind its back is not read for today.
+        timetable.addRoute("bus-13a", "13A", null, RouteType.BUS, null, null);
+        timetable.addTrip("t2", "bus-13a", "tuesdays", "shape");
+        timetable.addTrip("w2", "bus-13a", "wednesdays", "shape");
+        client.get()
+                .uri("/api/lines?date=2026-10-20")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isNotModified();
+        client.get()
+                .uri("/api/lines?date=2026-10-21")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("bus-13a", "tram-62"));
+
+        timetable.importNothing(store);
+        timetable.addWeeklyService("tuesdays", DayOfWeek.TUESDAY, DAY, DAY);
+        timetable.addShape("shape", 16.1, 48.1, 16.2, 48.2);
+        timetable.addRoute("subway-u1", "U1", null, RouteType.SUBWAY, null, null);
+        timetable.addTrip("t3", "subway-u1", "tuesdays", "shape");
+        client.get()
+                .uri("/api/lines")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.features[*].id")
+                .isEqualTo(List.of("subway-u1"));
     }
 
     @Test

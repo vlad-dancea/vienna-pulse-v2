@@ -42,6 +42,21 @@ export default defineConfig([
     },
   },
   {
+    // The API data stays free of the map, so other views such as a departure board can use it.
+    files: ['src/app/timetable/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['maplibre-gl', '@maplibre/*'], message: 'Keep MapLibre code in the map view.' },
+            { group: ['**/map-view/**'], message: 'The map view uses the timetable, not the other way round.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {},

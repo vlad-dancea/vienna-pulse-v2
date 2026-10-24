@@ -21,7 +21,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
 1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, typed ESLint, Angular tests,
    production build, Worker type checking and packaging, and integration tests in Cloudflare's
    local runtime. The integration tests use a temporary local HTTP origin to verify API
-   forwarding without depending on production.
+   forwarding without depending on production. A Playwright test then opens the build from that
+   runtime in headless Chromium, with a stand-in API and base map, and checks that the map draws
+   and filters stops, lines and vehicles under the Content-Security-Policy from `_headers`.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
 3. The frontend's smoke test checks that the public JavaScript and map worker match the build and
@@ -153,6 +155,17 @@ limited to `main`:
 
 Run `check`, `deploy` and `smoke` above for the initial deployment. Subsequent frontend pushes
 to `main` deploy automatically. Cloudflare manages TLS using the hostname's existing setup.
+
+Browsers ignore the site's `Strict-Transport-Security` header on plain HTTP, so a Single
+Redirect rule in the `vladdancea.com` zone (Rules > Redirect Rules) sends HTTP to HTTPS with a
+301 that keeps the path and query. It matches only this project's hostnames: the site, every
+name under it (all served by the Preview custom domain) and the API's own hostname, so other
+hosts in the zone are untouched:
+
+```text
+Expression: not ssl and (http.host in {"pulse.vladdancea.com" "pulse-api.vladdancea.com"} or ends_with(http.host, ".pulse.vladdancea.com"))
+Target URL: concat("https://", http.host, http.request.uri)
+```
 
 ## Setting up a new backend server
 
