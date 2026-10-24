@@ -71,10 +71,10 @@ class StopControllerTest {
                         {"type": "FeatureCollection", "features": [
                           {"type": "Feature", "id": "s1",
                            "geometry": {"type": "Point", "coordinates": [16.36951, 48.20024]},
-                           "properties": {"name": "Karlsplatz", "modes": null}},
+                           "properties": {"name": "Karlsplatz", "modes": []}},
                           {"type": "Feature", "id": "s2",
                            "geometry": {"type": "Point", "coordinates": [16.37212, 48.20845]},
-                           "properties": {"name": "Stephansplatz", "modes": null}}
+                           "properties": {"name": "Stephansplatz", "modes": []}}
                         ]}
                         """, JsonCompareMode.STRICT);
     }
@@ -97,10 +97,10 @@ class StopControllerTest {
                         {"type": "FeatureCollection", "features": [
                           {"type": "Feature", "id": "at:49:1320",
                            "geometry": {"type": "Point", "coordinates": [16.37212, 48.20845]},
-                           "properties": {"name": "Stephansplatz", "modes": null}},
+                           "properties": {"name": "Stephansplatz", "modes": []}},
                           {"type": "Feature", "id": "at:49:1349",
                            "geometry": {"type": "Point", "coordinates": [16.5, 48.5]},
-                           "properties": {"name": "Hauptbahnhof", "modes": null}}
+                           "properties": {"name": "Hauptbahnhof", "modes": []}}
                         ]}
                         """, JsonCompareMode.STRICT);
     }
@@ -193,7 +193,7 @@ class StopControllerTest {
                         {"type": "FeatureCollection", "features": [
                           {"type": "Feature", "id": "s3",
                            "geometry": {"type": "Point", "coordinates": [16.37798, 48.21178]},
-                           "properties": {"name": "Schwedenplatz", "modes": null}}
+                           "properties": {"name": "Schwedenplatz", "modes": []}}
                         ]}
                         """, JsonCompareMode.STRICT);
     }

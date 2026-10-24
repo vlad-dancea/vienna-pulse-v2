@@ -160,7 +160,7 @@ export interface components {
             name: string;
         };
         StopProperties: {
-            modes: string[] | null;
+            modes: string[];
             name: string;
         };
         VehicleProperties: {

@@ -8,7 +8,6 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
@@ -43,8 +42,7 @@ public class StopService {
                             CROSS JOIN LATERAL unnest(m.types) AS type
                             GROUP BY s.merged_id
                         )
-                        SELECT g.*, CASE WHEN EXISTS (SELECT FROM timetable.stop_modes)
-                                         THEN coalesce(m.modes, ARRAY[]::text[]) END AS modes
+                        SELECT g.*, coalesce(m.modes, ARRAY[]::text[]) AS modes
                         FROM grouped g LEFT JOIN modes m USING (id)
                         ORDER BY g.id
                         """)
@@ -56,9 +54,7 @@ public class StopService {
         return new FeatureCollection<>(features);
     }
 
-    // Null distinguishes an upgrade awaiting its first classification from a known unused stop.
-    private static @Nullable List<String> modes(ResultSet row) throws SQLException {
-        var modes = row.getArray("modes");
-        return modes == null ? null : Arrays.asList((String[]) modes.getArray());
+    private static List<String> modes(ResultSet row) throws SQLException {
+        return Arrays.asList((String[]) row.getArray("modes").getArray());
     }
 }
