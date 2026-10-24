@@ -24,12 +24,12 @@
             "content" : {
               "application/geo+json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionLineProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionMultiLineStringLineProperties"
                 }
               },
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionLineProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionMultiLineStringLineProperties"
                 }
               }
             },
@@ -47,12 +47,12 @@
             "content" : {
               "application/geo+json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionStopProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionPointStopProperties"
                 }
               },
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionStopProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionPointStopProperties"
                 }
               }
             },
@@ -96,12 +96,12 @@
             "content" : {
               "application/geo+json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionVehicleProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
                 }
               },
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionVehicleProperties"
+                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
                 }
               }
             },
@@ -148,13 +148,13 @@
         },
         "required" : [ "departures", "stop" ]
       },
-      "FeatureCollectionLineProperties" : {
+      "FeatureCollectionMultiLineStringLineProperties" : {
         "type" : "object",
         "properties" : {
           "features" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/FeatureLineProperties"
+              "$ref" : "#/components/schemas/FeatureMultiLineStringLineProperties"
             }
           },
           "type" : {
@@ -164,13 +164,13 @@
         },
         "required" : [ "features", "type" ]
       },
-      "FeatureCollectionStopProperties" : {
+      "FeatureCollectionPointStopProperties" : {
         "type" : "object",
         "properties" : {
           "features" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/FeatureStopProperties"
+              "$ref" : "#/components/schemas/FeaturePointStopProperties"
             }
           },
           "type" : {
@@ -180,13 +180,13 @@
         },
         "required" : [ "features", "type" ]
       },
-      "FeatureCollectionVehicleProperties" : {
+      "FeatureCollectionPointVehicleProperties" : {
         "type" : "object",
         "properties" : {
           "features" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/FeatureVehicleProperties"
+              "$ref" : "#/components/schemas/FeaturePointVehicleProperties"
             }
           },
           "type" : {
@@ -196,15 +196,11 @@
         },
         "required" : [ "features", "type" ]
       },
-      "FeatureLineProperties" : {
+      "FeatureMultiLineStringLineProperties" : {
         "type" : "object",
         "properties" : {
           "geometry" : {
-            "oneOf" : [ {
-              "$ref" : "#/components/schemas/MultiLineString"
-            }, {
-              "$ref" : "#/components/schemas/Point"
-            } ]
+            "$ref" : "#/components/schemas/MultiLineString"
           },
           "id" : {
             "type" : "string"
@@ -219,15 +215,11 @@
         },
         "required" : [ "geometry", "id", "properties", "type" ]
       },
-      "FeatureStopProperties" : {
+      "FeaturePointStopProperties" : {
         "type" : "object",
         "properties" : {
           "geometry" : {
-            "oneOf" : [ {
-              "$ref" : "#/components/schemas/MultiLineString"
-            }, {
-              "$ref" : "#/components/schemas/Point"
-            } ]
+            "$ref" : "#/components/schemas/Point"
           },
           "id" : {
             "type" : "string"
@@ -242,15 +234,11 @@
         },
         "required" : [ "geometry", "id", "properties", "type" ]
       },
-      "FeatureVehicleProperties" : {
+      "FeaturePointVehicleProperties" : {
         "type" : "object",
         "properties" : {
           "geometry" : {
-            "oneOf" : [ {
-              "$ref" : "#/components/schemas/MultiLineString"
-            }, {
-              "$ref" : "#/components/schemas/Point"
-            } ]
+            "$ref" : "#/components/schemas/Point"
           },
           "id" : {
             "type" : "string"
@@ -265,7 +253,6 @@
         },
         "required" : [ "geometry", "id", "properties", "type" ]
       },
-      "Geometry" : { },
       "Line" : {
         "type" : "object",
         "properties" : {
@@ -312,56 +299,48 @@
         "required" : [ "color", "longName", "name", "textColor", "type" ]
       },
       "MultiLineString" : {
-        "allOf" : [ {
-          "$ref" : "#/components/schemas/Geometry"
-        }, {
-          "type" : "object",
-          "properties" : {
-            "coordinates" : {
+        "type" : "object",
+        "properties" : {
+          "coordinates" : {
+            "type" : "array",
+            "items" : {
               "type" : "array",
               "items" : {
                 "type" : "array",
-                "items" : {
-                  "type" : "array",
-                  "maxItems" : 2,
-                  "minItems" : 2,
-                  "prefixItems" : [ {
-                    "type" : "number",
-                    "format" : "double"
-                  }, {
-                    "type" : "number",
-                    "format" : "double"
-                  } ]
-                }
+                "maxItems" : 2,
+                "minItems" : 2,
+                "prefixItems" : [ {
+                  "type" : "number",
+                  "format" : "double"
+                }, {
+                  "type" : "number",
+                  "format" : "double"
+                } ]
               }
-            },
-            "type" : {
-              "type" : "string",
-              "const" : "MultiLineString"
             }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "MultiLineString"
           }
-        } ],
+        },
         "required" : [ "coordinates", "type" ]
       },
       "Point" : {
-        "allOf" : [ {
-          "$ref" : "#/components/schemas/Geometry"
-        }, {
-          "type" : "object",
-          "properties" : {
-            "coordinates" : {
-              "type" : "array",
-              "items" : {
-                "type" : "number",
-                "format" : "double"
-              }
-            },
-            "type" : {
-              "type" : "string",
-              "const" : "Point"
+        "type" : "object",
+        "properties" : {
+          "coordinates" : {
+            "type" : "array",
+            "items" : {
+              "type" : "number",
+              "format" : "double"
             }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "Point"
           }
-        } ],
+        },
         "required" : [ "coordinates", "type" ]
       },
       "Stop" : {

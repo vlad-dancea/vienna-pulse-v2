@@ -83,43 +83,42 @@ export interface components {
             departures: components["schemas"]["Departure"][];
             stop: components["schemas"]["Stop"];
         };
-        FeatureCollectionLineProperties: {
-            features: components["schemas"]["FeatureLineProperties"][];
+        FeatureCollectionMultiLineStringLineProperties: {
+            features: components["schemas"]["FeatureMultiLineStringLineProperties"][];
             /** @constant */
             type: "FeatureCollection";
         };
-        FeatureCollectionStopProperties: {
-            features: components["schemas"]["FeatureStopProperties"][];
+        FeatureCollectionPointStopProperties: {
+            features: components["schemas"]["FeaturePointStopProperties"][];
             /** @constant */
             type: "FeatureCollection";
         };
-        FeatureCollectionVehicleProperties: {
-            features: components["schemas"]["FeatureVehicleProperties"][];
+        FeatureCollectionPointVehicleProperties: {
+            features: components["schemas"]["FeaturePointVehicleProperties"][];
             /** @constant */
             type: "FeatureCollection";
         };
-        FeatureLineProperties: {
-            geometry: components["schemas"]["MultiLineString"] | components["schemas"]["Point"];
+        FeatureMultiLineStringLineProperties: {
+            geometry: components["schemas"]["MultiLineString"];
             id: string;
             properties: components["schemas"]["LineProperties"];
             /** @constant */
             type: "Feature";
         };
-        FeatureStopProperties: {
-            geometry: components["schemas"]["MultiLineString"] | components["schemas"]["Point"];
+        FeaturePointStopProperties: {
+            geometry: components["schemas"]["Point"];
             id: string;
             properties: components["schemas"]["StopProperties"];
             /** @constant */
             type: "Feature";
         };
-        FeatureVehicleProperties: {
-            geometry: components["schemas"]["MultiLineString"] | components["schemas"]["Point"];
+        FeaturePointVehicleProperties: {
+            geometry: components["schemas"]["Point"];
             id: string;
             properties: components["schemas"]["VehicleProperties"];
             /** @constant */
             type: "Feature";
         };
-        Geometry: unknown;
         Line: {
             color: string | null;
             id: string;
@@ -135,7 +134,7 @@ export interface components {
             textColor: string | null;
             type: string;
         };
-        MultiLineString: components["schemas"]["Geometry"] & {
+        MultiLineString: {
             coordinates: [
                 number,
                 number
@@ -143,7 +142,7 @@ export interface components {
             /** @constant */
             type: "MultiLineString";
         };
-        Point: components["schemas"]["Geometry"] & {
+        Point: {
             coordinates: number[];
             /** @constant */
             type: "Point";
@@ -191,8 +190,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/geo+json": components["schemas"]["FeatureCollectionLineProperties"];
-                    "application/json": components["schemas"]["FeatureCollectionLineProperties"];
+                    "application/geo+json": components["schemas"]["FeatureCollectionMultiLineStringLineProperties"];
+                    "application/json": components["schemas"]["FeatureCollectionMultiLineStringLineProperties"];
                 };
             };
         };
@@ -212,8 +211,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/geo+json": components["schemas"]["FeatureCollectionStopProperties"];
-                    "application/json": components["schemas"]["FeatureCollectionStopProperties"];
+                    "application/geo+json": components["schemas"]["FeatureCollectionPointStopProperties"];
+                    "application/json": components["schemas"]["FeatureCollectionPointStopProperties"];
                 };
             };
         };
@@ -255,8 +254,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/geo+json": components["schemas"]["FeatureCollectionVehicleProperties"];
-                    "application/json": components["schemas"]["FeatureCollectionVehicleProperties"];
+                    "application/geo+json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
+                    "application/json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
                 };
             };
         };

@@ -1,7 +1,6 @@
 import { HttpErrorResponse, httpResource } from '@angular/common/http';
 import { computed, DestroyRef, DOCUMENT, inject, linkedSignal, Service, signal } from '@angular/core';
 import type { FeatureCollection, MultiLineString } from 'geojson';
-import type { ApiFeatureCollection } from './api-response';
 import type { components } from './openapi';
 
 /** Describes a scheduled line using the public names, mode and colors from the API. */
@@ -18,9 +17,7 @@ export class RunningLines {
   });
   private readonly day = signal(this.dateFormat.format(new Date()));
 
-  readonly routes = httpResource<
-    ApiFeatureCollection<components['schemas']['FeatureCollectionLineProperties'], MultiLineString>
-  >(() => ({
+  readonly routes = httpResource<components['schemas']['FeatureCollectionMultiLineStringLineProperties']>(() => ({
     url: '/api/lines',
     params: { date: this.day() },
   }));

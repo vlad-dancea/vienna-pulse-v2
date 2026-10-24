@@ -1,7 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { DestroyRef, DOCUMENT, inject, linkedSignal, Service } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
-import type { ApiFeatureCollection } from './api-response';
 import type { components } from './openapi';
 
 /** Describes a running vehicle by its line, drawn like that line, and where its trip is headed. */
@@ -12,9 +11,9 @@ export type VehicleProperties = components['schemas']['VehicleProperties'];
 export class RunningVehicles {
   /** How often the vehicles are refreshed, and so how long they take to move to the next positions. */
   readonly interval = 15_000;
-  readonly vehicles = httpResource<
-    ApiFeatureCollection<components['schemas']['FeatureCollectionVehicleProperties'], Point>
-  >(() => '/api/vehicles');
+  readonly vehicles = httpResource<components['schemas']['FeatureCollectionPointVehicleProperties']>(
+    () => '/api/vehicles',
+  );
   /** The last vehicles that loaded, kept on the map when a refresh fails. */
   readonly latest = linkedSignal<
     FeatureCollection<Point, VehicleProperties> | undefined,

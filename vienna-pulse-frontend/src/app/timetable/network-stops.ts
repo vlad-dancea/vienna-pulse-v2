@@ -1,7 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { computed, DestroyRef, inject, linkedSignal, Service } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
-import type { ApiFeatureCollection } from './api-response';
 import type { components } from './openapi';
 
 /** Describes a stop complex, with null modes while the backend has not classified the stops yet. */
@@ -10,9 +9,7 @@ export type StopProperties = components['schemas']['StopProperties'];
 /** Loads stops and rechecks classification while independently deployed services catch up. */
 @Service()
 export class NetworkStops {
-  readonly stops = httpResource<ApiFeatureCollection<components['schemas']['FeatureCollectionStopProperties'], Point>>(
-    () => '/api/stops',
-  );
+  readonly stops = httpResource<components['schemas']['FeatureCollectionPointStopProperties']>(() => '/api/stops');
   /** The last stops that loaded, kept on the map when a later recheck fails. */
   readonly latest = linkedSignal<
     FeatureCollection<Point, StopProperties> | undefined,

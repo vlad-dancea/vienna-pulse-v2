@@ -37,7 +37,7 @@ public class LineService {
     ///
     /// The days the timetable covers come from the same statement as the lines: a second one could
     /// read the next timetable, which an import can swap in between the two.
-    public FeatureCollection<LineProperties> lines(LocalDate date) {
+    public FeatureCollection<MultiLineString, LineProperties> lines(LocalDate date) {
         var rows = jdbc.sql("""
                         WITH coverage AS (
                             SELECT min(first_date) AS first_date, max(last_date) AS last_date
@@ -134,8 +134,8 @@ public class LineService {
     }
 
     // The rows come ordered by route, so each route's paths are next to each other.
-    private static List<Feature<LineProperties>> features(List<RoutePath> paths) {
-        var features = new ArrayList<Feature<LineProperties>>();
+    private static List<Feature<MultiLineString, LineProperties>> features(List<RoutePath> paths) {
+        var features = new ArrayList<Feature<MultiLineString, LineProperties>>();
         var index = 0;
         while (index < paths.size()) {
             var first = paths.get(index);
