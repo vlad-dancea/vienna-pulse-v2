@@ -39,18 +39,7 @@ public class LineService {
     /// read the next timetable, which an import can swap in between the two.
     public FeatureCollection<MultiLineString, LineProperties> lines(LocalDate date) {
         var rows = jdbc.sql("""
-                        WITH coverage AS (
-                            SELECT min(first_date) AS first_date, max(last_date) AS last_date
-                            FROM (
-                                SELECT start_date AS first_date, end_date AS last_date
-                                FROM timetable.service_calendars
-                                UNION ALL
-                                SELECT date, date
-                                FROM timetable.calendar_dates
-                                WHERE exception_type = 'ADDED'
-                            ) AS days
-                        ),
-                        route_shapes AS (
+                        WITH route_shapes AS (
                             SELECT DISTINCT route_id, shape_id
                             FROM timetable.trips
                             WHERE service_id IN (SELECT service_id FROM pulse.running_services(CAST(:date AS date)))
@@ -87,7 +76,7 @@ public class LineService {
                                line.longitudes,
                                line.latitudes
                         -- The days covered come in every row, and alone in one when no line runs.
-                        FROM coverage
+                        FROM pulse.coverage() AS coverage
                         LEFT JOIN (
                             SELECT r.id,
                                    r.short_name,
