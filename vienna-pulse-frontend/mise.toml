@@ -13,7 +13,7 @@ run = "pnpm start"
 [tasks.build]
 description = "Build the frontend for production"
 depends = ["install"]
-run = ["pnpm build", "node worker/cache-headers.mjs", "node worker/source.mjs record"]
+run = ["node worker/source.mjs start", "pnpm build", "node worker/cache-headers.mjs", "node worker/source.mjs record"]
 
 [tasks."worker:check"]
 description = "Check the Cloudflare Worker's configuration and static files without deploying"
