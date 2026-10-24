@@ -26,19 +26,26 @@ public class LineController {
 
     private final LineService lineService;
     private final Clock clock;
+    private final TimetableVersion timetable;
+    private final CachedResponses responses;
 
     /// The lines running on `date`, given as `YYYY-MM-DD` and today in Vienna if left out, as GeoJSON
     /// that is also served as plain JSON for MapLibre. Any other date, empty included, gets a 400,
     /// and a date the timetable does not cover a 404.
-    /// Like the stops, browsers must check before reusing the response, since the next import can
-    /// change the lines of any day.
+    /// Today's lines, which every map asks for, are read once per timetable and the ETag answers
+    /// with an empty 304 until the next import. Other days are read on every request, so that asking
+    /// for many of them cannot fill the memory. Like the stops, browsers must check before reusing
+    /// the response, since the next import can change the lines of any day.
     @GetMapping(
             path = "/api/lines",
             produces = {FeatureCollection.MEDIA_TYPE, MediaType.APPLICATION_JSON_VALUE})
-    public ResponseEntity<FeatureCollection<LineProperties>> lines(
-            @RequestParam(required = false) @Nullable String date) {
-        var day = date != null ? parse(date) : LocalDate.now(clock.withZone(Timetable.ZONE));
-        return ResponseEntity.ok().cacheControl(CacheControl.noCache()).body(lineService.lines(day));
+    public ResponseEntity<?> lines(@RequestParam(required = false) @Nullable String date) {
+        var today = LocalDate.now(clock.withZone(Timetable.ZONE));
+        var day = date != null ? parse(date) : today;
+        if (!day.equals(today)) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noCache()).body(lineService.lines(day));
+        }
+        return responses.lines(timetable.current(), day).response();
     }
 
     private static LocalDate parse(String date) {

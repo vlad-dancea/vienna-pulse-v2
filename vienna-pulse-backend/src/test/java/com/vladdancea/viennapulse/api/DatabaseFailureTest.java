@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
+import com.vladdancea.viennapulse.TimetableFixture;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,15 @@ class DatabaseFailureTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    TimetableFixture timetable;
+
+    // Stops cached by an earlier test would be answered without the query these tests break.
+    @BeforeEach
+    void forgetTheCachedResponses() {
+        timetable.clear();
+    }
+
     // Without a limit the query would wait for the lock until the test gives up.
     @Test
     @Timeout(20)
@@ -71,9 +82,10 @@ class DatabaseFailureTest {
             try (var statement = lock.createStatement()) {
                 statement.execute("LOCK TABLE timetable.stops IN ACCESS EXCLUSIVE MODE");
             }
-            // Two at once, because PgJDBC sends their cancellations one after the other.
+            // Two at once, because PgJDBC sends their cancellations one after the other. Requests for the
+            // stops share one query, so the second asks for a stop's departures, which read the stops too.
             var first = CompletableFuture.supplyAsync(() -> timeUnavailable("/api/stops"));
-            var second = CompletableFuture.supplyAsync(() -> timeUnavailable("/api/stops"));
+            var second = CompletableFuture.supplyAsync(() -> timeUnavailable("/api/stops/at:49:1320/departures"));
             try {
                 await().until(() -> stopsQueriesWaitingForTheLock() == 2);
                 docker.pauseContainerCmd(postgres.getContainerId()).exec();

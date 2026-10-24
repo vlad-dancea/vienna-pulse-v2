@@ -1,11 +1,16 @@
 package com.vladdancea.viennapulse.api;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Duration;
 import javax.sql.DataSource;
+import org.springframework.boot.cache.autoconfigure.CacheManagerCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,7 +22,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /// Web setup shared by every API endpoint.
 @Configuration(proxyBeanMethods = false)
+@EnableCaching
 class ApiConfiguration implements WebMvcConfigurer {
+    // Every map asks every 15 seconds and glides its vehicles over that time, so positions up to one
+    // step old do not show, and the database works out the vehicles at most once per step.
+    static final Duration VEHICLE_STEP = Duration.ofSeconds(5);
     // The API's queries take about a second in production. One that takes five holds a connection
     // of the small pool that other requests wait for, so it is cancelled instead of waited for.
     private static final int QUERY_TIMEOUT_SECONDS = 5;
@@ -35,6 +44,34 @@ class ApiConfiguration implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns("https://pulse.vladdancea.com", "https://pr-*.pulse.vladdancea.com")
                 .allowedMethods("GET", "HEAD");
+    }
+
+    /// The caches of [CachedResponses], each dropping the entries no request uses any more. The
+    /// stops and lines of a replaced timetable go an hour after the import, and the vehicles of a
+    /// step soon after it ends, so the caches hold a few megabytes at most.
+    @Bean
+    CacheManagerCustomizer<CaffeineCacheManager> responseCaches() {
+        return manager -> {
+            var timetable = Duration.ofHours(1);
+            manager.registerCustomCache(
+                    CachedResponses.STOPS,
+                    Caffeine.newBuilder()
+                            .expireAfterAccess(timetable)
+                            .recordStats()
+                            .build());
+            manager.registerCustomCache(
+                    CachedResponses.LINES,
+                    Caffeine.newBuilder()
+                            .expireAfterAccess(timetable)
+                            .recordStats()
+                            .build());
+            manager.registerCustomCache(
+                    CachedResponses.VEHICLES,
+                    Caffeine.newBuilder()
+                            .expireAfterWrite(VEHICLE_STEP.multipliedBy(2))
+                            .recordStats()
+                            .build());
+        };
     }
 
     /// The database client of the API services, which cancels any query that runs for more than 5

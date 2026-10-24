@@ -96,7 +96,7 @@ alone.
 | --- | --- |
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
-| `/api/vehicles` | A GeoJSON point for every trip running now, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
+| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
 | `/api/stops/{id}/departures` | The next 20 departures from any platform of the merged stop, each with its time in Vienna, its line, its headsign and its platform. An unknown stop gets a 404. The map does not show the departures yet. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
@@ -106,10 +106,16 @@ the importer records find the running trips without reading every stop time.
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
 and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457.
 
-When the database is slow or down, the API answers with a 503, `Cache-Control: no-store` and
-`Retry-After: 5`. It waits at most 2 seconds for a database connection, cancels any query that
-runs for more than 5 seconds and gives up after 10 seconds on a database that stops answering
-altogether. Other database errors get a 500.
+The backend keeps the stops and today's lines, serialized with their ETag, until an import
+replaces the timetable, which it notices because every import renames a new schema to `timetable`.
+It works out the vehicles once per step for every map. Other days' lines and the departures are
+read on each request.
+
+When the database is slow or down, a request that needs it is answered with a 503,
+`Cache-Control: no-store` and `Retry-After: 5`. The stops and lines need it on every request to
+check the timetable version, and the vehicles once per step. The API waits at most 2 seconds for
+a database connection, cancels any query that runs for more than 5 seconds and gives up after 10
+seconds on a database that stops answering altogether. Other database errors get a 500.
 
 ## Run
 

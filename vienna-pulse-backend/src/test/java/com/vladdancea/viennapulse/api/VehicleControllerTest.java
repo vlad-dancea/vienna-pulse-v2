@@ -155,6 +155,49 @@ class VehicleControllerTest {
     }
 
     @Test
+    void placesTheVehiclesOncePerStep() {
+        timetable.addWeeklyService("tuesdays", DAY);
+        // A meter a second along the first leg of the shape.
+        timetable.addTrip(
+                "first", "u1", "tuesdays", SHAPE, call(1, null, "00:00:00", 0), call(2, "00:33:20", null, 2000));
+        // At five past midnight, 300 m east.
+        var etag = client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult()
+                .getResponseHeaders()
+                .getETag();
+
+        // Within the step, the trip added and the meters moved since are not read.
+        clock.set("2026-10-19T22:05:04Z");
+        timetable.addTrip(
+                "second", "u1", "tuesdays", SHAPE, call(1, null, "00:00:00", 0), call(2, "00:33:20", null, 2000));
+        client.get()
+                .uri("/api/vehicles")
+                .ifNoneMatch(String.valueOf(etag))
+                .exchange()
+                .expectStatus()
+                .isNotModified();
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].geometry.coordinates")
+                .isEqualTo(List.of(List.of(16.03, 48.0)));
+
+        // The next step reads them again, where they are at its start.
+        clock.set("2026-10-19T22:05:06Z");
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].geometry.coordinates")
+                .isEqualTo(List.of(List.of(16.0305, 48.0), List.of(16.0305, 48.0)));
+    }
+
+    @Test
     void servesNoVehiclesWhenNothingRuns() {
         client.get()
                 .uri("/api/vehicles")

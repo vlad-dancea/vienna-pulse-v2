@@ -5,8 +5,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -56,8 +58,8 @@ public class TestcontainersConfiguration {
     }
 
     @Bean
-    TimetableFixture timetableFixture(JdbcClient jdbc) {
-        return new TimetableFixture(jdbc);
+    TimetableFixture timetableFixture(JdbcClient jdbc, ObjectProvider<CacheManager> caches) {
+        return new TimetableFixture(jdbc, caches);
     }
 
     private static PostgreSQLContainer startPostgres() {
