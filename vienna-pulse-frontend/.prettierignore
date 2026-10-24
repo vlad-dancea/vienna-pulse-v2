@@ -5,3 +5,5 @@ test-results/
 pnpm-lock.yaml
 .wrangler/
 public/data/
+# openapi-typescript writes it, and openapi:check compares it with exactly what it writes.
+src/app/timetable/openapi.ts

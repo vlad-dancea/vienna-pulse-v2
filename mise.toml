@@ -37,6 +37,10 @@ depends = ["//vienna-pulse-backend:test", "//vienna-pulse-frontend:test"]
 description = "Format the sources of every project"
 depends = ["//vienna-pulse-backend:format", "//vienna-pulse-frontend:format"]
 
+[tasks.openapi]
+description = "Update the backend's API description and the frontend types generated from it"
+run = [{ task = "//vienna-pulse-backend:openapi" }, { task = "//vienna-pulse-frontend:openapi" }]
+
 [tasks.dev]
 description = "Run every project in development mode"
 depends = ["//vienna-pulse-backend:dev", "//vienna-pulse-frontend:dev"]

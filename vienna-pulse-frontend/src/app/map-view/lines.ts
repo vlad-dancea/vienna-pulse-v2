@@ -1,18 +1,19 @@
 import type { ExpressionSpecification, LineLayerSpecification, SymbolLayerSpecification } from 'maplibre-gl';
+import { lineProperty } from './properties';
 
 /** The transport modes that get their own route layers, from the bottom up, and the routes each one draws. */
 export const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
   // Keep any other API route types visible with buses, below the tram and U-Bahn layers.
-  { mode: 'bus', filter: ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]] },
-  { mode: 'tram', filter: ['==', ['get', 'type'], 'tram'] },
-  { mode: 'subway', filter: ['==', ['get', 'type'], 'subway'] },
+  { mode: 'bus', filter: ['!', ['in', lineProperty('type'), ['literal', ['tram', 'subway']]]] },
+  { mode: 'tram', filter: ['==', lineProperty('type'), 'tram'] },
+  { mode: 'subway', filter: ['==', lineProperty('type'), 'subway'] },
 ];
 
 /** Gives lines and their vehicles the line's color, or one color per mode when the feed has none. */
 export const lineColor: ExpressionSpecification = [
   'coalesce',
-  ['get', 'color'],
-  ['match', ['get', 'type'], 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
+  lineProperty('color'),
+  ['match', lineProperty('type'), 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
 ];
 
 const lineLayout: LineLayerSpecification['layout'] = {
@@ -58,7 +59,7 @@ export const lineNamesLayer: SymbolLayerSpecification = {
   layout: {
     'symbol-placement': 'line',
     'text-font': ['Noto Sans Bold'],
-    'text-field': ['get', 'name'],
+    'text-field': lineProperty('name'),
     'text-size': 12,
     'symbol-spacing': 250,
   },

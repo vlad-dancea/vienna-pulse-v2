@@ -26,7 +26,7 @@ public class StopService {
     /// Its ids are IFOPT-style global stop ids instead, like `at:49:1320:0:3`, where the first three
     /// parts name the stop and the rest its platform. A stop takes the name most of its platforms
     /// use; on a tie, the first in alphabetical order, so that the response stays the same.
-    public FeatureCollection<StopProperties> stops() {
+    public FeatureCollection<Point, StopProperties> stops() {
         var features = jdbc.sql("""
                         WITH grouped AS (
                             SELECT merged_id AS id,

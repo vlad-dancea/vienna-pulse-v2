@@ -73,9 +73,19 @@ description = "Check frontend formatting with Prettier"
 depends = ["install"]
 run = "pnpm exec prettier --check ."
 
+[tasks.openapi]
+description = "Generate the API types in src/app/timetable/openapi.ts from the backend's openapi.json"
+depends = ["install"]
+run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/timetable/openapi.ts"
+
+[tasks."openapi:check"]
+description = "Check that src/app/timetable/openapi.ts matches the backend's openapi.json"
+depends = ["install"]
+run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/timetable/openapi.ts --check"
+
 [tasks.check]
-description = "Everything CI checks: formatting, typed lint, template accessibility, production builds, unit and browser tests"
-depends = ["format:check", "lint", "test", "worker:test", "browser:test"]
+description = "Everything CI checks: formatting, API types, typed lint, template accessibility, production builds, unit and browser tests"
+depends = ["format:check", "openapi:check", "lint", "test", "worker:test", "browser:test"]
 
 # A named monorepo task resolves the pinned local CLI from either project or the
 # repository root. MCP uses stdout for messages, so mise must not write task logs there.

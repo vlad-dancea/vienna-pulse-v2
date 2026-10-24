@@ -17,6 +17,9 @@ in `vienna-pulse-backend/` and an Angular frontend in `vienna-pulse-frontend/`.
   bracket one letter, as in `pgrep -f '[n]g serve'`, and check each PID's command line with
   `ps -o args= -p <pid>` and its folder with `readlink /proc/<pid>/cwd` before you kill it,
   because other worktrees run the same commands.
+- `vienna-pulse-backend/openapi.json` describes the API, and the frontend generates its API types
+  in `src/app/timetable/openapi.ts` from it. After changing what an endpoint answers, run
+  `mise run openapi` and commit both files. Each project's check fails while its file is stale.
 - Run `mise run dev` in one worktree at a time. Its ports are fixed, and every worktree shares
   one Docker Compose project and database volume, named after the `vienna-pulse-backend` folder.
   `mise run check` starts its own database with Testcontainers, so it runs in parallel safely.

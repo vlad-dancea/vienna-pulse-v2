@@ -31,7 +31,7 @@ public class VehicleService {
     /// 24 hours for trips that run after midnight. The feed's times end before 30 hours, so trips of
     /// yesterday's service day can still be running. So can tomorrow's on the evening before the
     /// clocks go forward, when its time 00:00 is 23:00 the day before.
-    public FeatureCollection<VehicleProperties> vehicles(Instant now) {
+    public FeatureCollection<Point, VehicleProperties> vehicles(Instant now) {
         var features = jdbc.sql("""
                         WITH days AS (
                             SELECT CAST(:today AS date) + shift AS day,
