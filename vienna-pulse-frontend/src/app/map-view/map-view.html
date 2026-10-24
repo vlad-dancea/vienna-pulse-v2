@@ -61,5 +61,10 @@
 </section>
 
 @if (stop(); as id) {
-  <app-departure-panel [stop]="id" [name]="selectedStop()?.properties.name" (closed)="closeStop()" />
+  <app-departure-panel
+    [stop]="id"
+    [name]="selectedStop()?.properties.name"
+    [mode]="selectedMode()"
+    (closed)="closeStop()"
+  />
 }

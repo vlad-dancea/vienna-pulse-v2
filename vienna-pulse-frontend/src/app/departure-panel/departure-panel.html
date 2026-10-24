@@ -24,7 +24,7 @@
         } @else if (departures.isLoading()) {
           Loading departures...
         } @else {
-          No departures in the next hour.
+          {{ nothingLeaves() }}
         }
       </p>
     }

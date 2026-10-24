@@ -18,6 +18,9 @@ import { refreshEvery } from '../timetable/refresh-every';
 import { stopDepartures } from '../timetable/stop-departures';
 import { boardRows } from './departure-board';
 
+// How the empty board names the modes the map's filter can show.
+const modeNames: Record<string, string> = { subway: 'U-Bahn', tram: 'tram', bus: 'bus' };
+
 /** Shows a stop's next departures grouped by line and headsign, beside the map or as a sheet below it on phones. */
 @Component({
   selector: 'app-departure-panel',
@@ -37,6 +40,8 @@ export class DeparturePanel {
   readonly stop = input.required<string>();
   /** The stop's name on the map, shown while its departures load. */
   readonly name = input<string>();
+  /** The transport mode the map's filter shows, such as `subway`, so the board shows only its lines, or `all`. */
+  readonly mode = input('all');
   /** Emits when the close button or Escape asks to close the panel. */
   readonly closed = output();
 
@@ -48,7 +53,18 @@ export class DeparturePanel {
     return latest?.stop.id === this.stop() ? latest : undefined;
   });
   private readonly now = signal(Date.now());
-  protected readonly rows = computed(() => boardRows(this.loaded()?.departures ?? [], this.now()));
+  protected readonly rows = computed(() => {
+    const mode = this.mode();
+    const departures = this.loaded()?.departures ?? [];
+    return boardRows(
+      mode === 'all' ? departures : departures.filter((departure) => departure.line.type === mode),
+      this.now(),
+    );
+  });
+  protected readonly nothingLeaves = computed(() => {
+    const name = modeNames[this.mode()];
+    return name ? `No ${name} departures in the next hour.` : 'No departures in the next hour.';
+  });
   protected readonly title = computed(() => this.name() ?? this.loaded()?.stop.name ?? 'Departures');
   /** Whether the API knows no such stop, as after an import that removed one a link points to. */
   protected readonly unknown = computed(() => {

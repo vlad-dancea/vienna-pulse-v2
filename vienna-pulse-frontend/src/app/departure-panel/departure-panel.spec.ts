@@ -161,6 +161,26 @@ describe('DeparturePanel', () => {
     expect(text()).toBe('Departures Close This stop is not in the timetable.');
   });
 
+  it('shows only the departures of the mode the map shows, and says when that mode has none', async () => {
+    fixture.componentRef.setInput('mode', 'subway');
+    TestBed.tick();
+    http.expectOne(karlsplatz).flush({
+      stop: { id: 'at:49:657', name: 'Karlsplatz' },
+      departures: [departure(u3, 'Wien Ottakring', 2), departure(tram1, 'Wien Prater, Hauptallee', 5)],
+    });
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring 2 min 18:02');
+
+    fixture.componentRef.setInput('mode', 'bus');
+    await fixture.whenStable();
+    expect(text('ul')).toBe('');
+    expect(text('[role="status"]')).toBe('No bus departures in the next hour.');
+
+    fixture.componentRef.setInput('mode', 'all');
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring 2 min 18:02 1 Prater, Hauptallee 5 min 18:05');
+  });
+
   it("loads another stop's departures without showing the last stop's", async () => {
     TestBed.tick();
     http.expectOne(karlsplatz).flush({

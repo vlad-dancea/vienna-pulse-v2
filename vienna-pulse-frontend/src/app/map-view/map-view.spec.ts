@@ -560,8 +560,27 @@ describe('MapView', () => {
     const element = harness.fixture.nativeElement as HTMLElement;
     expect(element.querySelector('h2#departures-heading')?.textContent).toBe('Tram');
     expect(document.activeElement?.id).toBe('departures-heading');
-    http.expectOne('/api/stops/tram/departures').flush({ stop: { id: 'tram', name: 'Tram' }, departures: [] });
+    const soon = new Date(Date.now() + 5 * 60_000).toISOString();
+    const line = { longName: null, color: null, textColor: null };
+    http.expectOne('/api/stops/tram/departures').flush({
+      stop: { id: 'tram', name: 'Tram' },
+      departures: [
+        { time: soon, line: { ...line, id: 'u1', name: 'U1', type: 'subway' }, headsign: 'Leopoldau', platform: 'a' },
+        { time: soon, line: { ...line, id: 'tram-62', name: '62', type: 'tram' }, headsign: 'Oper', platform: 'b' },
+      ],
+    });
     await harness.fixture.whenStable();
+    const rows = () =>
+      Array.from(element.querySelectorAll('app-departure-panel li > span:first-child'), (badge) =>
+        badge.textContent.trim(),
+      );
+    expect(rows()).toEqual(['U1', '62']);
+    // The board follows the map's mode filter.
+    Array.from(element.querySelectorAll('button'))
+      .find((button) => button.textContent.trim() === 'Tram')
+      ?.click();
+    await harness.fixture.whenStable();
+    expect(rows()).toEqual(['62']);
 
     navigation = navigated();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));

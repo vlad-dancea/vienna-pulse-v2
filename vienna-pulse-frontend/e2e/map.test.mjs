@@ -199,7 +199,7 @@ test('draws the stops, lines and vehicles from the API and filters them by mode'
   expect(errors).toEqual([]);
 });
 
-test("opens a clicked stop's departures, closes them on Escape and opens them again from the link", async ({
+test("opens a clicked stop's departures, closes them on Escape, opens them from the link and filters them by mode", async ({
   page,
 }) => {
   const errors = [];
@@ -229,6 +229,13 @@ test("opens a clicked stop's departures, closes them on Escape and opens them ag
   await expect(page.getByRole('region', { name: 'Map' })).toBeFocused();
 
   await page.goto(`${origin}/?stop=at:49:1`);
+  await expect(panel.getByRole('listitem')).toHaveText(row);
+
+  // The board shows only the mode the filter shows.
+  await page.getByRole('button', { name: 'Tram' }).click();
+  await expect(panel.getByRole('listitem')).toHaveCount(0);
+  await expect(panel.getByRole('status')).toHaveText('No tram departures in the next hour.');
+  await page.getByRole('button', { name: 'All' }).click();
   await expect(panel.getByRole('listitem')).toHaveText(row);
   expect(errors).toEqual([]);
 });
