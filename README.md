@@ -51,6 +51,11 @@ browser loads the base map from OpenFreeMap and everything about the network fro
 request. The API is another origin than the site, so the backend allows the site and its Previews
 to read it with CORS. The map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
+[`public/_headers`](vienna-pulse-frontend/public/_headers) sends a Content-Security-Policy that
+allows scripts only from the site itself and connections to it and OpenFreeMap, plus the other
+security headers. The build adds a rule per hashed JavaScript and CSS file so browsers cache
+those for a year.
+
 ### Cloudflare Worker
 
 The API has a hostname of its own because every request that runs a Worker counts against the
