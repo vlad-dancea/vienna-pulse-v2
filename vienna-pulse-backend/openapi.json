@@ -5,7 +5,7 @@
     "version" : "1"
   },
   "servers" : [ {
-    "url" : "https://pulse.vladdancea.com"
+    "url" : "https://pulse-api.vladdancea.com"
   } ],
   "paths" : {
     "/api/lines" : {

@@ -21,6 +21,7 @@ flowchart LR
     feed["Wiener Linien<br/>GTFS feed"]
     subgraph cloudflare["Cloudflare"]
         assets["Static files<br/>(Angular app)"]
+        api["pulse-api<br/>hostname"]
         worker["Worker"]
     end
     subgraph server["Hetzner server (Docker Compose)"]
@@ -29,8 +30,10 @@ flowchart LR
         postgres[("PostgreSQL")]
     end
     browser -->|"pages and scripts"| assets
-    browser -->|"/api"| worker
+    browser -->|"/api"| api
+    browser -.->|"/api, old tabs"| worker
     browser --> tiles
+    api -->|"tunnel"| cloudflared
     worker -->|"tunnel"| cloudflared
     cloudflared --> backend
     backend -->|"timetable schema"| postgres
@@ -41,29 +44,38 @@ flowchart LR
 
 The Angular app is a set of static files, which Cloudflare serves from its edge with Workers
 Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it and sends a path it does not know to the map. The
-browser loads the base map from OpenFreeMap and everything about the network from `/api`. The
-map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts). The API types and
-the services that load them are in [`timetable/`](vienna-pulse-frontend/src/app/timetable), which
-lint keeps free of MapLibre.
+browser loads the base map from OpenFreeMap and everything about the network from the API at
+`https://pulse-api.vladdancea.com/api`. The production build sets that origin in
+[`environment.ts`](vienna-pulse-frontend/src/environments/environment.ts), and
+[`api-origin.ts`](vienna-pulse-frontend/src/app/api-origin.ts) puts it in front of every `/api`
+request. The API is another origin than the site, so the backend allows the site and its Previews
+to read it with CORS. The map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+The API types and the services that load them are in
+[`timetable/`](vienna-pulse-frontend/src/app/timetable), which lint keeps free of MapLibre.
 
 [`public/_headers`](vienna-pulse-frontend/public/_headers) sends a Content-Security-Policy that
-allows scripts only from the site itself and connections to it and OpenFreeMap, plus the other
-security headers. The build adds a rule per hashed JavaScript and CSS file so browsers cache
+allows scripts only from the site itself and connections to it, the API and OpenFreeMap, plus the
+other security headers. The build adds a rule per hashed JavaScript and CSS file so browsers cache
 those for a year.
 
 ### Cloudflare Worker
 
-Only `/api` and `/api/*` run the [Worker](vienna-pulse-frontend/worker/index.ts), as configured in
-[`wrangler.json`](vienna-pulse-frontend/wrangler.json). In production it passes the request on
-unchanged, and Cloudflare sends it through the tunnel to the backend. A pull request Preview has
-no tunnel of its own, so its Worker sends API requests to production.
+The API has a hostname of its own because every request that runs a Worker counts against the
+Workers Free plan's 100,000 a day, and one open map polls `/api/vehicles` 5,760 times a day.
+`pulse-api.vladdancea.com` has no Worker in front of it, so polling costs nothing there.
+
+`/api` and `/api/*` on `pulse.vladdancea.com` still run the [Worker](vienna-pulse-frontend/worker/index.ts),
+as configured in [`wrangler.json`](vienna-pulse-frontend/wrangler.json), for tabs that loaded the
+site before the switch. In production it passes the request on unchanged, and Cloudflare sends it
+through the tunnel to the backend. A pull request Preview has no tunnel of its own, so its Worker
+sends those requests to production.
 
 ### Tunnel and server
 
 The backend runs on one Hetzner server as the Docker Compose stack in
 [`deploy/compose.yaml`](deploy/compose.yaml): Spring Boot, PostgreSQL and cloudflared. cloudflared
-connects out to Cloudflare, which forwards `pulse.vladdancea.com/api/*` to the backend over that
-connection, so the server has no open ports to the internet. The database sits on an internal network without
+connects out to Cloudflare, which forwards `/api/*` on `pulse-api.vladdancea.com` and
+`pulse.vladdancea.com` to the backend over that connection, so the server has no open ports to the internet. The database sits on an internal network without
 internet access. Administrators and CI reach the server over Tailscale.
 
 ### Daily import
