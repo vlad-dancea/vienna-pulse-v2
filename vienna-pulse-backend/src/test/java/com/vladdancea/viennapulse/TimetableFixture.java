@@ -137,11 +137,22 @@ public class TimetableFixture {
     /// Adds a trip with its headsign named after it, its calls, and the span the import derives from
     /// them.
     public void addTrip(String id, String route, String service, @Nullable String shape, Call... calls) {
+        addTrip(id, id, route, service, shape, calls);
+    }
+
+    /// Adds a trip like [#addTrip], but towards a headsign that other trips can share and without a shape.
+    public void addTripTowards(String id, String headsign, String route, String service, Call... calls) {
+        addTrip(id, headsign, route, service, null, calls);
+    }
+
+    private void addTrip(
+            String id, String headsign, String route, String service, @Nullable String shape, Call... calls) {
         jdbc.sql("""
                         INSERT INTO timetable.trips (id, route_id, service_id, shape_id, headsign)
-                        VALUES (:id, :route, :service, :shape, :id)
+                        VALUES (:id, :route, :service, :shape, :headsign)
                         """)
                 .param("id", id)
+                .param("headsign", headsign)
                 .param("route", route)
                 .param("service", service)
                 .param("shape", shape)

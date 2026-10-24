@@ -4,6 +4,7 @@ import com.vladdancea.viennapulse.api.Departures.Departure;
 import com.vladdancea.viennapulse.api.Departures.Line;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -18,20 +19,28 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class DepartureService {
-    private static final int LIMIT = 20;
+    private static final Duration HORIZON = Duration.ofHours(1);
+
+    /// How many departures of each line and headsign the board shows.
+    private static final int PER_LINE = 2;
 
     @ApiDatabase
     private final JdbcClient jdbc;
 
-    /// The first 20 departures at or after `now` from any platform of the stop whose merged id, like
-    /// `at:49:1320`, the map shows. Fails with a 404 for an unknown stop.
+    /// The next two departures of each line and headsign in the hour after `now`, soonest first,
+    /// from any platform of the stop whose merged id, like `at:49:1320`, the map shows. Fails with
+    /// a 404 for an unknown stop.
+    ///
+    /// The board groups the departures by line and headsign, like the displays at the stops. A fixed
+    /// number of the soonest departures would show one time for most groups at a busy stop, where
+    /// frequent U-Bahn trains take most of them, and miss some trams and buses leaving within half
+    /// an hour.
     ///
     /// A call is a departure when passengers can board and the trip goes on to another stop. Its
     /// time counts from noon minus 12 hours on its service day, which is midnight except on the
     /// days the clocks change, and passes 24 hours for trips that run after midnight. The feed's
     /// times end before 30 hours, so the service days of yesterday, today and tomorrow hold every
-    /// departure until tomorrow's service day ends, where the search stops: a later day's earliest
-    /// trips would otherwise be missing from between the ones of tomorrow.
+    /// departure in the next hour.
     ///
     /// The stop's name comes from the same statement as its departures, because an import can swap
     /// in the next timetable between two.
@@ -42,21 +51,15 @@ public class DepartureService {
                             FROM timetable.stops
                             WHERE merged_id = :stop
                         ),
-                        days AS (
-                            SELECT shift,
-                                   CAST(:today AS date) + shift AS day,
-                                   pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
-                            FROM generate_series(-1, 2) AS shift
-                        ),
-                        -- Each service day with the seconds of its times that fall between now and the end of
-                        -- tomorrow's service day.
+                        -- Each service day with the seconds of its times that fall in the next hour.
                         service_days AS (
                             SELECT day,
                                    origin,
                                    extract(epoch FROM CAST(:now AS timestamptz) - origin) AS first_second,
-                                   extract(epoch FROM (SELECT origin FROM days WHERE shift = 2) - origin) AS end_second
-                            FROM days
-                            WHERE shift <= 1
+                                   extract(epoch FROM CAST(:until AS timestamptz) - origin) AS end_second
+                            FROM (SELECT CAST(:today AS date) + shift AS day,
+                                         pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
+                                  FROM generate_series(-1, 1) AS shift) AS days
                         ),
                         running AS (
                             SELECT d.day, r.service_id
@@ -70,11 +73,13 @@ public class DepartureService {
                             FROM timetable.stop_times
                             WHERE stop_id IN (SELECT id FROM platforms) AND pickup_type <> 'NONE'
                         ),
-                        -- Each day's calls are sorted by time before anything else, so the trips are looked up
-                        -- one call at a time until 20 of them run that day and go on, instead of for all of the
-                        -- tens of thousands of calls a busy stop has.
+                        -- The calls in the next hour, about 4,000 at a busy stop, look up their trips one at a
+                        -- time, day by day. Joined for all days at once, the planner, expecting a few running
+                        -- services, pairs every call of the stop with every running service, millions of rows.
                         departures AS (
-                            SELECT next.*
+                            SELECT next.*,
+                                   row_number() OVER (PARTITION BY next.route_id, next.headsign
+                                                      ORDER BY next.time, next.trip_id, next.sequence) AS rank
                             FROM service_days d
                             CROSS JOIN LATERAL (
                                 SELECT d.origin + c.departure_time * interval '1 second' AS time,
@@ -83,23 +88,15 @@ public class DepartureService {
                                        c.stop_id,
                                        t.route_id,
                                        t.headsign
-                                -- OFFSET 0 keeps the sort in here, ahead of the joins.
-                                FROM (SELECT *
-                                      FROM calls
-                                      WHERE departure_time >= d.first_second AND departure_time < d.end_second
-                                      ORDER BY departure_time, trip_id, sequence
-                                      OFFSET 0) AS c
+                                FROM calls c
                                 JOIN timetable.trips t ON t.id = c.trip_id
-                                WHERE t.service_id IN (SELECT service_id FROM running r WHERE r.day = d.day)
+                                WHERE c.departure_time >= d.first_second AND c.departure_time < d.end_second
+                                  AND t.service_id IN (SELECT service_id FROM running r WHERE r.day = d.day)
                                   -- The last call of a trip only arrives, though the feed lets passengers board.
                                   AND EXISTS (SELECT
                                               FROM timetable.stop_times later
                                               WHERE later.trip_id = c.trip_id AND later.sequence > c.sequence)
-                                ORDER BY c.departure_time, c.trip_id, c.sequence
-                                LIMIT :limit
                             ) AS next
-                            ORDER BY next.time, next.trip_id, next.sequence
-                            LIMIT :limit
                         )
                         SELECT stop.name AS stop_name,
                                next.time,
@@ -114,14 +111,15 @@ public class DepartureService {
                         -- The name comes in every row, and alone in one when nothing leaves; it is null
                         -- only when no platform belongs to the stop.
                         FROM (SELECT mode() WITHIN GROUP (ORDER BY name) AS name FROM platforms) AS stop
-                        LEFT JOIN departures AS next ON true
+                        LEFT JOIN (SELECT * FROM departures WHERE rank <= :perLine) AS next ON true
                         LEFT JOIN timetable.routes r ON r.id = next.route_id
                         ORDER BY next.time, next.trip_id, next.sequence
                         """)
                 .param("stop", stopId)
                 .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
-                .param("limit", LIMIT)
+                .param("until", now.plus(HORIZON).atOffset(ZoneOffset.UTC))
+                .param("perLine", PER_LINE)
                 .query((row, number) -> new Row(row.getString("stop_name"), departure(row)))
                 .list();
         var name = rows.getFirst().stopName();
