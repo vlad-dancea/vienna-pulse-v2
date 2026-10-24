@@ -4,10 +4,11 @@
 effect through GitHub's API, not by committing this file. The active ruleset is
 visible under **Settings → Rules → Rulesets**.
 
-Every change to `main` requires a pull request, passing `backend-required` and
-`frontend-required` checks from the GitHub Actions app, and a branch up to date
-with `main`. All review conversations must be resolved. Force pushes, deletion
-and merge commits are blocked. No user, administrator or app has bypass permission.
+Every change to `main` requires a pull request, passing `backend-required`,
+`frontend-required` and `repository-required` checks from the GitHub Actions app,
+and a branch up to date with `main`. All review conversations must be resolved.
+Force pushes, deletion and merge commits are blocked. No user, administrator or
+app has bypass permission.
 Squash and rebase merges preserve the linear history.
 
 Two repository settings sit outside the ruleset. Merge commits are disabled, so the
@@ -20,10 +21,11 @@ When a second reviewer is available, set `required_approving_review_count` to `1
 and `require_last_push_approval` to `true`. Stale approvals are already dismissed.
 CodeRabbit continues reviewing pull requests, and its review threads must be resolved.
 
-The two project workflows always start on pull requests. A change-detection job
-filters each project's builds using the full pull request diff. Each required job
-accepts a successful build (and backend image build) or an explicitly unchanged
-project; detection errors, failed builds and cancelled builds fail the requirement.
+The two project workflows and the repository workflow always start on pull
+requests. A change-detection job filters each one's builds using the full pull
+request diff. Each required job accepts a successful build (and backend image
+build) or an explicitly unchanged project; detection errors, failed builds and
+cancelled builds fail the requirement.
 This avoids GitHub's permanently pending checks when an entire required workflow
 is skipped by a path filter. Push workflows retain their path filters and deploy
 only from `main`.

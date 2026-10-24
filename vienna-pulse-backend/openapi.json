@@ -1,0 +1,402 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "Vienna Pulse API",
+    "version" : "1"
+  },
+  "servers" : [ {
+    "url" : "https://pulse.vladdancea.com"
+  } ],
+  "paths" : {
+    "/api/lines" : {
+      "get" : {
+        "operationId" : "lines",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "date",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/geo+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionMultiLineStringLineProperties"
+                }
+              },
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionMultiLineStringLineProperties"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "line-controller" ]
+      }
+    },
+    "/api/stops" : {
+      "get" : {
+        "operationId" : "stops",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/geo+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionPointStopProperties"
+                }
+              },
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionPointStopProperties"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "stop-controller" ]
+      }
+    },
+    "/api/stops/{id}/departures" : {
+      "get" : {
+        "operationId" : "departures",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Departures"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "departure-controller" ]
+      }
+    },
+    "/api/vehicles" : {
+      "get" : {
+        "operationId" : "vehicles",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/geo+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
+                }
+              },
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "vehicle-controller" ]
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "Departure" : {
+        "type" : "object",
+        "properties" : {
+          "headsign" : {
+            "type" : [ "string", "null" ]
+          },
+          "line" : {
+            "$ref" : "#/components/schemas/Line"
+          },
+          "platform" : {
+            "type" : "string"
+          },
+          "time" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "headsign", "line", "platform", "time" ]
+      },
+      "Departures" : {
+        "type" : "object",
+        "properties" : {
+          "departures" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Departure"
+            }
+          },
+          "stop" : {
+            "$ref" : "#/components/schemas/Stop"
+          }
+        },
+        "required" : [ "departures", "stop" ]
+      },
+      "FeatureCollectionMultiLineStringLineProperties" : {
+        "type" : "object",
+        "properties" : {
+          "features" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeatureMultiLineStringLineProperties"
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "FeatureCollection"
+          }
+        },
+        "required" : [ "features", "type" ]
+      },
+      "FeatureCollectionPointStopProperties" : {
+        "type" : "object",
+        "properties" : {
+          "features" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeaturePointStopProperties"
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "FeatureCollection"
+          }
+        },
+        "required" : [ "features", "type" ]
+      },
+      "FeatureCollectionPointVehicleProperties" : {
+        "type" : "object",
+        "properties" : {
+          "features" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeaturePointVehicleProperties"
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "FeatureCollection"
+          }
+        },
+        "required" : [ "features", "type" ]
+      },
+      "FeatureMultiLineStringLineProperties" : {
+        "type" : "object",
+        "properties" : {
+          "geometry" : {
+            "$ref" : "#/components/schemas/MultiLineString"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "properties" : {
+            "$ref" : "#/components/schemas/LineProperties"
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "Feature"
+          }
+        },
+        "required" : [ "geometry", "id", "properties", "type" ]
+      },
+      "FeaturePointStopProperties" : {
+        "type" : "object",
+        "properties" : {
+          "geometry" : {
+            "$ref" : "#/components/schemas/Point"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "properties" : {
+            "$ref" : "#/components/schemas/StopProperties"
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "Feature"
+          }
+        },
+        "required" : [ "geometry", "id", "properties", "type" ]
+      },
+      "FeaturePointVehicleProperties" : {
+        "type" : "object",
+        "properties" : {
+          "geometry" : {
+            "$ref" : "#/components/schemas/Point"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "properties" : {
+            "$ref" : "#/components/schemas/VehicleProperties"
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "Feature"
+          }
+        },
+        "required" : [ "geometry", "id", "properties", "type" ]
+      },
+      "Line" : {
+        "type" : "object",
+        "properties" : {
+          "color" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "longName" : {
+            "type" : [ "string", "null" ]
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "textColor" : {
+            "type" : [ "string", "null" ]
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "color", "id", "longName", "name", "textColor", "type" ]
+      },
+      "LineProperties" : {
+        "type" : "object",
+        "properties" : {
+          "color" : {
+            "type" : [ "string", "null" ]
+          },
+          "longName" : {
+            "type" : [ "string", "null" ]
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "textColor" : {
+            "type" : [ "string", "null" ]
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "color", "longName", "name", "textColor", "type" ]
+      },
+      "MultiLineString" : {
+        "type" : "object",
+        "properties" : {
+          "coordinates" : {
+            "type" : "array",
+            "items" : {
+              "type" : "array",
+              "items" : {
+                "type" : "array",
+                "maxItems" : 2,
+                "minItems" : 2,
+                "prefixItems" : [ {
+                  "type" : "number",
+                  "format" : "double"
+                }, {
+                  "type" : "number",
+                  "format" : "double"
+                } ]
+              }
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "MultiLineString"
+          }
+        },
+        "required" : [ "coordinates", "type" ]
+      },
+      "Point" : {
+        "type" : "object",
+        "properties" : {
+          "coordinates" : {
+            "type" : "array",
+            "items" : {
+              "type" : "number",
+              "format" : "double"
+            }
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "Point"
+          }
+        },
+        "required" : [ "coordinates", "type" ]
+      },
+      "Stop" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ]
+      },
+      "StopProperties" : {
+        "type" : "object",
+        "properties" : {
+          "modes" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "modes", "name" ]
+      },
+      "VehicleProperties" : {
+        "type" : "object",
+        "properties" : {
+          "color" : {
+            "type" : [ "string", "null" ]
+          },
+          "headsign" : {
+            "type" : [ "string", "null" ]
+          },
+          "line" : {
+            "type" : "string"
+          },
+          "longName" : {
+            "type" : [ "string", "null" ]
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "textColor" : {
+            "type" : [ "string", "null" ]
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "color", "headsign", "line", "longName", "name", "textColor", "type" ]
+      }
+    }
+  }
+}

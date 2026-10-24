@@ -12,6 +12,10 @@ run = "./gradlew test --console=plain"
 description = "Everything CI checks: formatting, compiler lint, Error Prone, NullAway, tests"
 run = "./gradlew check --console=plain"
 
+[tasks.openapi]
+description = "Write the API description the controllers serve to openapi.json"
+run = "./gradlew test --tests com.vladdancea.viennapulse.api.ApiDescriptionTest -PupdateApiDescription --console=plain"
+
 [tasks.compile]
 description = "Compile main classes and resources"
 run = "./gradlew classes --console=plain"

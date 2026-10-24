@@ -44,6 +44,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -69,6 +70,12 @@ tasks.javadoc {
 
 tasks.test {
     useJUnitPlatform()
+    // ApiDescriptionTest compares the served API description with this file.
+    inputs.file("openapi.json")
+    // `mise run openapi` passes this to write the served description instead.
+    if (providers.gradleProperty("updateApiDescription").isPresent) {
+        systemProperty("updateApiDescription", "true")
+    }
     // Every checkout's tests and the app in development share /tmp, where the importer downloads
     // the feed and deletes the leftovers of others. A directory of their own keeps them apart.
     val tmpdir = layout.buildDirectory.dir("tmp/test-java-tmpdir").get().asFile

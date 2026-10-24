@@ -1,10 +1,12 @@
 // @ts-check
 import eslint from '@eslint/js';
-import { defineConfig } from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 
 export default defineConfig([
+  // openapi-typescript writes it, and openapi:check compares it with exactly what it writes.
+  globalIgnores(['src/app/timetable/openapi.ts']),
   {
     files: ['**/*.ts'],
     // Type information catches unsafe values and unhandled promises that syntax-only lint misses.
