@@ -147,6 +147,14 @@ export interface components {
             /** @constant */
             type: "Point";
         };
+        /** @description An error as RFC 9457 describes it. */
+        ProblemDetail: {
+            detail: string;
+            /** Format: uri-reference */
+            instance: string;
+            status: number;
+            title: string;
+        };
         Stop: {
             id: string;
             name: string;
@@ -194,6 +202,44 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureCollectionMultiLineStringLineProperties"];
                 };
             };
+            /** @description The date is not a day written as YYYY-MM-DD. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description There is no timetable yet, or it does not cover the date. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Reading the timetable failed in a way no retry fixes. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The database did not answer in time. This passes on its own. */
+            503: {
+                headers: {
+                    /** @description The seconds to wait before asking again. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
         };
     };
     stops: {
@@ -213,6 +259,26 @@ export interface operations {
                 content: {
                     "application/geo+json": components["schemas"]["FeatureCollectionPointStopProperties"];
                     "application/json": components["schemas"]["FeatureCollectionPointStopProperties"];
+                };
+            };
+            /** @description Reading the timetable failed in a way no retry fixes. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The database did not answer in time. This passes on its own. */
+            503: {
+                headers: {
+                    /** @description The seconds to wait before asking again. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };
@@ -237,6 +303,35 @@ export interface operations {
                     "application/json": components["schemas"]["Departures"];
                 };
             };
+            /** @description There is no stop with this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Reading the timetable failed in a way no retry fixes. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The database did not answer in time. This passes on its own. */
+            503: {
+                headers: {
+                    /** @description The seconds to wait before asking again. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
         };
     };
     vehicles: {
@@ -256,6 +351,26 @@ export interface operations {
                 content: {
                     "application/geo+json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
                     "application/json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
+                };
+            };
+            /** @description Reading the timetable failed in a way no retry fixes. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The database did not answer in time. This passes on its own. */
+            503: {
+                headers: {
+                    /** @description The seconds to wait before asking again. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };
