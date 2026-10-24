@@ -77,20 +77,10 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
                         """).param("day", day).query(Boolean.class).single();
     }
 
-    // The days the timetable covers, counted the way the lines endpoint counts them, which answers
-    // 404 for any other day.
+    // The days the timetable covers, the same as for the lines endpoint, which answers 404 for any
+    // other day.
     private Coverage coverage() {
-        return jdbc.sql("""
-                        SELECT min(first_date) AS first_date, max(last_date) AS last_date
-                        FROM (
-                            SELECT start_date AS first_date, end_date AS last_date
-                            FROM timetable.service_calendars
-                            UNION ALL
-                            SELECT date, date
-                            FROM timetable.calendar_dates
-                            WHERE exception_type = 'ADDED'
-                        ) AS days
-                        """)
+        return jdbc.sql("SELECT first_date, last_date FROM pulse.coverage()")
                 .query((row, number) -> new Coverage(
                         row.getObject("first_date", LocalDate.class), row.getObject("last_date", LocalDate.class)))
                 .single();

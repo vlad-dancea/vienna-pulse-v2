@@ -172,6 +172,10 @@ class StoreTest {
         assertThat(runningServices(LocalDate.of(2026, 10, 24))).containsExactly("T2");
         assertThat(runningServices(LocalDate.of(2026, 10, 26))).containsExactly("T0");
         assertThat(runningServices(LocalDate.of(2026, 11, 1))).isEmpty();
+        assertThat(jdbc.sql("SELECT first_date || ' ' || last_date FROM pulse.coverage()")
+                        .query(String.class)
+                        .single())
+                .isEqualTo("2026-10-24 2026-12-06");
         assertThat(jdbc.sql("SELECT id || ' ' || merged_id FROM timetable.stops ORDER BY id")
                         .query(String.class)
                         .list())
