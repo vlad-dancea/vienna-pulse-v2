@@ -68,14 +68,14 @@ depends = ["install"]
 run = "pnpm exec prettier --check ."
 
 [tasks.openapi]
-description = "Generate the API types in src/app/openapi.ts from the backend's openapi.json"
+description = "Generate the API types in src/app/timetable/openapi.ts from the backend's openapi.json"
 depends = ["install"]
-run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/openapi.ts"
+run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/timetable/openapi.ts"
 
 [tasks."openapi:check"]
-description = "Check that src/app/openapi.ts matches the backend's openapi.json"
+description = "Check that src/app/timetable/openapi.ts matches the backend's openapi.json"
 depends = ["install"]
-run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/openapi.ts --check"
+run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/timetable/openapi.ts --check"
 
 [tasks.check]
 description = "Everything CI checks: formatting, API types, typed lint, template accessibility, production builds, tests"

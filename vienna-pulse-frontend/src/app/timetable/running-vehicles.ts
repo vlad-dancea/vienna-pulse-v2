@@ -1,8 +1,8 @@
 import { httpResource } from '@angular/common/http';
 import { DestroyRef, DOCUMENT, inject, linkedSignal, Service } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
-import type { ApiFeatureCollection } from '../api-response';
-import type { components } from '../openapi';
+import type { ApiFeatureCollection } from './api-response';
+import type { components } from './openapi';
 
 /** Describes a running vehicle by its line, drawn like that line, and where its trip is headed. */
 export type VehicleProperties = components['schemas']['VehicleProperties'];

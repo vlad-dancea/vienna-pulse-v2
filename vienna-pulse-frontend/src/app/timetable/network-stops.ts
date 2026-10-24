@@ -1,8 +1,8 @@
 import { httpResource } from '@angular/common/http';
 import { computed, DestroyRef, inject, linkedSignal, Service } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
-import type { ApiFeatureCollection } from '../api-response';
-import type { components } from '../openapi';
+import type { ApiFeatureCollection } from './api-response';
+import type { components } from './openapi';
 
 /** Describes a stop complex, with null modes while the backend has not classified the stops yet. */
 export type StopProperties = components['schemas']['StopProperties'];

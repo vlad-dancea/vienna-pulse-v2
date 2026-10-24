@@ -6,7 +6,7 @@ import angular from 'angular-eslint';
 
 export default defineConfig([
   // openapi-typescript writes it, and openapi:check compares it with exactly what it writes.
-  globalIgnores(['src/app/openapi.ts']),
+  globalIgnores(['src/app/timetable/openapi.ts']),
   {
     files: ['**/*.ts'],
     // Type information catches unsafe values and unhandled promises that syntax-only lint misses.
