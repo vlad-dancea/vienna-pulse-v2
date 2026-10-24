@@ -13,7 +13,7 @@ run = "pnpm start"
 [tasks.build]
 description = "Build the frontend for production"
 depends = ["install"]
-run = ["pnpm build", "node worker/cache-headers.mjs"]
+run = ["node worker/source.mjs start", "pnpm build", "node worker/cache-headers.mjs", "node worker/source.mjs record"]
 
 [tasks."worker:check"]
 description = "Check the Cloudflare Worker's configuration and static files without deploying"
@@ -31,10 +31,13 @@ depends = ["worker:check"]
 # The browser matches the pinned Playwright release, so a Playwright update also updates it.
 run = ["pnpm exec playwright install chromium --only-shell", "pnpm exec playwright test"]
 
+# CI deploys the artifact its check job built from the same commit, so only a local run can
+# meet a stale build or uncommitted changes. Previews deploy a pull request's build from a
+# checkout of main, so `preview` does not compare the two.
 [tasks.deploy]
-description = "Deploy the checked frontend artifact to Cloudflare"
+description = "Deploy the checked frontend artifact to Cloudflare, if it was built from HEAD with no uncommitted changes"
 depends = ["install"]
-run = "pnpm exec wrangler deploy"
+run = ["node worker/source.mjs verify", "pnpm exec wrangler deploy"]
 
 [tasks.preview]
 description = "Deploy the checked frontend artifact as a Cloudflare Preview, named with --name"

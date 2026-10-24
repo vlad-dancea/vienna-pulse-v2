@@ -122,8 +122,11 @@ SMOKE_URL=https://pr-12.pulse.vladdancea.com mise run //vienna-pulse-frontend:sm
 mise run //vienna-pulse-frontend:preview:delete --name pr-12
 ```
 
-`deploy` uploads the artifact produced by `check`; it does not rebuild it. Each deploy is a new
-Worker version with its files. To restore a previous frontend version, run `mise exec --
+`deploy` uploads the artifact produced by `check`; it does not rebuild it. It refuses a build
+from another commit than `HEAD`, and any uncommitted changes in the frontend, because production
+would then run something no commit describes. `build` records its commit in
+`dist/vienna-pulse-frontend/source.json` for that comparison. Each deploy is a new Worker version
+with its files. To restore a previous frontend version, run `mise exec --
 pnpm --dir vienna-pulse-frontend exec wrangler rollback` and select that version.
 
 On the server (`ssh hetzner`), in `/opt/vienna-pulse`:
