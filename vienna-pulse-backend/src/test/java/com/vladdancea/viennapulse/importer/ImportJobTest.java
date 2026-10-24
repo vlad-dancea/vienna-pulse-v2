@@ -148,6 +148,7 @@ class ImportJobTest {
                    "properties": {"line": "22-2-j26-1", "headsign": "Wien Friedrich-Engels-Platz", %s}}
                 ]}
                 """.formatted(unwrapped(U1), unwrapped(TRAM_2)), JsonCompareMode.STRICT);
+        // The U1 left Schwedenplatz at 08:01, and the next day's trips leave more than an hour later.
         client.get()
                 .uri("/api/stops/at:49:1198/departures")
                 .exchange()
@@ -157,13 +158,9 @@ class ImportJobTest {
                 .json("""
                         {"stop": {"id": "at:49:1198", "name": "Schwedenplatz"}, "departures": [
                           {"time": "2026-10-20T08:04:00+02:00", "headsign": "Wien Friedrich-Engels-Platz",
-                           "platform": "at:49:1198:0:2", "line": {"id": "22-2-j26-1", %s}},
-                          {"time": "2026-10-21T08:01:00+02:00", "headsign": "Wien Oberlaa",
-                           "platform": "at:49:1198:0:13", "line": {"id": "21-U1-j26-1", %s}},
-                          {"time": "2026-10-21T08:04:00+02:00", "headsign": "Wien Friedrich-Engels-Platz",
                            "platform": "at:49:1198:0:2", "line": {"id": "22-2-j26-1", %s}}
                         ]}
-                        """.formatted(unwrapped(TRAM_2), unwrapped(U1), unwrapped(TRAM_2)), JsonCompareMode.STRICT);
+                        """.formatted(unwrapped(TRAM_2)), JsonCompareMode.STRICT);
     }
 
     @Test
