@@ -7,10 +7,27 @@ config_roots = ["vienna-pulse-backend", "vienna-pulse-frontend"]
 java = "temurin-25.0.4+101.0.LTS"
 node = "24.21.0"
 pnpm = "12.11.2"
+# The `lint` task below runs these three.
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
+zizmor = "1.31.1"
 
 [tasks.check]
 description = "Everything CI checks, in every project"
-depends = ["//vienna-pulse-backend:check", "//vienna-pulse-frontend:check"]
+depends = ["lint", "//vienna-pulse-backend:check", "//vienna-pulse-frontend:check"]
+
+# The workflows hold the deploy secrets and pulse-deploy runs as root, so a mistake in either
+# must not wait until it runs. actionlint also passes every `run:` block to shellcheck.
+# File tasks under */mise-tasks/ are shell scripts, so they are checked too. With a GitHub token
+# in GH_TOKEN, as in CI, zizmor also runs its online audits, such as impostor-commit and
+# known-vulnerable-actions. Run `GH_TOKEN=$(gh auth token) mise run lint` for the same locally.
+[tasks.lint]
+description = "Lint the GitHub workflows and the shell scripts"
+run = [
+  "actionlint",
+  "zizmor .github/workflows",
+  "git ls-files -z -- 'deploy/vps/*' '*/mise-tasks/*' | xargs -0 -r shellcheck",
+]
 
 [tasks.test]
 description = "Run the tests of every project"
