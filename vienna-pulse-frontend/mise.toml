@@ -16,15 +16,12 @@ depends = ["install"]
 run = ["pnpm build", "node worker/cache-headers.mjs"]
 
 [tasks."worker:check"]
-description = "Type-check and package the production Cloudflare Worker without deploying"
+description = "Check the Cloudflare Worker's configuration and static files without deploying"
 depends = ["build"]
-run = [
-  "pnpm exec tsc -p worker/tsconfig.json",
-  "pnpm exec wrangler deploy --dry-run --outdir dist/worker",
-]
+run = "pnpm exec wrangler deploy --dry-run"
 
 [tasks."worker:test"]
-description = "Verify the built frontend and API passthrough in the Cloudflare runtime"
+description = "Verify the built frontend and its headers in the Cloudflare runtime"
 depends = ["worker:check"]
 run = "node --test worker/deployment.test.mjs"
 
@@ -37,12 +34,12 @@ run = ["pnpm exec playwright install chromium --only-shell", "pnpm exec playwrig
 [tasks.deploy]
 description = "Deploy the checked frontend artifact to Cloudflare"
 depends = ["install"]
-run = "pnpm exec wrangler deploy dist/worker/index.js --no-bundle"
+run = "pnpm exec wrangler deploy"
 
 [tasks.preview]
 description = "Deploy the checked frontend artifact as a Cloudflare Preview, named with --name"
 depends = ["install"]
-run = "pnpm exec wrangler preview dist/worker/index.js"
+run = "pnpm exec wrangler preview"
 
 [tasks."preview:delete"]
 description = "Delete a Cloudflare Preview, named with --name"
@@ -50,7 +47,7 @@ depends = ["install"]
 run = "pnpm exec wrangler preview delete --skip-confirmation"
 
 [tasks.smoke]
-description = "Verify the deployed frontend, JavaScript, map worker and API through Cloudflare (SMOKE_URL picks a Preview)"
+description = "Verify the deployed frontend, JavaScript and map worker through Cloudflare, and that the API allows it (SMOKE_URL picks a Preview)"
 run = "node worker/smoke.mjs"
 
 [tasks.test]
