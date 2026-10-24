@@ -40,7 +40,7 @@ flowchart LR
 ### Frontend
 
 The Angular app is a set of static files, which Cloudflare serves from its edge with Workers
-Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it. The
+Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it and sends a path it does not know to the map. The
 browser loads the base map from OpenFreeMap and everything about the network from `/api`. The
 map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
@@ -165,7 +165,11 @@ ones.
 The All, U-Bahn, Tram and Bus controls filter routes, vehicles and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while
 routes run on today's service date. Stop loading and upgrade status appear in the map panel only
-while needed, with a retry button when the stops request fails. While the backend is upgrading or
+while needed, with a retry button when the stops request fails. The lines keep the last ones that
+loaded while a new day loads or a request fails, and a failed request is retried once a minute.
+With no lines on the map the panel says they could not be loaded and offers a retry, and on a date
+the timetable does not cover it says there is no timetable for today. The panel also says when the
+base map style could not be loaded. While the backend is upgrading or
 importing for the first time, the frontend keeps available stops visible and rechecks once a
 minute until classifications arrive. The map keeps MapLibre's own mouse, touch and keyboard
 controls.
