@@ -44,6 +44,11 @@ Static Assets. A path outside `/api` that is not a file gets `index.html`, so An
 browser loads the base map from OpenFreeMap and everything about the network from `/api`. The
 map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
 
+[`public/_headers`](vienna-pulse-frontend/public/_headers) sends a Content-Security-Policy that
+allows scripts only from the site itself and connections to it and OpenFreeMap, plus the other
+security headers. The build adds a rule per hashed JavaScript and CSS file so browsers cache
+those for a year.
+
 ### Cloudflare Worker
 
 Only `/api` and `/api/*` run the [Worker](vienna-pulse-frontend/worker/index.ts), as configured in
