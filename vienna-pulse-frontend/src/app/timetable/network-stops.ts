@@ -1,7 +1,8 @@
 import { httpResource } from '@angular/common/http';
-import { DestroyRef, inject, Service } from '@angular/core';
+import { Service } from '@angular/core';
 import { latestValue } from './latest-value';
 import type { components } from './openapi';
+import { refreshEvery } from './refresh-every';
 
 /** Describes a stop complex and the transport modes that let passengers on or off there. */
 export type StopProperties = components['schemas']['StopProperties'];
@@ -16,13 +17,10 @@ export class NetworkStops {
   constructor() {
     // Only an import changes the stops, so only a failed load, such as one that hit a backend
     // restart during a deploy, loads them again.
-    const timer = setInterval(() => {
+    refreshEvery(60_000, () => {
       if (this.stops.error() && !this.stops.isLoading()) {
         this.stops.reload();
       }
-    }, 60_000);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(timer);
     });
   }
 }

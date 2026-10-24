@@ -1,7 +1,8 @@
 import { HttpErrorResponse, httpResource } from '@angular/common/http';
-import { computed, DestroyRef, DOCUMENT, inject, Service, signal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
 import { latestValue } from './latest-value';
 import type { components } from './openapi';
+import { refreshEvery } from './refresh-every';
 
 /** Describes a scheduled line using the public names, mode and colors from the API. */
 export type LineProperties = components['schemas']['LineProperties'];
@@ -30,7 +31,6 @@ export class RunningLines {
   });
 
   constructor() {
-    const document = inject(DOCUMENT);
     // A new day loads its own lines, and the same day retries a failed load, such as one that
     // hit a backend restart during a deploy.
     const refresh = () => {
@@ -42,13 +42,6 @@ export class RunningLines {
       }
     };
     // Timers can pause in background tabs, so also check as soon as the user returns.
-    const timer = setInterval(refresh, 60_000);
-    document.addEventListener('visibilitychange', refresh);
-    document.defaultView?.addEventListener('focus', refresh);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-      document.defaultView?.removeEventListener('focus', refresh);
-    });
+    refreshEvery(60_000, refresh, ['visibilitychange', 'focus']);
   }
 }

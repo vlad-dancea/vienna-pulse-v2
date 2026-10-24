@@ -1,7 +1,8 @@
 import { httpResource } from '@angular/common/http';
-import { DestroyRef, DOCUMENT, inject, Service } from '@angular/core';
+import { DOCUMENT, inject, Service } from '@angular/core';
 import { latestValue } from './latest-value';
 import type { components } from './openapi';
+import { refreshEvery } from './refresh-every';
 
 /** Describes a running vehicle by its line, drawn like that line, and where its trip is headed. */
 export type VehicleProperties = components['schemas']['VehicleProperties'];
@@ -26,11 +27,6 @@ export class RunningVehicles {
         this.vehicles.reload();
       }
     };
-    const timer = setInterval(refresh, this.interval);
-    document.addEventListener('visibilitychange', refresh);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', refresh);
-    });
+    refreshEvery(this.interval, refresh, ['visibilitychange']);
   }
 }
