@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import { createTestHarness } from 'wrangler';
 import config from '../wrangler.json' with { type: 'json' };
+import { assetPaths, directory, hashedFiles } from './build.mjs';
 import {
   assertHeadersAsBuilt,
   assertRevalidated,
@@ -24,7 +25,7 @@ after(async () => {
 });
 
 test('serves the production shell, styles, lazy JavaScript and map worker with their headers, including direct navigation', async () => {
-  const index = await readFile('dist/vienna-pulse-frontend/browser/index.html', 'utf8');
+  const index = await readFile(`${directory}/index.html`, 'utf8');
   // The Content-Security-Policy allows no inline code, so it would block either.
   assert.doesNotMatch(index, /<script(?![^>]*\ssrc=)|<style/);
   // The API has its own hostname, so its old path here is one more page for Angular's router.
@@ -35,13 +36,12 @@ test('serves the production shell, styles, lazy JavaScript and map worker with t
     assertSiteHeaders(path, response.headers);
     assert.equal(await response.text(), index);
   }
-  const assets = (await readdir('dist/vienna-pulse-frontend/browser')).filter((file) => /\.(js|css)$/.test(file));
-  for (const path of [...assets.map((file) => `/${file}`), '/assets/maplibre-gl-worker.mjs']) {
+  for (const path of await assetPaths()) {
     const response = await server.fetch(path);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('Content-Type'), path.endsWith('.css') ? /text\/css/ : /javascript/);
     assertSiteHeaders(path, response.headers);
-    assert.equal(await response.text(), await readFile(`dist/vienna-pulse-frontend/browser${path}`, 'utf8'));
+    assert.equal(await response.text(), await readFile(`${directory}${path}`, 'utf8'));
   }
   // A tab from the previous deploy can still request its old chunks, which the SPA fallback answers.
   for (const path of ['/chunk-REMOVED1.js', '/styles-REMOVED1.css']) {
@@ -52,9 +52,8 @@ test('serves the production shell, styles, lazy JavaScript and map worker with t
 });
 
 test('finds the headers that the built _headers sets on each response, which a deployment must send', async () => {
-  const directory = 'dist/vienna-pulse-frontend/browser';
-  const [hashed] = (await readdir(directory)).filter((file) => /-[A-Z0-9]{8}\.js$/.test(file));
-  const built = await serveBuiltHeaders(config, directory);
+  const [hashed] = await hashedFiles();
+  const built = await serveBuiltHeaders(config);
   try {
     const site = Object.keys(securityHeaders).map((name) => name.toLowerCase());
     const names = async (url) => [...(await built.headers(new URL(url))).keys()].sort();
