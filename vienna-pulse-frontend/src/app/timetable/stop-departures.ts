@@ -4,10 +4,13 @@ import { DOCUMENT, inject } from '@angular/core';
 import type { components } from './openapi';
 import { refreshEvery } from './refresh-every';
 
-/** A stop and the next two departures of each line and headsign there in the next hour, soonest first. */
+/**
+ * A stop, the next two departures of each line and headsign there, soonest first, and whether their
+ * live times have been fetched.
+ */
 export type StopDepartures = components['schemas']['Departures'];
 
-/** One trip leaving a stop: when, on which line and towards where. */
+/** One trip leaving a stop: when the timetable plans it and Wiener Linien expect it, on which line and towards where. */
 export type Departure = components['schemas']['Departure'];
 
 /** The line a departure runs on, with the names, mode and colors the map draws it with. */
