@@ -5,7 +5,6 @@ import com.vladdancea.viennapulse.importer.download.FeedValidator;
 import com.vladdancea.viennapulse.importer.history.FeedFile;
 import com.vladdancea.viennapulse.importer.history.ImportAttempt;
 import com.vladdancea.viennapulse.importer.history.ImportHistory;
-import com.vladdancea.viennapulse.importer.read.FeedFormatException;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDate;
 import com.vladdancea.viennapulse.importer.read.calendar.CalendarDateReader;
 import com.vladdancea.viennapulse.importer.read.calendar.ServiceCalendar;
@@ -31,12 +30,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.TransactionException;
-import org.springframework.web.client.RestClientException;
 
 /// Downloads, validates and stores the GTFS feed on the `pulse.importer.cron` schedule, and right
 /// after startup into a new database, recording each attempt in the [ImportHistory]. A failed
@@ -115,18 +111,10 @@ public class ImportJob {
             } finally {
                 cleanUp(feed, "the downloaded feed " + feed.path());
             }
-        } catch (RestClientException exception) {
-            log.error("Feed download failed", exception);
-            history.failed(attempt, exception);
-        } catch (IOException | FeedFormatException exception) {
+        } catch (IOException | RuntimeException exception) {
+            // Any runtime exception, so that a failure nobody foresaw, such as a table the import left
+            // empty, is also recorded and retried. The exception names the step that failed.
             log.error("Feed import failed", exception);
-            history.failed(attempt, exception);
-        } catch (DataAccessException | TransactionException exception) {
-            log.error("Storing the timetable failed", exception);
-            history.failed(attempt, exception);
-        } catch (RuntimeException exception) {
-            // Such as a table the import left empty. Caught so the history records it and it is retried.
-            log.error("Feed import failed unexpectedly", exception);
             history.failed(attempt, exception);
         }
         return false;
