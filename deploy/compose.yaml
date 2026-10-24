@@ -96,7 +96,7 @@ services:
     logging: *logging
 
   # Connects outwards to Cloudflare and carries the public traffic in. Cloudflare holds the
-  # routes (remotely managed tunnel): pulse.vladdancea.com/api/* goes to http://backend:8080.
+  # routes (remotely managed tunnel): pulse-api.vladdancea.com/api/* goes to http://backend:8080.
   tunnel:
     image: cloudflare/cloudflared:2026.10.1@sha256:a15a3b50b8dabd57ac2090e9484c0247dba9dfa1f0df4d298d4317f9d69eb2d5
     restart: unless-stopped

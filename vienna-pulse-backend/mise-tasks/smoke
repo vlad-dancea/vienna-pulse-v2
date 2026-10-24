@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Verify every API endpoint of the deployed backend through Cloudflare (SMOKE_URL picks a Preview)"
+#MISE description="Verify every API endpoint of the deployed backend through Cloudflare (SMOKE_URL picks another origin)"
 #
-# Both deploy workflows run this. A release whose queries fail still has a healthy container,
+# The backend deploy runs this. A release whose queries fail still has a healthy container,
 # which is all pulse-deploy checks before it keeps a release, so only these requests notice.
 set -euo pipefail
 

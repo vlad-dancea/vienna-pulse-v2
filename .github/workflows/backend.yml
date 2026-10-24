@@ -180,7 +180,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://pulse.vladdancea.com/api/stops
+      url: https://pulse-api.vladdancea.com/api/stops
     # A deploy never cancels another one halfway. A newer one waits its turn.
     concurrency:
       group: deploy-production
