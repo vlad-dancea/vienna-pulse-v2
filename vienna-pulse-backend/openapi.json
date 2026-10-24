@@ -34,6 +34,55 @@
               }
             },
             "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The date is not a day written as YYYY-MM-DD."
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "There is no timetable yet, or it does not cover the date."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Reading the timetable failed in a way no retry fixes."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The database did not answer in time. This passes on its own.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "The seconds to wait before asking again.",
+                "required" : true,
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "line-controller" ]
@@ -57,6 +106,35 @@
               }
             },
             "description" : "OK"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Reading the timetable failed in a way no retry fixes."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The database did not answer in time. This passes on its own.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "The seconds to wait before asking again.",
+                "required" : true,
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "stop-controller" ]
@@ -83,6 +161,45 @@
               }
             },
             "description" : "OK"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "There is no stop with this id."
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Reading the timetable failed in a way no retry fixes."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The database did not answer in time. This passes on its own.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "The seconds to wait before asking again.",
+                "required" : true,
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "departure-controller" ]
@@ -106,6 +223,35 @@
               }
             },
             "description" : "OK"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Reading the timetable failed in a way no retry fixes."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The database did not answer in time. This passes on its own.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "The seconds to wait before asking again.",
+                "required" : true,
+                "schema" : {
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "vehicle-controller" ]
@@ -342,6 +488,26 @@
           }
         },
         "required" : [ "coordinates", "type" ]
+      },
+      "ProblemDetail" : {
+        "type" : "object",
+        "description" : "An error as RFC 9457 describes it.",
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "instance" : {
+            "type" : "string",
+            "format" : "uri-reference"
+          },
+          "status" : {
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "detail", "instance", "status", "title" ]
       },
       "Stop" : {
         "type" : "object",
