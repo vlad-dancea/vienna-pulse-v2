@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class VehicleService {
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// A point for every trip that has left its first stop and not yet reached its last at `now`,

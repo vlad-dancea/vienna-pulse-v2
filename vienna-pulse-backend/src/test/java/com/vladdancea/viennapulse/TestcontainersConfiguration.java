@@ -26,8 +26,8 @@ public class TestcontainersConfiguration {
     // One container for every Spring context of the test run, which would otherwise each start their
     // own. It is no bean, because a context stops its container beans when it closes, as when the
     // context cache evicts it, while other cached contexts still use them. Testcontainers removes it
-    // when the test run ends.
-    static final PostgreSQLContainer POSTGRES = startPostgres();
+    // when the test run ends. Public for the tests that freeze the database.
+    public static final PostgreSQLContainer POSTGRES = startPostgres();
 
     @Bean
     JdbcConnectionDetails postgres() {

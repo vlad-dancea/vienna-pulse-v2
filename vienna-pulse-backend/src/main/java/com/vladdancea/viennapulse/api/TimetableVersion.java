@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 class TimetableVersion {
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// The internal id of the `timetable` schema. Every import loads a new schema and renames it to

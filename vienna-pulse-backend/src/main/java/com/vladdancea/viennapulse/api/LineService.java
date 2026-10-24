@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class LineService {
+    @ApiDatabase
     private final JdbcClient jdbc;
 
     /// Every route with a trip on `date`, ordered by id, drawn along the distinct paths its trips

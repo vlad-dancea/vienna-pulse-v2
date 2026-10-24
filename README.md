@@ -110,6 +110,12 @@ replaces the timetable, which it notices because every import renames a new sche
 It works out the vehicles once per step for every map. Other days' lines and the departures are
 read on each request.
 
+When the database is slow or down, a request that needs it is answered with a 503,
+`Cache-Control: no-store` and `Retry-After: 5`. The stops and lines need it on every request to
+check the timetable version, and the vehicles once per step. The API waits at most 2 seconds for
+a database connection, cancels any query that runs for more than 5 seconds and gives up after 10
+seconds on a database that stops answering altogether. Other database errors get a 500.
+
 ## Run
 
 The toolchain is managed by [mise](https://mise.jdx.dev): the root `mise.toml` pins the tool
