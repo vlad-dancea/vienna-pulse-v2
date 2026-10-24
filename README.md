@@ -69,7 +69,8 @@ passengers board or alight there, and records when each trip leaves its first st
 its last. In the same transaction, [`Store`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/store/Store.java)
 renames `timetable` to `timetable_old` and `staging` to `timetable`. Readers see either the
 previous timetable or the new one, never a mix, and a failed import leaves the previous one in
-place.
+place. A failed import tries again after 10 minutes, 1 hour and 3 hours, then waits for the next
+morning. The download stops at 500 MB.
 
 Every attempt leaves a row in `public.imports`, outside the schema the import replaces: its
 outcome, the error of a failure, the feed's size and SHA-256, and the rows loaded into each table.
