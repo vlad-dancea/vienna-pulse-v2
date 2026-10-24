@@ -282,6 +282,8 @@ The panel refreshes every 30 seconds while the tab is visible, and at once when 
 The first answer for a stop the backend has not fetched recently has planned times only, so each
 time shows a loader, and the panel asks again after 15 seconds instead of 30, since the backend
 fetches the stop in its next round, at most 15 seconds later (see [Live departures](#live-departures)).
+The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
+license asks.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay

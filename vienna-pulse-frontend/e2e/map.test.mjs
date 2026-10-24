@@ -176,7 +176,9 @@ async function expectDrawn(page, shown) {
   await expect.poll(() => colors(page), { timeout: 20_000 }).toEqual(expected);
 }
 
-test('draws the stops, lines and vehicles from the API and filters them by mode', async ({ page }) => {
+test('draws the stops, lines and vehicles from the API, filters them by mode and credits the live times', async ({
+  page,
+}) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -198,6 +200,11 @@ test('draws the stops, lines and vehicles from the API and filters them by mode'
   await page.getByRole('button', { name: 'All' }).click();
   await expectDrawn(page, all);
 
+  // Wiener Linien's realtime data, which the departure panel shows, is licensed under CC BY 4.0.
+  await expect(page.getByRole('link', { name: 'Wiener Linien' })).toHaveAttribute(
+    'href',
+    'https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de',
+  );
   expect(errors).toEqual([]);
 });
 
