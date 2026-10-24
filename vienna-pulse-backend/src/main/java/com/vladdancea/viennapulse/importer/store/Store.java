@@ -1,6 +1,7 @@
 package com.vladdancea.viennapulse.importer.store;
 
 import static com.vladdancea.viennapulse.importer.store.Staging.quoted;
+import static java.util.stream.Collectors.joining;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -56,15 +57,13 @@ public class Store {
         dropPrevious();
     }
 
-    /// Whether the timetable is empty or an upgrade added stop modes, stop times or trip spans it has
-    /// not loaded yet.
+    /// Whether a timetable table is empty: every one is in a new database, and so is a table that a
+    /// migration has just added.
     public boolean needsImport() {
-        return jdbc.sql("""
-                        SELECT NOT EXISTS (SELECT FROM timetable.stops)
-                            OR NOT EXISTS (SELECT FROM timetable.stop_modes)
-                            OR NOT EXISTS (SELECT FROM timetable.stop_times)
-                            OR NOT EXISTS (SELECT FROM timetable.trip_spans)
-                        """).query(Boolean.class).single();
+        var empty = timetableTables().stream()
+                .map(table -> "NOT EXISTS (SELECT FROM timetable.%s)".formatted(quoted(table)))
+                .collect(joining(" OR "));
+        return jdbc.sql("SELECT " + empty).query(Boolean.class).single();
     }
 
     private void swapIn(Load load, Swapped swapped) {
@@ -100,19 +99,21 @@ public class Store {
     // Copies every table of the live timetable, so the Flyway migrations stay the only place that
     // defines their structure.
     private List<String> createStaging() {
-        var tables = jdbc.sql("""
-                        SELECT table_name FROM information_schema.tables
-                        WHERE table_schema = 'timetable' AND table_type = 'BASE TABLE'
-                        ORDER BY table_name
-                        """)
-                .query((row, number) -> row.getString("table_name"))
-                .list();
+        var tables = timetableTables();
         jdbc.sql("CREATE SCHEMA staging").update();
         for (var table : tables) {
             jdbc.sql("CREATE TABLE staging.%1$s (LIKE timetable.%1$s INCLUDING ALL)".formatted(quoted(table)))
                     .update();
         }
         return tables;
+    }
+
+    private List<String> timetableTables() {
+        return jdbc.sql("""
+                        SELECT table_name FROM information_schema.tables
+                        WHERE table_schema = 'timetable' AND table_type = 'BASE TABLE'
+                        ORDER BY table_name
+                        """).query((row, number) -> row.getString("table_name")).list();
     }
 
     private void dropPrevious() {
