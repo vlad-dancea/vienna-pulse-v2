@@ -58,6 +58,8 @@ class StopTimeReaderTest {
             t1,,1,08:00:00,08:00:00,0,0,0  | missing stop_id
             t1,s1,,08:00:00,08:00:00,0,0,0 | missing stop_sequence
             t1,s1,x,08:00:00,08:00:00,0,0,0 | stop_sequence x is not an integer
+            t1,s1,1.5,08:00:00,08:00:00,0,0,0 | stop_sequence 1.5 is not an integer
+            t1,s1,2147483648,08:00:00,08:00:00,0,0,0 | stop_sequence 2147483648 is out of range
             t1,s1,-1,08:00:00,08:00:00,0,0,0 | stop_sequence -1 is negative
             t1,s1,1,8:00,08:00:00,0,0,0    | arrival_time 8:00 is not a time in HH:MM:SS form
             t1,s1,1,08:00:00,08:60:00,0,0,0 | departure_time 08:60:00 is not a time in HH:MM:SS form

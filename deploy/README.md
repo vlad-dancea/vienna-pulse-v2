@@ -26,8 +26,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
    and filters stops, lines and vehicles.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
-3. The smoke test checks that the public JavaScript and map worker match the build and that
-   `/api/stops` still serves GeoJSON through the tunnel.
+3. The frontend's smoke test checks that the public JavaScript and map worker match the build and
+   that `/api/stops` still serves GeoJSON through the tunnel. The backend's smoke test then checks
+   every API endpoint, as after a backend deploy.
 
 Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
 production deployment. Frontend deployments do not restart the backend.
@@ -41,8 +42,11 @@ Every push to `main` that touches the backend runs `.github/workflows/backend.ym
 3. `deploy` joins the tailnet as `tag:ci` and runs `ssh deploy@<server> "deploy <commit> <digest>"`.
    The deploy user's key can only run [`vps/pulse-deploy`](vps/pulse-deploy), which checks that the
    commit is on `main`, fetches `compose.yaml` from that commit, pulls the images, starts them, waits
-   until every container is healthy and rolls back if they are not. The job then checks the public
-   API through Cloudflare.
+   until every container is healthy and rolls back if they are not. The job then runs the
+   backend's `smoke` task through Cloudflare. It checks that `/api/stops` and `/api/lines` serve
+   features, that `/api/vehicles` serves a FeatureCollection (empty at night) and that the first
+   stop's departures answer. A failed smoke test fails the job, but the release stays live:
+   `pulse-deploy` rolls back only when a container's health check fails.
 
 A deploy interrupts the API for about ten seconds, while the new backend starts. Database migrations run when the backend starts, and
 a rollback only swaps the image back, so migrations must keep working with the previous release.
@@ -90,6 +94,8 @@ mise run //vienna-pulse-frontend:deploy
 mise run //vienna-pulse-frontend:smoke
 ```
 
+`mise run //vienna-pulse-backend:smoke` checks every API endpoint and needs no credentials.
+
 A Preview can also be deployed and removed by hand:
 
 ```sh
@@ -110,6 +116,8 @@ On the server (`ssh hetzner`), in `/opt/vienna-pulse`:
 | State of the stack | `docker compose ps` |
 | Backend logs (JSON, one line per event) | `docker compose logs --tail 100 backend` |
 | Deploy history | `cat deploys.log`, full output in `/var/log/pulse-deploy.log` |
+| Recent imports | `docker compose exec postgres psql -U pulse -d pulse -c 'SELECT id, finished_at, outcome, error FROM imports ORDER BY id DESC LIMIT 5'` |
+| Health, with the timetable's age | `docker compose exec backend bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081 && printf "GET /actuator/health HTTP/1.0\r\n\r\n" >&3 && cat <&3'` |
 | Memory use | `docker stats --no-stream` |
 | Query the database | `docker compose exec postgres psql -U pulse -d pulse` |
 | Redeploy a commit by hand | `SSH_ORIGINAL_COMMAND="deploy <commit> <digest>" /usr/local/sbin/pulse-deploy` |
@@ -147,6 +155,17 @@ limited to `main`:
 
 Run `check`, `deploy` and `smoke` above for the initial deployment. Subsequent frontend pushes
 to `main` deploy automatically. Cloudflare manages TLS using the hostname's existing setup.
+
+Browsers ignore the site's `Strict-Transport-Security` header on plain HTTP, so a Single
+Redirect rule in the `vladdancea.com` zone (Rules > Redirect Rules) sends HTTP to HTTPS with a
+301 that keeps the path and query. It matches only this project's hostnames: the site, every
+name under it (all served by the Preview custom domain) and the API's own hostname, so other
+hosts in the zone are untouched:
+
+```text
+Expression: not ssl and (http.host in {"pulse.vladdancea.com" "pulse-api.vladdancea.com"} or ends_with(http.host, ".pulse.vladdancea.com"))
+Target URL: concat("https://", http.host, http.request.uri)
+```
 
 ## Setting up a new backend server
 
