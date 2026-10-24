@@ -1,6 +1,7 @@
 .angular/
 dist/
 coverage/
+test-results/
 pnpm-lock.yaml
 .wrangler/
 public/data/

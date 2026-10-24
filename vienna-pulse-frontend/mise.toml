@@ -28,6 +28,12 @@ description = "Verify the built frontend and API passthrough in the Cloudflare r
 depends = ["worker:check"]
 run = "node --test worker/deployment.test.mjs"
 
+[tasks."browser:test"]
+description = "Check in headless Chromium that the built map draws and filters stops, lines and vehicles"
+depends = ["worker:check"]
+# The browser matches the pinned Playwright release, so a Playwright update also updates it.
+run = ["pnpm exec playwright install chromium --only-shell", "pnpm exec playwright test"]
+
 [tasks.deploy]
 description = "Deploy the checked frontend artifact to Cloudflare"
 depends = ["install"]
@@ -78,8 +84,8 @@ depends = ["install"]
 run = "pnpm exec openapi-typescript ../vienna-pulse-backend/openapi.json -o src/app/timetable/openapi.ts --check"
 
 [tasks.check]
-description = "Everything CI checks: formatting, API types, typed lint, template accessibility, production builds, tests"
-depends = ["format:check", "openapi:check", "lint", "test", "worker:test"]
+description = "Everything CI checks: formatting, API types, typed lint, template accessibility, production builds, unit and browser tests"
+depends = ["format:check", "openapi:check", "lint", "test", "worker:test", "browser:test"]
 
 # A named monorepo task resolves the pinned local CLI from either project or the
 # repository root. MCP uses stdout for messages, so mise must not write task logs there.
