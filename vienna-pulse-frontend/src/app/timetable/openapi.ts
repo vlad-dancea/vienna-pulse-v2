@@ -75,12 +75,16 @@ export interface components {
         Departure: {
             headsign: string | null;
             line: components["schemas"]["Line"];
-            platform: string;
             /** Format: date-time */
-            time: string;
+            liveTime: string | null;
+            /** Format: date-time */
+            plannedTime: string;
+            platform: string;
         };
         Departures: {
             departures: components["schemas"]["Departure"][];
+            /** @enum {string} */
+            liveStatus: "pending" | "live" | "unavailable";
             stop: components["schemas"]["Stop"];
         };
         FeatureCollectionMultiLineStringLineProperties: {

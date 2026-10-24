@@ -4,11 +4,12 @@
 [![frontend](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml/badge.svg)](https://github.com/vlad-dancea/vienna-pulse-v2/actions/workflows/frontend.yml)
 
 A live map of the Vienna public transport network, built on the Wiener Linien GTFS feed. It shows
-the stops, today's lines and the running vehicles where the timetable puts them right now.
+the stops, today's lines, the running vehicles where the timetable puts them right now, and a
+stop's next departures.
 
 | Folder | What it is |
 | --- | --- |
-| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON, and a stop's next departures as JSON |
+| [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON, and a stop's next departures with Wiener Linien's live times as JSON |
 | [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops, scheduled routes and the running vehicles |
 | [`deploy`](deploy) | The production stack and how it is deployed |
 
@@ -19,6 +20,7 @@ flowchart TB
     browser["Browser"]
     tiles["OpenFreeMap<br/>map tiles"]
     feed["Wiener Linien<br/>GTFS feed"]
+    realtime["Wiener Linien<br/>realtime API"]
     subgraph cloudflare["Cloudflare"]
         assets["Static files<br/>(Angular app)"]
         api["pulse-api<br/>hostname"]
@@ -35,10 +37,12 @@ flowchart TB
     cloudflared --> backend
     backend -->|"timetable schema"| postgres
     feed -->|"daily import"| backend
-    %% These draw no lines. They put the feed under the static files and the API under the
-    %% map tiles, which keeps the diagram narrow and PostgreSQL clear of GitHub's zoom
-    %% buttons in the bottom right corner.
+    realtime -->|"live departures"| backend
+    %% These draw no lines. They put the feed under the static files, the realtime API under
+    %% the feed and the API under the map tiles, which keeps the diagram narrow and PostgreSQL
+    %% clear of GitHub's zoom buttons in the bottom right corner.
     assets ~~~ feed
+    feed ~~~ realtime
     tiles ~~~ api
 ```
 
@@ -115,7 +119,7 @@ which days the timetable covers and where a service day's times start, are SQL f
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
 | `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
-| `/api/stops/{id}/departures` | The next 20 departures from any platform of the merged stop, each with its time in Vienna, its line, its headsign and its platform. An unknown stop gets a 404. The map does not show the departures yet. |
+| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
 its arrival and departure. Trips without a shape, or without distances along it, are left out. The trip spans
@@ -135,6 +139,65 @@ When the database is slow or down, a request that needs it is answered with a 50
 check the timetable version, and the vehicles once per step. The API waits at most 2 seconds for
 a database connection, cancels any query that runs for more than 5 seconds and gives up after 10
 seconds on a database that stops answering altogether. Other database errors get a 500.
+
+### Live departures
+
+The [`live`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/live) package adds
+live times to the departures from the `monitor` endpoint of Wiener Linien's
+[realtime API](https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de),
+which they publish under CC BY 4.0. It answers without a key with every departure of the next 70
+minutes from the platforms it is asked about, with a planned time and usually a live one, but
+without a trip id or a vehicle position.
+
+The dataset's fair-use rules ask clients to leave at least 15 seconds between requests and to ask
+only about the stops someone needs, or Wiener Linien block the client's address. Wiener Linien
+publish no other numbers, and a test from one address was blocked with HTTP 403 and code 316
+after about 10 requests a minute. So the backend treats the 15 seconds as a limit for the whole
+server:
+
+- A departures request opens the stop's station for a minute. The station's number is 60200000
+  plus the third part of the stop's id, so `at:49:1320` is 60201320. The stops outside Vienna,
+  with ids from `at:43:`, have none.
+- The next round starts 15 seconds after the last one ended. It sends one request for the
+  platforms of every open station, at most 100, and the stations that do not fit go first in the
+  next round. With no station open it sends nothing, so the backend asks at most 4 times a minute,
+  however many people use the map. The platforms of each station come from Wiener Linien's
+  [list of platforms](https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-ogd-haltepunkte.csv),
+  which the backend loads at startup and again once a day, or within the hour after a failed load.
+- After a 403, a 429 or code 316, it stops asking for 5 minutes. Any other failure, or no answer
+  within 2 seconds, leaves the board with the timetable's times until the next round. A departures
+  request only reads what the last round fetched, so a failing realtime API never fails it.
+- The requests go through Apache HttpClient with its retries turned off, and follow no redirect,
+  since either would make a second request in the same round. Java's own client sends a GET again
+  by itself when the connection drops before an answer. Everything else in the backend uses Java's
+  client.
+
+The first answer for a newly opened stop has the planned times only, because the backend answers
+at once instead of waiting for the next round. Its `liveStatus` says whether a later one will have
+more: `pending` until a round has fetched the station, `live` once one has in the last minute, so
+a departure without a live time has no live data, and `unavailable` when there is none, because the
+stop has no station or Wiener Linien failed or blocked the backend. An answer more than a minute
+old, from a station waiting for its turn while many are open, counts as `pending` again.
+
+The live departures carry no trip id, so each is paired with a timetable departure of the same
+line and direction whose planned times are at most two minutes apart, the closest first. Wiener
+Linien plan some platforms a minute or two later than the timetable, and their U-Bahn times have
+half minutes that the timetable rounds either way. Their directions, `H` and `R`, match the
+timetable's direction ids on most lines but are the other way round on a few, such as bus 5B, so
+each line takes the reading that pairs more of its departures. One request for Stephansplatz,
+Karlsplatz, Westbahnhof, Praterstern and Floridsdorf on 2026-10-24 paired 278 of the 279 live
+departures of the next hour. The one left was a tram ending at Floridsdorf, which the board does
+not list.
+
+A departure planned up to an hour ago stays on the board while its live time is still ahead, and
+the two departures shown for each line and headsign are the soonest by live time where there is
+one. The live time is what the displays at the stops show, but a delay computed from it can
+mislead: during a U3 disruption, Wiener Linien paired a train planned for 20:15 with 21:02 and one
+planned for 20:33 with 20:23. The map's departure panel does not show the live times yet.
+
+`mise run dev` asks Wiener Linien too, within the same limits. The tests never do: they answer
+from [`MonitorServer`](vienna-pulse-backend/src/test/java/com/vladdancea/viennapulse/live/MonitorServer.java),
+which replays an answer Wiener Linien sent.
 
 ## Run
 

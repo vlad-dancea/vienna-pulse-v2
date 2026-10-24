@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse;
 
+import com.vladdancea.viennapulse.live.MonitorServer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -12,11 +13,13 @@ import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /// Runs tests against PostgreSQL in a container, from the image `compose.yaml` runs in development,
-/// with a [TimetableFixture] to fill it and a [TestClock] that each test sets.
+/// with a [TimetableFixture] to fill it, a [TestClock] that each test sets, and a [MonitorServer] in
+/// place of Wiener Linien's realtime API.
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
     // Reading the image from compose.yaml leaves one pin to update, which Renovate already does.
@@ -60,6 +63,20 @@ public class TestcontainersConfiguration {
     @Bean
     TimetableFixture timetableFixture(JdbcClient jdbc, ObjectProvider<CacheManager> caches) {
         return new TimetableFixture(jdbc, caches);
+    }
+
+    @Bean
+    MonitorServer monitorServer() {
+        return MonitorServer.start();
+    }
+
+    // No test may ask Wiener Linien, whose fair-use rules allow one request per 15 seconds.
+    @Bean
+    DynamicPropertyRegistrar monitorServerUrls(MonitorServer monitor) {
+        return registry -> {
+            registry.add("pulse.live.monitor-url", monitor::monitorUrl);
+            registry.add("pulse.live.platforms-url", monitor::platformsUrl);
+        };
     }
 
     private static PostgreSQLContainer startPostgres() {

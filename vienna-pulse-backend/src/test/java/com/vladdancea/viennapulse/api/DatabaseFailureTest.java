@@ -18,10 +18,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -37,7 +39,11 @@ class DatabaseFailureTest {
     private static final Duration NETWORK_LIMIT = Duration.ofSeconds(10);
     private static final Duration MARGIN = Duration.ofSeconds(2);
 
-    @Autowired
+    @LocalServerPort
+    int port;
+
+    // The JDK's client, which sends each request once. Apache HttpClient, which Spring picks while it is
+    // on the classpath, waits out a 503's Retry-After and asks again, which adds to the times measured.
     RestTestClient client;
 
     @Autowired
@@ -52,6 +58,9 @@ class DatabaseFailureTest {
     // Stops cached by an earlier test would be answered without the query these tests break.
     @BeforeEach
     void forgetTheCachedResponses() {
+        client = RestTestClient.bindToServer(new JdkClientHttpRequestFactory())
+                .baseUrl("http://localhost:" + port)
+                .build();
         timetable.clear();
     }
 

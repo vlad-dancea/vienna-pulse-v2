@@ -24,7 +24,7 @@ const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour
 export function boardRows(departures: readonly Departure[], now: number): BoardRow[] {
   const rows = new Map<string, { line: DepartureLine; headsign: string | null; departures: Departure[] }>();
   for (const departure of departures) {
-    if (Date.parse(departure.time) < now) {
+    if (Date.parse(departure.plannedTime) < now) {
       continue;
     }
     const key = JSON.stringify([departure.line.id, departure.headsign]);
@@ -46,10 +46,10 @@ export function boardRows(departures: readonly Departure[], now: number): BoardR
       // The displays at the stops leave out the "Wien " that most headsigns start with.
       headsign: row.headsign?.replace(/^Wien /, '') ?? '',
       departures: row.departures.slice(0, 2).map((departure) => {
-        const minutes = Math.floor((Date.parse(departure.time) - now) / 60_000);
+        const minutes = Math.floor((Date.parse(departure.plannedTime) - now) / 60_000);
         return {
-          time: departure.time,
-          clock: clock.format(Date.parse(departure.time)),
+          time: departure.plannedTime,
+          clock: clock.format(Date.parse(departure.plannedTime)),
           wait: minutes < 1 ? 'now' : `${minutes.toString()} min`,
         };
       }),

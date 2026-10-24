@@ -7,8 +7,12 @@ import com.vladdancea.viennapulse.TimetableFixture.Call;
 import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
 import com.vladdancea.viennapulse.importer.read.stoptime.PickupDropOffType;
+import com.vladdancea.viennapulse.live.LiveDepartures;
+import com.vladdancea.viennapulse.live.MonitorServer;
+import com.vladdancea.viennapulse.live.Platforms;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,15 @@ class DepartureControllerTest {
     private static final LocalDate DAY = LocalDate.parse("2026-10-20");
     private static final String STOP = "at:49:1320";
     private static final String NEXT_STOP = "at:49:1350:0:1";
+    private static final String PRATERSTERN = "at:49:1040";
+    // The lines at Praterstern, as the API serves them.
+    private static final String U1 = """
+            {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway", "color": "#E3000F",
+             "textColor": "#FFFFFF"}""";
+    private static final String TRAM_O = """
+            {"id": "o", "name": "O", "longName": null, "type": "tram", "color": null, "textColor": null}""";
+    private static final String BUS_5B = """
+            {"id": "5b", "name": "5B", "longName": null, "type": "bus", "color": null, "textColor": null}""";
 
     @Autowired
     RestTestClient client;
@@ -39,8 +52,23 @@ class DepartureControllerTest {
     @Autowired
     TestClock clock;
 
+    @Autowired
+    LiveDepartures live;
+
+    @Autowired
+    Platforms platforms;
+
+    @Autowired
+    MonitorServer monitor;
+
     @BeforeEach
     void removeTheTimetable() {
+        platforms.load();
+        // A round forgets the stations nobody opened in the minute before it, so one far ahead
+        // forgets those of earlier tests.
+        clock.set("2100-01-01T00:00:00Z");
+        live.round();
+        monitor.reset();
         // Half past midnight on DAY in Vienna.
         clock.set("2026-10-19T22:30:00Z");
         timetable.clear();
@@ -98,18 +126,22 @@ class DepartureControllerTest {
                 .cacheControl(CacheControl.noCache())
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"},
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "pending",
                          "departures": [
-                           {"time": "2026-10-20T00:30:00+02:00", "headsign": "now", "platform": "at:49:1320:0:2",
+                           {"plannedTime": "2026-10-20T00:30:00+02:00", "liveTime": null, "headsign": "now",
+                            "platform": "at:49:1320:0:2",
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}},
-                           {"time": "2026-10-20T00:40:00+02:00", "headsign": "late", "platform": "at:49:1320:0:1",
+                           {"plannedTime": "2026-10-20T00:40:00+02:00", "liveTime": null, "headsign": "late",
+                            "platform": "at:49:1320:0:1",
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}},
-                           {"time": "2026-10-20T01:00:00+02:00", "headsign": "night", "platform": "at:49:1320:0:3",
+                           {"plannedTime": "2026-10-20T01:00:00+02:00", "liveTime": null, "headsign": "night",
+                            "platform": "at:49:1320:0:3",
                             "line": {"id": "n25", "name": "N25", "longName": null, "type": "bus",
                                      "color": null, "textColor": null}},
-                           {"time": "2026-10-20T01:10:00+02:00", "headsign": "added", "platform": "at:49:1320:0:1",
+                           {"plannedTime": "2026-10-20T01:10:00+02:00", "liveTime": null, "headsign": "added",
+                            "platform": "at:49:1320:0:1",
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}}
                          ]}
@@ -132,7 +164,7 @@ class DepartureControllerTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.departures[*].time")
+                .jsonPath("$.departures[*].plannedTime")
                 .isEqualTo(List.of("2026-10-21T00:10:00+02:00", "2026-10-21T00:20:00+02:00"));
     }
 
@@ -151,7 +183,7 @@ class DepartureControllerTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.departures[*].time")
+                .jsonPath("$.departures[*].plannedTime")
                 .isEqualTo(List.of("2026-10-25T08:00:00+01:00"));
     }
 
@@ -172,7 +204,7 @@ class DepartureControllerTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.departures[*].time")
+                .jsonPath("$.departures[*].plannedTime")
                 .isEqualTo(List.of(
                         "2026-10-20T00:31:00+02:00",
                         "2026-10-20T00:32:00+02:00",
@@ -202,6 +234,87 @@ class DepartureControllerTest {
                 .isEqualTo(24);
     }
 
+    // The fake monitor's answer came from Praterstern at 21:47:55 on Saturday 2026-10-24.
+    @Test
+    void addsTheLiveTimesOnceARoundFetchedTheStation() {
+        clock.set(MonitorServer.ANSWERED_AT);
+        timetable.addWeeklyService("saturdays", LocalDate.parse("2026-10-24"));
+        timetable.addStop(PRATERSTERN + ":0:1", "Praterstern");
+        timetable.addStop(PRATERSTERN + ":0:2", "Praterstern");
+        timetable.addStop(PRATERSTERN + ":0:3", "Praterstern");
+        timetable.addRoute("o", "O", null, RouteType.TRAM, null, null);
+        timetable.addRoute("5b", "5B", null, RouteType.BUS, null, null);
+        // Without a live time, the first left before now, and the second is late.
+        addSaturdayDeparture("o-left", "Wien Bruno-Marek-Allee", 0, "o", ":0:2", "21:26:00");
+        addSaturdayDeparture("o-late", "Wien Bruno-Marek-Allee", 0, "o", ":0:2", "21:41:00");
+        addSaturdayDeparture("o-next", "Wien Bruno-Marek-Allee", 0, "o", ":0:2", "21:56:00");
+        addSaturdayDeparture("o-later", "Wien Bruno-Marek-Allee", 0, "o", ":0:2", "22:10:00");
+        // Wiener Linien call the direction towards Heiligenstadt H, which the timetable calls 1.
+        addSaturdayDeparture("5b", "Wien Heiligenstadt", 1, "5b", ":0:3", "21:49:00");
+        addSaturdayDeparture("u1-oberlaa", "Wien Oberlaa", 1, "u1", ":0:1", "21:49:00");
+        addSaturdayDeparture("u1-alaudagasse", "Wien Alaudagasse", 1, "u1", ":0:1", "21:57:00");
+        // Leaves when the U1 to Oberlaa does, the other way, which the answer has no departures of.
+        addSaturdayDeparture("u1-leopoldau", "Wien Leopoldau", 0, "u1", ":0:1", "21:49:00");
+
+        client.get()
+                .uri("/api/stops/at:49:1040/departures")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json(
+                        """
+                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "pending", "departures": [
+                          %s, %s, %s, %s, %s, %s
+                        ]}
+                        """.formatted(
+                                        praterstern("21:49:00", null, "Wien Heiligenstadt", ":0:3", BUS_5B),
+                                        praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", U1),
+                                        praterstern("21:49:00", null, "Wien Oberlaa", ":0:1", U1),
+                                        praterstern("21:56:00", null, "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
+                                        praterstern("21:57:00", null, "Wien Alaudagasse", ":0:1", U1),
+                                        praterstern("22:10:00", null, "Wien Bruno-Marek-Allee", ":0:2", TRAM_O)),
+                        JsonCompareMode.STRICT);
+
+        live.round();
+
+        client.get()
+                .uri("/api/stops/at:49:1040/departures")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json(
+                        """
+                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live", "departures": [
+                          %s, %s, %s, %s, %s, %s
+                        ]}
+                        """.formatted(
+                                        praterstern("21:49:00", "21:49:00", "Wien Heiligenstadt", ":0:3", BUS_5B),
+                                        praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", U1),
+                                        praterstern("21:41:00", "21:49:07", "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
+                                        praterstern("21:49:00", "21:49:34", "Wien Oberlaa", ":0:1", U1),
+                                        praterstern("21:56:00", "21:57:40", "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
+                                        praterstern("21:57:00", "21:58:25", "Wien Alaudagasse", ":0:1", U1)),
+                        JsonCompareMode.STRICT);
+    }
+
+    @Test
+    void hasNoLiveTimesForAStopOutsideVienna() {
+        timetable.addStop("at:43:3121:0:1", "Baden Josefsplatz");
+
+        client.get()
+                .uri("/api/stops/at:43:3121/departures")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json("""
+                        {"stop": {"id": "at:43:3121", "name": "Baden Josefsplatz"}, "liveStatus": "unavailable",
+                         "departures": []}
+                        """, JsonCompareMode.STRICT);
+    }
+
     @Test
     void answersAStopWithNothingLeavingWithNoDepartures() {
         client.get()
@@ -211,7 +324,8 @@ class DepartureControllerTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "departures": []}
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "pending",
+                         "departures": []}
                         """, JsonCompareMode.STRICT);
     }
 
@@ -232,6 +346,33 @@ class DepartureControllerTest {
                         {"title": "Not Found", "status": 404, "instance": "/api/stops/at:49:1320:0:1/departures",
                          "detail": "There is no stop 'at:49:1320:0:1'"}
                         """, JsonCompareMode.STRICT);
+    }
+
+    // A trip on Saturday 2026-10-24 towards `headsign` in `direction`, leaving Praterstern's platform
+    // with the id ending in `platform` at `time` and calling at the next stop after.
+    private void addSaturdayDeparture(
+            String trip, String headsign, int direction, String route, String platform, String time) {
+        timetable.addTripTowards(
+                trip,
+                headsign,
+                direction,
+                route,
+                "saturdays",
+                Call.at(1, PRATERSTERN + platform, time),
+                Call.at(2, NEXT_STOP, time));
+    }
+
+    // A departure from Praterstern on 2026-10-24 as the API answers it, with its times in Vienna.
+    private static String praterstern(
+            String plannedTime, @Nullable String liveTime, String headsign, String platform, String line) {
+        return """
+                {"plannedTime": "2026-10-24T%s+02:00", "liveTime": %s, "headsign": "%s", "platform": "%s",
+                 "line": %s}""".formatted(
+                        plannedTime,
+                        liveTime == null ? "null" : "\"2026-10-24T%s+02:00\"".formatted(liveTime),
+                        headsign,
+                        PRATERSTERN + platform,
+                        line);
     }
 
     // A trip with its headsign named after it, leaving `platform` and calling at the next stop after.

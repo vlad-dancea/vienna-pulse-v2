@@ -25,6 +25,8 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.json.JsonCompareMode;
@@ -156,11 +158,20 @@ class ImportJobTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1198", "name": "Schwedenplatz"}, "departures": [
-                          {"time": "2026-10-20T08:04:00+02:00", "headsign": "Wien Friedrich-Engels-Platz",
-                           "platform": "at:49:1198:0:2", "line": {"id": "22-2-j26-1", %s}}
+                        {"stop": {"id": "at:49:1198", "name": "Schwedenplatz"}, "liveStatus": "unavailable",
+                         "departures": [
+                          {"plannedTime": "2026-10-20T08:04:00+02:00", "liveTime": null,
+                           "headsign": "Wien Friedrich-Engels-Platz", "platform": "at:49:1198:0:2",
+                           "line": {"id": "22-2-j26-1", %s}}
                         ]}
                         """.formatted(unwrapped(TRAM_2)), JsonCompareMode.STRICT);
+    }
+
+    // The downloader relies on the JDK's client to stop an oversized or slow feed. Apache HttpClient
+    // is there for the live departures, and Spring Boot would pick it by default.
+    @Test
+    void downloadsWithTheJdkClient(@Autowired ClientHttpRequestFactory requests) {
+        assertThat(requests).isInstanceOf(JdkClientHttpRequestFactory.class);
     }
 
     @Test

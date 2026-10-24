@@ -565,8 +565,20 @@ describe('MapView', () => {
     http.expectOne('/api/stops/tram/departures').flush({
       stop: { id: 'tram', name: 'Tram' },
       departures: [
-        { time: soon, line: { ...line, id: 'u1', name: 'U1', type: 'subway' }, headsign: 'Leopoldau', platform: 'a' },
-        { time: soon, line: { ...line, id: 'tram-62', name: '62', type: 'tram' }, headsign: 'Oper', platform: 'b' },
+        {
+          plannedTime: soon,
+          liveTime: null,
+          line: { ...line, id: 'u1', name: 'U1', type: 'subway' },
+          headsign: 'Leopoldau',
+          platform: 'a',
+        },
+        {
+          plannedTime: soon,
+          liveTime: null,
+          line: { ...line, id: 'tram-62', name: '62', type: 'tram' },
+          headsign: 'Oper',
+          platform: 'b',
+        },
       ],
     });
     await harness.fixture.whenStable();

@@ -269,15 +269,19 @@
           "line" : {
             "$ref" : "#/components/schemas/Line"
           },
-          "platform" : {
-            "type" : "string"
+          "liveTime" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
           },
-          "time" : {
+          "plannedTime" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "platform" : {
+            "type" : "string"
           }
         },
-        "required" : [ "headsign", "line", "platform", "time" ]
+        "required" : [ "headsign", "line", "liveTime", "plannedTime", "platform" ]
       },
       "Departures" : {
         "type" : "object",
@@ -288,11 +292,15 @@
               "$ref" : "#/components/schemas/Departure"
             }
           },
+          "liveStatus" : {
+            "type" : "string",
+            "enum" : [ "pending", "live", "unavailable" ]
+          },
           "stop" : {
             "$ref" : "#/components/schemas/Stop"
           }
         },
-        "required" : [ "departures", "stop" ]
+        "required" : [ "departures", "liveStatus", "stop" ]
       },
       "FeatureCollectionMultiLineStringLineProperties" : {
         "type" : "object",
