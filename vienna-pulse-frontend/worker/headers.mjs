@@ -3,6 +3,7 @@ import { cp, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { createTestHarness } from 'wrangler';
+import { isHashed } from './build.mjs';
 
 /** Headers that public/_headers must send with every page and file of the site. */
 export const securityHeaders = {
@@ -21,8 +22,8 @@ export const securityHeaders = {
 export function assertSiteHeaders(path, headers) {
   for (const [name, value] of Object.entries(securityHeaders))
     assert.equal(headers.get(name), value, `${path} ${name}`);
-  const hashed = /^\/[^/]+-[A-Z0-9]{8}\.(js|css)$/.test(path);
-  if (hashed) assert.equal(headers.get('Cache-Control'), 'public, max-age=31536000, immutable', `${path} caching`);
+  if (isHashed(path))
+    assert.equal(headers.get('Cache-Control'), 'public, max-age=31536000, immutable', `${path} caching`);
   else assertRevalidated(path, headers);
 }
 
@@ -38,7 +39,8 @@ export function assertRevalidated(path, headers) {
  * Serves built files in Cloudflare's local runtime with and without their `_headers`, so what that
  * file changes on a response follows Cloudflare's own reading of it. The files run no code.
  */
-export async function serveBuiltHeaders(config, directory) {
+export async function serveBuiltHeaders(config) {
+  const directory = config.assets.directory;
   const plain = await mkdtemp(join(tmpdir(), 'vienna-pulse-plain-'));
   await cp(directory, plain, { recursive: true, filter: (source) => basename(source) !== '_headers' });
   // Without routes the runtime answers every hostname from the files.

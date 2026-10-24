@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { setTimeout } from 'node:timers/promises';
 import config from '../wrangler.json' with { type: 'json' };
+import { assetPaths, directory } from './build.mjs';
 import { assertHeadersAsBuilt, serveBuiltHeaders } from './headers.mjs';
 
 const production = 'https://pulse.vladdancea.com';
@@ -9,18 +10,17 @@ const production = 'https://pulse.vladdancea.com';
 const api = 'https://pulse-api.vladdancea.com';
 // Previews pass their own URL; the default checks production.
 const base = process.env.SMOKE_URL ?? production;
-const directory = 'dist/vienna-pulse-frontend/browser';
 const index = await readFile(`${directory}/index.html`, 'utf8');
 // A Preview runs this file from main against a pull request's build, which may change the headers,
 // so the deployment must send what its own _headers says rather than main's policy.
-const local = await serveBuiltHeaders(config, directory);
+const local = await serveBuiltHeaders(config);
 /** Checks that the deployment sends the headers the build's _headers sets on the URL. */
 async function assertBuiltHeaders(url, headers) {
   assertHeadersAsBuilt(url.pathname, await local.headers(url), headers);
 }
-const assets = (await readdir(directory)).filter((file) => /\.(js|css)$/.test(file));
-const paths = ['/', ...assets.map((file) => `/${file}`), '/assets/maplibre-gl-worker.mjs'];
-const scripts = await Promise.all(assets.map((file) => readFile(`${directory}/${file}`, 'utf8')));
+const assets = await assetPaths();
+const paths = ['/', ...assets];
+const scripts = await Promise.all(assets.map((path) => readFile(`${directory}${path}`, 'utf8')));
 assert.ok(
   scripts.some((script) => script.includes(api)),
   `the build calls the API at ${api}`,
