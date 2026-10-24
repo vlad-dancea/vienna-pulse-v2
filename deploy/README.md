@@ -154,6 +154,17 @@ limited to `main`:
 Run `check`, `deploy` and `smoke` above for the initial deployment. Subsequent frontend pushes
 to `main` deploy automatically. Cloudflare manages TLS using the hostname's existing setup.
 
+Browsers ignore the site's `Strict-Transport-Security` header on plain HTTP, so a Single
+Redirect rule in the `vladdancea.com` zone (Rules > Redirect Rules) sends HTTP to HTTPS with a
+301 that keeps the path and query. It matches only this project's hostnames: the site, every
+name under it (all served by the Preview custom domain) and the API's own hostname, so other
+hosts in the zone are untouched:
+
+```text
+Expression: not ssl and (http.host in {"pulse.vladdancea.com" "pulse-api.vladdancea.com"} or ends_with(http.host, ".pulse.vladdancea.com"))
+Target URL: concat("https://", http.host, http.request.uri)
+```
+
 ## Setting up a new backend server
 
 These steps rebuild production from nothing. Everything else is in this repository.
