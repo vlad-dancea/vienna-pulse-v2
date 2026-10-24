@@ -4,7 +4,6 @@ import { TestBed } from '@angular/core/testing';
 import type { FilterSpecification, LayerSpecification, LineLayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
 import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
-import { NetworkStops } from '../timetable/network-stops';
 
 const map = vi.hoisted(() => ({
   on: vi.fn(),
@@ -180,7 +179,6 @@ describe('MapView', () => {
     expect(map.setFilter).toHaveBeenCalledWith('vehicles', ['==', ['get', 'type'], type]);
     expect(selected?.getAttribute('aria-pressed')).toBe('true');
     expect(setStops).toHaveBeenLastCalledWith(stops);
-    expect(TestBed.inject(NetworkStops).classified()).toBe(true);
     expect(map.setFilter).toHaveBeenCalledWith('stops', ['in', type, ['get', 'modes']]);
     const stopFilter = map.setFilter.mock.calls
       .filter(([layer]: unknown[]) => layer === 'stops')
@@ -376,60 +374,6 @@ describe('MapView', () => {
     } finally {
       consoleError.mockRestore();
     }
-  });
-
-  it.each([undefined, null])(
-    'keeps stops visible against unclassified API modes %s, then applies the selected mode',
-    async (modes) => {
-      const fixture = TestBed.createComponent(MapView);
-      TestBed.tick();
-      loadMap();
-      http.expectOne((request) => request.url === '/api/lines').flush(routes);
-      http.expectOne('/api/stops').flush({
-        ...stops,
-        features: stops.features.map((stop) => ({ ...stop, properties: { name: stop.properties.name, modes } })),
-      });
-      http.expectOne('/api/vehicles').flush(noVehicles);
-      await fixture.whenStable();
-      const element = fixture.nativeElement as HTMLElement;
-      const subway = Array.from(element.querySelectorAll('button')).find(
-        (button) => button.textContent.trim() === 'U-Bahn',
-      );
-      subway?.click();
-      await fixture.whenStable();
-      expect(map.setFilter).toHaveBeenLastCalledWith('stops', null);
-      expect(element.textContent).toContain('Stop filters are updating. All stops are shown for now.');
-      TestBed.inject(NetworkStops).stops.reload();
-      TestBed.tick();
-      http.expectOne('/api/stops').flush(stops);
-      await fixture.whenStable();
-      expect(map.setFilter).toHaveBeenLastCalledWith('stops', ['in', 'subway', ['get', 'modes']]);
-      expect(element.textContent).not.toContain('Stop filters are updating');
-      fixture.destroy();
-    },
-  );
-
-  it('keeps unclassified stops on the map when a recheck fails', async () => {
-    const fixture = TestBed.createComponent(MapView);
-    TestBed.tick();
-    loadMap();
-    http.expectOne((request) => request.url === '/api/lines').flush(routes);
-    const legacy = {
-      ...stops,
-      features: stops.features.map((stop) => ({ ...stop, properties: { name: stop.properties.name } })),
-    };
-    http.expectOne('/api/stops').flush(legacy);
-    http.expectOne('/api/vehicles').flush(noVehicles);
-    await fixture.whenStable();
-    const element = fixture.nativeElement as HTMLElement;
-    TestBed.inject(NetworkStops).stops.reload();
-    TestBed.tick();
-    http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
-    await fixture.whenStable();
-    expect(setStops).toHaveBeenLastCalledWith(legacy);
-    expect(element.textContent).toContain('Stop filters are updating. All stops are shown for now.');
-    expect(element.textContent).not.toContain('Retry stops');
-    fixture.destroy();
   });
 
   it('retries failed stops while keeping keyboard focus in the Filters panel', async () => {

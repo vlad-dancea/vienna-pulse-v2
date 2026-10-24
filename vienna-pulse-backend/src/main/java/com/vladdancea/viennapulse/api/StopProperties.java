@@ -1,7 +1,6 @@
 package com.vladdancea.viennapulse.api;
 
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 
-/// A stop's name and timetable-wide modes, with null modes while classification is pending.
-public record StopProperties(String name, @Nullable List<String> modes) {}
+/// A stop's name and timetable-wide modes, empty where no trip lets passengers on or off.
+public record StopProperties(String name, List<String> modes) {}

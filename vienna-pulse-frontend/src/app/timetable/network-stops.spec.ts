@@ -4,42 +4,34 @@ import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NetworkStops } from './network-stops';
 
-describe('NetworkStops upgrade compatibility', () => {
-  let http: HttpTestingController;
+describe('NetworkStops', () => {
   afterEach(() => {
-    http.verify();
     TestBed.resetTestingModule();
     vi.useRealTimers();
   });
 
-  it.each(['empty', 'legacy'])(
-    'rechecks an %s backend until classified data arrives, then cleans up',
-    async (backend) => {
-      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-      TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
-      const stops = TestBed.inject(NetworkStops);
-      http = TestBed.inject(HttpTestingController);
-      TestBed.tick();
-      const old = {
-        type: 'FeatureCollection',
-        features: backend === 'empty' ? [] : [{ type: 'Feature', properties: { name: 'Karlsplatz' } }],
-      };
-      http.expectOne('/api/stops').flush(old);
-      await TestBed.inject(ApplicationRef).whenStable();
-      expect(stops.classified()).toBe(false);
-      vi.advanceTimersByTime(60_000);
-      TestBed.tick();
-      http.expectOne('/api/stops').flush({
-        ...old,
-        features: [{ type: 'Feature', properties: { name: 'Karlsplatz', modes: ['subway', 'tram'] } }],
-      });
-      await TestBed.inject(ApplicationRef).whenStable();
-      expect(stops.classified()).toBe(true);
-      vi.advanceTimersByTime(60_000);
-      TestBed.tick();
-      http.expectNone('/api/stops');
-      TestBed.resetTestingModule();
-      expect(vi.getTimerCount()).toBe(0);
-    },
-  );
+  it('retries a failed load until the stops arrive, then cleans up', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const stops = TestBed.inject(NetworkStops);
+    const http = TestBed.inject(HttpTestingController);
+    TestBed.tick();
+    http.expectOne('/api/stops').flush({}, { status: 503, statusText: 'Unavailable' });
+    await TestBed.inject(ApplicationRef).whenStable();
+    vi.advanceTimersByTime(60_000);
+    TestBed.tick();
+    const loaded = {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', properties: { name: 'Karlsplatz', modes: ['subway', 'tram'] } }],
+    };
+    http.expectOne('/api/stops').flush(loaded);
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(stops.latest()).toEqual(loaded);
+    vi.advanceTimersByTime(60_000);
+    TestBed.tick();
+    http.expectNone('/api/stops');
+    http.verify();
+    TestBed.resetTestingModule();
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

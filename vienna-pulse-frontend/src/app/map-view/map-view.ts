@@ -110,7 +110,6 @@ export class MapView {
     effect(() => {
       const map = this.map();
       const mode = this.selectedMode();
-      const classified = this.stops.classified();
       const filter: ExpressionSpecification | null = mode === 'all' ? null : ['==', lineProperty('type'), mode];
       for (const layer of routeLayers) {
         const layerFilter: FilterSpecification = filter ? ['all', layer.filter, filter] : layer.filter;
@@ -119,7 +118,7 @@ export class MapView {
       }
       map?.setFilter('line-names', filter);
       map?.setFilter('vehicles', filter);
-      map?.setFilter('stops', mode === 'all' || !classified ? null : ['in', mode, stopProperty('modes')]);
+      map?.setFilter('stops', mode === 'all' ? null : ['in', mode, stopProperty('modes')]);
     });
 
     // MapLibre sizes the map from its container, which has a size only once it is rendered.

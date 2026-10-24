@@ -323,20 +323,11 @@ class StoreTest {
     }
 
     @Test
-    void detectsAnUpgradeUntilClassificationHasCompletedEvenWithoutPassengerCalls() throws IOException {
-        var withoutPassengers = List.of(
-                stopTime(TRIPS_BEFORE.getFirst().id(), 1, "s1", PickupDropOffType.NONE, PickupDropOffType.NONE));
-        load(
-                ROUTES_BEFORE,
-                STOPS_BEFORE,
-                SHAPE_POINTS_BEFORE,
-                TRIPS_BEFORE,
-                CALENDARS_BEFORE,
-                DATES_BEFORE,
-                withoutPassengers);
+    void needsAnImportWhileAnyTimetableTableIsEmpty() throws IOException {
+        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
         assertThat(store.needsImport()).isFalse();
-        assertThat(stopModes()).containsExactly("s1:{}");
-        jdbc.sql("DELETE FROM timetable.stop_modes").update();
+        // As a migration that adds a table leaves it.
+        jdbc.sql("DELETE FROM timetable.calendar_dates").update();
         assertThat(store.needsImport()).isTrue();
     }
 
@@ -359,22 +350,6 @@ class StoreTest {
                         .query(String.class)
                         .list())
                 .containsExactly("2.T2.U2.1.H:T2:90060:90600");
-    }
-
-    @Test
-    void detectsAnUpgradeThatAddedTheTripSpans() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
-        assertThat(store.needsImport()).isFalse();
-        jdbc.sql("DELETE FROM timetable.trip_spans").update();
-        assertThat(store.needsImport()).isTrue();
-    }
-
-    @Test
-    void detectsAnUpgradeThatAddedTheStopTimes() throws IOException {
-        load(ROUTES_BEFORE, STOPS_BEFORE, SHAPE_POINTS_BEFORE, TRIPS_BEFORE, CALENDARS_BEFORE, DATES_BEFORE);
-        assertThat(store.needsImport()).isFalse();
-        jdbc.sql("DELETE FROM timetable.stop_times").update();
-        assertThat(store.needsImport()).isTrue();
     }
 
     private List<@Nullable String> runningServices(LocalDate day) {

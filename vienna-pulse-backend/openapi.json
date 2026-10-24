@@ -525,7 +525,7 @@
         "type" : "object",
         "properties" : {
           "modes" : {
-            "type" : [ "array", "null" ],
+            "type" : "array",
             "items" : {
               "type" : "string"
             }
