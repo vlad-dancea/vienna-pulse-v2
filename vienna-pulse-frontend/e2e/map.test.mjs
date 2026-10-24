@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
 import { createTestHarness } from 'wrangler';
 import config from '../wrangler.json' with { type: 'json' };
+import { securityHeaders } from '../worker/headers.mjs';
 
 // The map opens at this center and zoom, so a feature's position on screen follows from its coordinates.
 const center = [16.3738, 48.2082];
@@ -178,7 +179,10 @@ test('draws the stops, lines and vehicles from the API and filters them by mode'
     if (message.type() === 'error') errors.push(message.text());
   });
 
-  await page.goto(origin);
+  // The Worker serves public/_headers, so the map draws under the production Content-Security-Policy,
+  // and the browser reports anything it blocks as a console error.
+  const response = await page.goto(origin);
+  expect(response?.headers()['content-security-policy']).toBe(securityHeaders['Content-Security-Policy']);
   const all = modes.map((mode) => mode.type);
   await expectDrawn(page, all);
 
