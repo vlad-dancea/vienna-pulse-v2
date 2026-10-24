@@ -35,6 +35,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.core.type.TypeReference;
@@ -74,7 +75,8 @@ class ImportHistoryTest {
 
     static FeedDownloader downloader() {
         return new FeedDownloader(
-                new ImporterProperties(URI.create("http://localhost/"), false), RestClient.builder()) {
+                new ImporterProperties(URI.create("http://localhost/"), DataSize.ofMegabytes(500), false, List.of()),
+                RestClient.builder()) {
             @Override
             public DownloadedFeed download() {
                 return nextDownload.get();

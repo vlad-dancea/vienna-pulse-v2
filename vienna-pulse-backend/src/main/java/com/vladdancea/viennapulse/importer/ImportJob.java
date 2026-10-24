@@ -24,19 +24,23 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.concurrent.ScheduledFuture;
 import java.util.zip.ZipFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.client.RestClientException;
 
 /// Downloads, validates and stores the GTFS feed on the `pulse.importer.cron` schedule, and right
-/// after startup into a new database, recording each attempt in the [ImportHistory].
+/// after startup into a new database, recording each attempt in the [ImportHistory]. A failed
+/// import is retried after each of the `pulse.importer.retry-delays`.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -56,6 +60,9 @@ public class ImportJob {
     private final TaskScheduler scheduler;
     private final Clock clock;
 
+    // Only the scheduler's single thread runs imports and changes this.
+    private @Nullable ScheduledFuture<?> retry;
+
     // Runs the import on the scheduler's single thread, like the daily one: startup and readiness
     // do not wait for the download, and the two imports can never overlap.
     @EventListener(ApplicationReadyEvent.class)
@@ -70,6 +77,32 @@ public class ImportJob {
 
     @Scheduled(cron = "${pulse.importer.cron}", zone = "Europe/Vienna")
     public void run() {
+        // A scheduled run starts its own retries, so the retries of an earlier run end here.
+        if (retry != null) {
+            retry.cancel(false);
+            retry = null;
+        }
+        attempt(0);
+    }
+
+    // Every failure is retried: the feed may come back fixed within hours, and a retry costs one
+    // download.
+    private void attempt(int retries) {
+        if (importFeed()) {
+            return;
+        }
+        var delays = properties.retryDelays();
+        if (retries == delays.size()) {
+            log.error("Feed import failed {} times, waiting for the next scheduled run", retries + 1);
+            return;
+        }
+        var delay = delays.get(retries);
+        log.warn("Retrying the feed import in {}", delay);
+        retry = scheduler.schedule(
+                () -> attempt(retries + 1), scheduler.getClock().instant().plus(delay));
+    }
+
+    private boolean importFeed() {
         log.info("Feed import triggered");
         var attempt = new ImportAttempt(clock.instant(), properties.feedUrl());
         try {
@@ -78,6 +111,7 @@ public class ImportJob {
                 attempt = attempt.withFeed(FeedFile.of(feed.path()));
                 validator.validate(feed.path());
                 replaceTimetable(feed.path(), attempt);
+                return true;
             } finally {
                 cleanUp(feed, "the downloaded feed " + feed.path());
             }
@@ -87,14 +121,15 @@ public class ImportJob {
         } catch (IOException | FeedFormatException exception) {
             log.error("Feed import failed", exception);
             history.failed(attempt, exception);
-        } catch (DataAccessException exception) {
+        } catch (DataAccessException | TransactionException exception) {
             log.error("Storing the timetable failed", exception);
             history.failed(attempt, exception);
         } catch (RuntimeException exception) {
-            // Such as a table the import left empty. Caught here only so the history records it too.
+            // Such as a table the import left empty. Caught so the history records it and it is retried.
             log.error("Feed import failed unexpectedly", exception);
             history.failed(attempt, exception);
         }
+        return false;
     }
 
     // Runs after the import may have replaced the timetable, so a failure is only logged: a feed left
