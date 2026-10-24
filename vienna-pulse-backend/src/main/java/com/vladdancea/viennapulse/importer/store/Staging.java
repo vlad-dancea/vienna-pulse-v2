@@ -12,9 +12,9 @@ import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ import org.springframework.jdbc.datasource.DataSourceUtils;
 @Slf4j
 public final class Staging {
     private final DataSource dataSource;
-    private final Set<String> loadedTables = new HashSet<>();
+    private final Map<String, Long> rowCounts = new TreeMap<>();
 
     Staging(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -46,8 +46,7 @@ public final class Staging {
     /// fills the column of the same name in snake case, so `shortName` fills `short_name`. Components
     /// must be strings, numbers, booleans, [java.time.LocalDate]s or enums, which are stored by name.
     public <T extends Record> void copy(String table, Class<T> type, Rows<T> rows) throws IOException {
-        copy("staging", table, type, rows);
-        loadedTables.add(table);
+        rowCounts.put(table, copy("staging", table, type, rows));
     }
 
     /// Streams `stop_times.txt` into its table, then classifies every platform by the route types of
@@ -70,7 +69,7 @@ public final class Staging {
         if (invalid.isPresent()) {
             throw new FeedFormatException(invalid.get());
         }
-        jdbc.sql("""
+        var stopModes = jdbc.sql("""
                 INSERT INTO staging.stop_modes (stop_id, types)
                 SELECT s.id, coalesce(m.types, ARRAY[]::text[])
                 FROM staging.stops s
@@ -83,9 +82,9 @@ public final class Staging {
                     GROUP BY c.stop_id
                 ) m ON m.stop_id = s.id
                 """).update();
-        loadedTables.add("stop_modes");
+        rowCounts.put("stop_modes", (long) stopModes);
         // A trip none of whose calls has a time cannot be placed on the map at any moment.
-        jdbc.sql("""
+        var tripSpans = jdbc.sql("""
                 INSERT INTO staging.trip_spans (trip_id, service_id, first_departure, last_arrival)
                 SELECT t.id, t.service_id, min(c.departure_time), max(c.arrival_time)
                 FROM staging.stop_times c
@@ -93,10 +92,10 @@ public final class Staging {
                 GROUP BY t.id, t.service_id
                 HAVING min(c.departure_time) IS NOT NULL AND max(c.arrival_time) IS NOT NULL
                 """).update();
-        loadedTables.add("trip_spans");
+        rowCounts.put("trip_spans", (long) tripSpans);
     }
 
-    private <T extends Record> void copy(String schema, String table, Class<T> type, Rows<T> rows) throws IOException {
+    private <T extends Record> long copy(String schema, String table, Class<T> type, Rows<T> rows) throws IOException {
         var components = type.getRecordComponents();
         var columns = Arrays.stream(components)
                 .map(component -> quoted(snakeCase(component.getName())))
@@ -109,6 +108,7 @@ public final class Staging {
                 write(copy, components, rows);
                 var count = copy.endCopy();
                 log.info("Copied {} rows into {}.{}", count, schema, table);
+                return count;
             } catch (IOException | SQLException | RuntimeException exception) {
                 // An unfinished COPY blocks the connection, so the transaction could not even roll back.
                 if (copy.isActive()) {
@@ -123,8 +123,9 @@ public final class Staging {
         }
     }
 
-    Set<String> loadedTables() {
-        return Set.copyOf(loadedTables);
+    /// The rows loaded so far into each table, by table name.
+    Map<String, Long> rowCounts() {
+        return new TreeMap<>(rowCounts);
     }
 
     private static <T extends Record> void write(PGCopyOutputStream copy, RecordComponent[] components, Rows<T> rows)

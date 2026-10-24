@@ -1,6 +1,7 @@
 import {
   afterNextRender,
   Component,
+  computed,
   DestroyRef,
   DOCUMENT,
   effect,
@@ -52,8 +53,14 @@ export class MapView {
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
   private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
+  private readonly lineRetry = viewChild<ElementRef<HTMLButtonElement>>('lineRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
   private readonly movingVehicles = signal<MovingVehicles | undefined>(undefined);
+  protected readonly styleFailed = signal(false);
+  protected readonly stopRetryShown = computed(() => !!this.stops.stops.error() && !this.stops.latest());
+  protected readonly lineRetryShown = computed(
+    () => !!this.lines.routes.error() && !this.lines.latest() && !this.lines.unavailable(),
+  );
 
   protected retryStops() {
     // The error and retry button disappear after success, so focus the panel's persistent heading.
@@ -61,15 +68,22 @@ export class MapView {
     this.stops.stops.reload();
   }
 
+  protected retryLines() {
+    this.heading().nativeElement.focus();
+    this.lines.routes.reload();
+  }
+
   constructor() {
     const destroyRef = inject(DestroyRef);
     const document = inject(DOCUMENT);
 
     effect(() => {
-      const error = this.stops.stops.error();
-      const retry = this.stopRetry()?.nativeElement;
-      // Polling also removes the retry button, so preserve focus before Angular updates the view.
-      if (!error && retry && document.activeElement === retry) {
+      const retries = [
+        { shown: this.stopRetryShown(), button: this.stopRetry()?.nativeElement },
+        { shown: this.lineRetryShown(), button: this.lineRetry()?.nativeElement },
+      ];
+      // Polling also removes a retry button, so preserve focus before Angular updates the view.
+      if (retries.some(({ shown, button }) => !shown && button && document.activeElement === button)) {
         this.heading().nativeElement.focus();
       }
     });
@@ -84,11 +98,9 @@ export class MapView {
 
     effect(() => {
       const map = this.map();
-      const routes = this.lines.routes;
+      const routes = this.lines.latest();
       if (map) {
-        void map
-          .getSource<GeoJSONSource>('lines')
-          ?.setData(routes.hasValue() ? routes.value() : { type: 'FeatureCollection', features: [] });
+        void map.getSource<GeoJSONSource>('lines')?.setData(routes ?? { type: 'FeatureCollection', features: [] });
       }
     });
 
@@ -135,6 +147,17 @@ export class MapView {
           [16.1, 47.95],
           [16.65, 48.4],
         ],
+      });
+
+      // Without its style MapLibre never fires load, so the page would stay empty without a word.
+      // A style that loads after an error, and later errors such as a missing tile, leave a usable map.
+      const styleErrors = map.on('error', (event) => {
+        console.error(event.error);
+        this.styleFailed.set(true);
+      });
+      map.once('style.load', () => {
+        styleErrors.unsubscribe();
+        this.styleFailed.set(false);
       });
 
       // Keep routes below stops so platforms stay visible at interchanges.
