@@ -35,8 +35,11 @@ flowchart TB
     cloudflared --> backend
     backend -->|"timetable schema"| postgres
     feed -->|"daily import"| backend
-    %% Draws no line. It puts the feed below Cloudflare, which keeps the diagram narrow.
-    api ~~~ feed
+    %% These draw no lines. They put the feed under the static files and the API under the
+    %% map tiles, which keeps the diagram narrow and PostgreSQL clear of GitHub's zoom
+    %% buttons in the bottom right corner.
+    assets ~~~ feed
+    tiles ~~~ api
 ```
 
 ### Frontend
