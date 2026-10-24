@@ -1,5 +1,6 @@
 import {
   afterNextRender,
+  afterRenderEffect,
   Component,
   computed,
   DestroyRef,
@@ -7,33 +8,49 @@ import {
   effect,
   ElementRef,
   inject,
+  input,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import type { Signal, WritableResource } from '@angular/core';
 import type { FeatureCollection } from 'geojson';
+import { Router } from '@angular/router';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource } from 'maplibre-gl';
+import { DeparturePanel } from '../departure-panel/departure-panel';
 import { NetworkStops } from '../timetable/network-stops';
 import { RunningLines } from '../timetable/running-lines';
 import { RunningVehicles } from '../timetable/running-vehicles';
 import { addDistricts } from './districts';
 import { lineLayers, lineNamesLayer, routeLayers } from './lines';
 import { lineProperty, stopProperty } from './properties';
-import { stopsLayer } from './stops';
+import { selectedStopLayer, showStop, stopAt, stopsLayer, withIds } from './stops';
 import { VehicleAnimation } from './vehicle-animation';
 import { vehiclesLayer } from './vehicles';
 
 /** What a map source draws before its features load. */
 const noFeatures: FeatureCollection<never, never> = { type: 'FeatureCollection', features: [] };
 
-/** Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls. */
+/**
+ * Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls,
+ * and the departures of the stop a rider clicks.
+ */
 @Component({
+  imports: [DeparturePanel],
   selector: 'app-map-view',
   templateUrl: './map-view.html',
   host: { class: 'relative block h-dvh' },
 })
 export class MapView {
+  /**
+   * The id of the stop whose departures are open, from the `stop` query parameter, so a link opens it.
+   * A parameter given twice arrives as a list and opens no stop.
+   */
+  readonly stop = input(undefined, {
+    transform: (value: unknown) => (typeof value === 'string' ? value : undefined),
+  });
+  private readonly router = inject(Router);
   protected readonly lines = inject(RunningLines);
   protected readonly stops = inject(NetworkStops);
   private readonly vehicles = inject(RunningVehicles);
@@ -44,9 +61,14 @@ export class MapView {
     { type: 'bus', label: 'Bus' },
   ];
   protected readonly selectedMode = signal('all');
+  protected readonly selectedStop = computed(() =>
+    this.stops.latest()?.features.find((stop) => stop.id === this.stop()),
+  );
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
+  private readonly filters = viewChild.required<ElementRef<HTMLElement>>('filters');
+  private readonly panel = viewChild<DeparturePanel, ElementRef<HTMLElement>>(DeparturePanel, { read: ElementRef });
   private readonly map = signal<MapLibreMap | undefined>(undefined);
   private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
   protected readonly styleFailed = signal(false);
@@ -59,6 +81,10 @@ export class MapView {
     { name: 'stops', shown: this.stopRetryShown, resource: this.stops.stops },
     { name: 'lines', shown: this.lineRetryShown, resource: this.lines.routes },
   ];
+
+  protected closeStop() {
+    void this.router.navigate([], { queryParams: {} });
+  }
 
   protected reload(resource: WritableResource<unknown>) {
     // The error and retry button disappear after success, so focus the panel's persistent heading.
@@ -78,7 +104,11 @@ export class MapView {
       }
     });
 
-    this.drawLatest('stops', this.stops.latest);
+    // MapLibre keeps only numeric feature ids, so the stops carry theirs among their properties.
+    this.drawLatest(
+      'stops',
+      computed(() => withIds(this.stops.latest())),
+    );
     this.drawLatest('lines', this.lines.latest);
 
     effect(() => {
@@ -103,6 +133,36 @@ export class MapView {
       map?.setFilter('line-names', filter);
       map?.setFilter('vehicles', filter);
       map?.setFilter('stops', mode === 'all' ? null : ['in', mode, stopProperty('modes')]);
+    });
+
+    effect(() => {
+      this.map()?.setFilter('selected-stop', ['==', stopProperty('id'), this.stop() ?? '']);
+    });
+
+    effect(() => {
+      // Closing removes the panel and the focus in it, so move focus to the map before Angular updates the view.
+      const panel = this.panel()?.nativeElement;
+      const active = document.activeElement;
+      if (!this.stop() && panel && (active === document.body || panel.contains(active))) {
+        this.map()?.getCanvas().focus();
+      }
+    });
+
+    // A link opens the map on its stop once the map and the stops have loaded. A stop opened later
+    // moves into view only when the panel or the edge of the map hides it.
+    let linked = true;
+    afterRenderEffect(() => {
+      const map = this.map();
+      const stop = this.selectedStop();
+      const panel = this.panel()?.nativeElement;
+      if (map && this.stops.latest()) {
+        untracked(() => {
+          if (stop && panel) {
+            showStop(map, stop.geometry.coordinates, { panel, filters: this.filters().nativeElement }, linked);
+          }
+          linked = false;
+        });
+      }
     });
 
     // MapLibre sizes the map from its container, which has a size only once it is rendered.
@@ -144,11 +204,21 @@ export class MapView {
         }
         map.addSource('stops', { type: 'geojson', data: noFeatures });
         map.addLayer(stopsLayer);
+        map.addLayer(selectedStopLayer);
         map.addLayer(lineNamesLayer);
         // Vehicles go above the line names, because they are what changes on the map.
         map.addSource('vehicles', { type: 'geojson', data: noFeatures });
         map.addLayer(vehiclesLayer);
         addDistricts(map);
+        map.on('click', (event) => {
+          const stop = stopAt(map, event.point);
+          if (stop) {
+            void this.router.navigate([], { queryParams: { stop } });
+          }
+        });
+        map.on('mousemove', (event) => {
+          map.getCanvas().style.cursor = stopAt(map, event.point) ? 'pointer' : '';
+        });
         const vehicles = map.getSource<GeoJSONSource>('vehicles');
         if (vehicles && document.defaultView) {
           this.vehicleAnimation.set(new VehicleAnimation(vehicles, document.defaultView));

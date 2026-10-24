@@ -1,6 +1,7 @@
-<div #map class="h-full w-full"></div>
+<div #map class="h-full w-full" [class.departures-open]="stop()"></div>
 
 <section
+  #filters
   aria-labelledby="network-heading"
   class="absolute top-4 left-4 z-10 max-w-[calc(100%-2rem)] rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-lg sm:top-6 sm:left-6"
 >
@@ -58,3 +59,12 @@
     }
   }
 </section>
+
+@if (stop(); as id) {
+  <app-departure-panel
+    [stop]="id"
+    [name]="selectedStop()?.properties.name"
+    [mode]="selectedMode()"
+    (closed)="closeStop()"
+  />
+}

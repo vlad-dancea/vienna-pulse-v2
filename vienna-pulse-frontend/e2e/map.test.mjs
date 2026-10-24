@@ -38,8 +38,9 @@ const apiOrigin = 'https://pulse-api.vladdancea.com';
 const api = {
   '/api/stops': {
     type: 'FeatureCollection',
-    features: modes.map((mode) => ({
+    features: modes.map((mode, index) => ({
       type: 'Feature',
+      id: `at:49:${index + 1}`,
       properties: { name: `${mode.button} stop`, modes: [mode.type] },
       geometry: { type: 'Point', coordinates: at([mode.x, 50]) },
     })),
@@ -70,6 +71,20 @@ const api = {
     })),
   },
 };
+
+// The U-Bahn stop's departures leave a few minutes after the test starts.
+const leaving = [4, 9].map((minutes) => new Date(Date.now() + minutes * 60_000));
+const u1 = { id: 'u1', name: 'U1', longName: null, type: 'subway', color: '#E3000F', textColor: '#FFFFFF' };
+api['/api/stops/at:49:1/departures'] = {
+  stop: { id: 'at:49:1', name: 'U-Bahn stop' },
+  departures: leaving.map((time) => ({
+    time: time.toISOString(),
+    line: u1,
+    headsign: 'Wien Leopoldau',
+    platform: 'at:49:1:0:1',
+  })),
+};
+const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' });
 
 // The base map comes from OpenFreeMap in production. A plain background keeps the test offline
 // and leaves only the app's own layers to look at. Empty glyph ranges draw no text.
@@ -115,7 +130,7 @@ test.beforeEach(async ({ context }) => {
     // Chromium skips CORS checks on responses a route fulfills, so the backend's CorsTest and the
     // smoke test cover those headers.
     if (url.origin === apiOrigin) {
-      const body = api[url.pathname];
+      const body = api[decodeURIComponent(url.pathname)];
       return route.fulfill({ status: body ? 200 : 404, json: body ?? {} });
     }
     if (url.pathname === '/styles/positron') return route.fulfill({ json: style });
@@ -181,5 +196,46 @@ test('draws the stops, lines and vehicles from the API and filters them by mode'
   await page.getByRole('button', { name: 'All' }).click();
   await expectDrawn(page, all);
 
+  expect(errors).toEqual([]);
+});
+
+test("opens a clicked stop's departures, closes them on Escape, opens them from the link and filters them by mode", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.goto(origin);
+  await expectDrawn(
+    page,
+    modes.map((mode) => mode.type),
+  );
+
+  // A stop is 4 px wide at this zoom, so the click lands beside it.
+  await page.mouse.click(400 + points.subwayStop[0] + 8, 300 + points.subwayStop[1] + 4);
+  const panel = page.getByRole('region', { name: 'U-Bahn stop' });
+  const row = new RegExp(
+    `^\\s*U1\\s*Leopoldau\\s*\\d+ min\\s*${clock.format(leaving[0])}\\s*\\d+ min\\s*${clock.format(leaving[1])}$`,
+  );
+  await expect(panel.getByRole('listitem')).toHaveCount(1);
+  await expect(panel.getByRole('listitem')).toHaveText(row);
+  await expect(page).toHaveURL(`${origin}/?stop=at:49:1`);
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(page).toHaveURL(`${origin}/`);
+  await expect(page.getByRole('region', { name: 'Map' })).toBeFocused();
+
+  await page.goto(`${origin}/?stop=at:49:1`);
+  await expect(panel.getByRole('listitem')).toHaveText(row);
+
+  // The board shows only the mode the filter shows.
+  await page.getByRole('button', { name: 'Tram' }).click();
+  await expect(panel.getByRole('listitem')).toHaveCount(0);
+  await expect(panel.getByRole('status')).toHaveText('No tram departures in the next hour.');
+  await page.getByRole('button', { name: 'All' }).click();
+  await expect(panel.getByRole('listitem')).toHaveText(row);
   expect(errors).toEqual([]);
 });

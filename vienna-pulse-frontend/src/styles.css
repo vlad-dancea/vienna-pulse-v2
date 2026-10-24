@@ -1,3 +1,11 @@
 /* Scan only src/ for classes, so words in configuration and Worker files cannot add CSS rules. */
 @import 'tailwindcss' source('.');
 @import 'maplibre-gl/dist/maplibre-gl.css';
+
+/* On phones the departure sheet covers the bottom half of the map, as tall as the sheet in
+   departure-panel.ts, so the map's attribution moves above it. */
+.departures-open .maplibregl-ctrl-bottom-right {
+  @variant max-md {
+    bottom: 50dvh;
+  }
+}

@@ -1,8 +1,13 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { NavigationEnd, provideRouter, Router, withComponentInputBinding } from '@angular/router';
+import { filter, firstValueFrom } from 'rxjs';
+import { RouterTestingHarness } from '@angular/router/testing';
 import type { FilterSpecification, LayerSpecification, LineLayerSpecification } from 'maplibre-gl';
 import { MapView } from './map-view';
+import { withIds } from './stops';
+import type { components } from '../timetable/openapi';
 import { featureFilter } from '@maplibre/maplibre-gl-style-spec';
 
 const map = vi.hoisted(() => ({
@@ -14,6 +19,12 @@ const map = vi.hoisted(() => ({
   getSource: vi.fn(),
   setFilter: vi.fn(),
   remove: vi.fn(),
+  getCanvas: vi.fn(),
+  getContainer: vi.fn(),
+  getZoom: vi.fn(() => 12),
+  queryRenderedFeatures: vi.fn(),
+  project: vi.fn(),
+  easeTo: vi.fn(),
 }));
 
 vi.mock('maplibre-gl', () => ({
@@ -43,7 +54,7 @@ const routes = {
   ],
 };
 
-const stops = {
+const stops: components['schemas']['FeatureCollectionPointStopProperties'] = {
   type: 'FeatureCollection',
   features: [
     {
@@ -116,6 +127,8 @@ describe('MapView', () => {
   let loadMap: () => void;
   let loadStyle: () => void;
   let errorListeners: Set<(event: { error: Error }) => void>;
+  let listeners: Map<string, (event: unknown) => void>;
+  let canvas: HTMLCanvasElement;
   let setData: ReturnType<typeof vi.fn>;
   let setStops: ReturnType<typeof vi.fn>;
   let setVehicles: ReturnType<typeof vi.fn>;
@@ -130,10 +143,20 @@ describe('MapView', () => {
       }
     });
     errorListeners = new Set();
-    map.on.mockImplementation((_event: string, listener: (event: { error: Error }) => void) => {
+    listeners = new Map();
+    map.on.mockImplementation((event: string, listener: (event: { error: Error }) => void) => {
+      if (event !== 'error') {
+        listeners.set(event, listener as (event: unknown) => void);
+        return;
+      }
       errorListeners.add(listener);
       return { unsubscribe: () => errorListeners.delete(listener) };
     });
+    canvas = document.createElement('canvas');
+    canvas.tabIndex = 0;
+    document.body.append(canvas);
+    map.getCanvas.mockReturnValue(canvas);
+    map.getContainer.mockReturnValue(document.body);
     setData = vi.fn();
     setStops = vi.fn();
     setVehicles = vi.fn();
@@ -143,13 +166,19 @@ describe('MapView', () => {
     // jsdom has no media queries. Reduced motion draws the vehicles once, where they are.
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: true }) });
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([{ path: '', component: MapView }], withComponentInputBinding()),
+      ],
     });
     http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     http.verify();
+    canvas.remove();
+    vi.restoreAllMocks();
   });
 
   it.each([
@@ -178,7 +207,7 @@ describe('MapView', () => {
     expect(map.setFilter).toHaveBeenCalledWith('line-names', ['==', ['get', 'type'], type]);
     expect(map.setFilter).toHaveBeenCalledWith('vehicles', ['==', ['get', 'type'], type]);
     expect(selected?.getAttribute('aria-pressed')).toBe('true');
-    expect(setStops).toHaveBeenLastCalledWith(stops);
+    expect(setStops).toHaveBeenLastCalledWith(withIds(stops));
     expect(map.setFilter).toHaveBeenCalledWith('stops', ['in', type, ['get', 'modes']]);
     const stopFilter = map.setFilter.mock.calls
       .filter(([layer]: unknown[]) => layer === 'stops')
@@ -223,6 +252,7 @@ describe('MapView', () => {
     expect(map.addLayer.mock.calls.map(([layer]) => layer.id)).toEqual([
       ...expectedLayers.map(([id]) => id),
       'stops',
+      'selected-stop',
       'line-names',
       'vehicles',
       'district-boundaries',
@@ -483,5 +513,124 @@ describe('MapView', () => {
       TestBed.resetTestingModule();
       vi.useRealTimers();
     }
+  });
+
+  it("opens a clicked stop's departures in the URL, rings it and focuses the map again when they close", async () => {
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/', MapView);
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    await harness.fixture.whenStable();
+    // The map draws the stops with their ids among their properties, where clicks and filters read them.
+    expect(setStops).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        features: expect.arrayContaining([
+          expect.objectContaining({ properties: { id: 'tram', name: 'Tram', modes: ['tram'] } }),
+        ]) as unknown,
+      }),
+    );
+
+    // A stop whose dot reaches into the clicked box from beyond 12 px stays closed.
+    const router = TestBed.inject(Router);
+    map.queryRenderedFeatures.mockReturnValueOnce([
+      { geometry: { type: 'Point', coordinates: [16.37, 48.2] }, properties: { id: 'subway' } },
+    ]);
+    map.project.mockReturnValueOnce({ dist: () => 13 });
+    listeners.get('click')?.({ point: { x: 100, y: 100 } });
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/');
+
+    // Two stops are within reach of the click, and the nearer one opens.
+    map.queryRenderedFeatures.mockReturnValue([
+      { geometry: { type: 'Point', coordinates: [16.37, 48.2] }, properties: { id: 'subway' } },
+      { geometry: { type: 'Point', coordinates: [16.38, 48.2] }, properties: { id: 'tram' } },
+    ]);
+    map.project.mockImplementation(([longitude]: [number, number]) => ({
+      dist: () => (longitude === 16.38 ? 3 : 9),
+    }));
+    const navigated = () => firstValueFrom(router.events.pipe(filter((event) => event instanceof NavigationEnd)));
+    let navigation = navigated();
+    listeners.get('click')?.({ point: { x: 100, y: 100 } });
+    await navigation;
+    TestBed.tick();
+    expect(router.url).toBe('/?stop=tram');
+    expect(map.setFilter).toHaveBeenLastCalledWith('selected-stop', ['==', ['get', 'id'], 'tram']);
+    const element = harness.fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('h2#departures-heading')?.textContent).toBe('Tram');
+    expect(document.activeElement?.id).toBe('departures-heading');
+    const soon = new Date(Date.now() + 5 * 60_000).toISOString();
+    const line = { longName: null, color: null, textColor: null };
+    http.expectOne('/api/stops/tram/departures').flush({
+      stop: { id: 'tram', name: 'Tram' },
+      departures: [
+        { time: soon, line: { ...line, id: 'u1', name: 'U1', type: 'subway' }, headsign: 'Leopoldau', platform: 'a' },
+        { time: soon, line: { ...line, id: 'tram-62', name: '62', type: 'tram' }, headsign: 'Oper', platform: 'b' },
+      ],
+    });
+    await harness.fixture.whenStable();
+    const rows = () =>
+      Array.from(element.querySelectorAll('app-departure-panel li > span:first-child'), (badge) =>
+        badge.textContent.trim(),
+      );
+    expect(rows()).toEqual(['U1', '62']);
+    // The board follows the map's mode filter.
+    Array.from(element.querySelectorAll('button'))
+      .find((button) => button.textContent.trim() === 'Tram')
+      ?.click();
+    await harness.fixture.whenStable();
+    expect(rows()).toEqual(['62']);
+
+    navigation = navigated();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await navigation;
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/');
+    expect(element.querySelector('app-departure-panel')).toBeNull();
+    expect(map.setFilter).toHaveBeenLastCalledWith('selected-stop', ['==', ['get', 'id'], '']);
+    expect(document.activeElement).toBe(canvas);
+  });
+
+  it('opens the map on the stop a link names once the map and the stops have loaded', async () => {
+    // A phone, where the sheet covers the map's bottom half and the Filters card its top.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const top = this.tagName === 'APP-DEPARTURE-PANEL' ? 422 : 0;
+      const bottom = this.getAttribute('aria-labelledby') === 'network-heading' ? 140 : 844;
+      return DOMRect.fromRect({ x: 0, y: top, width: 390, height: bottom - top });
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/?stop=bus', MapView);
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    http.expectOne('/api/stops/bus/departures').flush({ stop: { id: 'bus', name: 'Bus' }, departures: [] });
+    TestBed.tick();
+    expect(map.easeTo).not.toHaveBeenCalled();
+
+    http.expectOne('/api/stops').flush(stops);
+    await harness.fixture.whenStable();
+    // The stop lands halfway between the Filters card and the sheet.
+    expect(map.easeTo).toHaveBeenCalledExactlyOnceWith({
+      center: [16.39, 48.2],
+      offset: [0, (140 + 422) / 2 - 844 / 2],
+      zoom: 15,
+      duration: 0,
+    });
+    expect((harness.fixture.nativeElement as HTMLElement).querySelector('h2#departures-heading')?.textContent).toBe(
+      'Bus',
+    );
+  });
+
+  it('opens no stop when the link names two', async () => {
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/?stop=get&stop=id', MapView);
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    await harness.fixture.whenStable();
+    expect((harness.fixture.nativeElement as HTMLElement).querySelector('app-departure-panel')).toBeNull();
+    expect(map.setFilter).toHaveBeenLastCalledWith('selected-stop', ['==', ['get', 'id'], '']);
   });
 });
