@@ -106,9 +106,9 @@ The [`api`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/api) p
 `timetable` schema and shares no code with the importer. The feed lists each platform as a stop
 of its own, with ids like `at:49:1320:0:3`. The first three parts name the stop, and the API
 merges a stop's platforms into one point in their middle, with the id `at:49:1320`, which the
-`stops` table stores as `merged_id`. The rules every query follows, which services run on a day
-and where a service day's times start, are SQL functions in a `pulse` schema that imports leave
-alone.
+`stops` table stores as `merged_id`. The rules every query follows, which services run on a day,
+which days the timetable covers and where a service day's times start, are SQL functions in a
+`pulse` schema that imports leave alone. The importer's health check uses them too.
 
 | Endpoint | What it returns |
 | --- | --- |
