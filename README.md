@@ -146,8 +146,9 @@ To run one project, use `mise run //vienna-pulse-frontend:dev` or
 `mise run //vienna-pulse-backend:dev`. Each project has its own CI workflow running its
 `check` task. The backend checks formatting, compiler warnings, Error Prone, NullAway and its
 tests. The frontend checks formatting, typed ESLint rules, template accessibility, the
-production build, Vitest tests and Cloudflare runtime integration tests. The backend's CI
-workflow also packages the jar and builds the container image, which the local check does not.
+production build, Vitest tests, Cloudflare runtime integration tests and a Playwright test that
+opens the built map in headless Chromium. The backend's CI workflow also packages the jar and
+builds the container image, which the local check does not.
 
 [`AGENTS.md`](AGENTS.md) holds the instructions for coding agents, and `CLAUDE.md` points Claude
 Code to it. `.mcp.json` and `.codex/config.toml` start the Angular CLI's MCP server for Claude

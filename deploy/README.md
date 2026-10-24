@@ -21,7 +21,9 @@ Every push to `main` that touches the frontend runs `.github/workflows/frontend.
 1. `check` runs `mise run //vienna-pulse-frontend:check`: formatting, typed ESLint, Angular tests,
    production build, Worker type checking and packaging, and integration tests in Cloudflare's
    local runtime. The integration tests use a temporary local HTTP origin to verify API
-   forwarding without depending on production.
+   forwarding without depending on production. A Playwright test then opens the build from that
+   runtime in headless Chromium, with a stand-in API and base map, and checks that the map draws
+   and filters stops, lines and vehicles under the Content-Security-Policy from `_headers`.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
 3. The frontend's smoke test checks that the public JavaScript and map worker match the build and
