@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
-import { DestroyRef, DOCUMENT, inject, linkedSignal, Service } from '@angular/core';
-import type { FeatureCollection, Point } from 'geojson';
+import { DestroyRef, DOCUMENT, inject, Service } from '@angular/core';
+import { latestValue } from './latest-value';
 import type { components } from './openapi';
 
 /** Describes a running vehicle by its line, drawn like that line, and where its trip is headed. */
@@ -15,13 +15,7 @@ export class RunningVehicles {
     () => '/api/vehicles',
   );
   /** The last vehicles that loaded, kept on the map when a refresh fails. */
-  readonly latest = linkedSignal<
-    FeatureCollection<Point, VehicleProperties> | undefined,
-    FeatureCollection<Point, VehicleProperties> | undefined
-  >({
-    source: () => (this.vehicles.hasValue() ? this.vehicles.value() : undefined),
-    computation: (next, previous) => next ?? previous?.value,
-  }).asReadonly();
+  readonly latest = latestValue(this.vehicles);
 
   constructor() {
     const document = inject(DOCUMENT);

@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
-import { DestroyRef, inject, linkedSignal, Service } from '@angular/core';
-import type { FeatureCollection, Point } from 'geojson';
+import { DestroyRef, inject, Service } from '@angular/core';
+import { latestValue } from './latest-value';
 import type { components } from './openapi';
 
 /** Describes a stop complex and the transport modes that let passengers on or off there. */
@@ -11,13 +11,7 @@ export type StopProperties = components['schemas']['StopProperties'];
 export class NetworkStops {
   readonly stops = httpResource<components['schemas']['FeatureCollectionPointStopProperties']>(() => '/api/stops');
   /** The last stops that loaded. */
-  readonly latest = linkedSignal<
-    FeatureCollection<Point, StopProperties> | undefined,
-    FeatureCollection<Point, StopProperties> | undefined
-  >({
-    source: () => (this.stops.hasValue() ? this.stops.value() : undefined),
-    computation: (next, previous) => next ?? previous?.value,
-  }).asReadonly();
+  readonly latest = latestValue(this.stops);
 
   constructor() {
     // Only an import changes the stops, so only a failed load, such as one that hit a backend

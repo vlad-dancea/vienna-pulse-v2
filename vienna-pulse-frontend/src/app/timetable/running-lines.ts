@@ -1,6 +1,6 @@
 import { HttpErrorResponse, httpResource } from '@angular/common/http';
-import { computed, DestroyRef, DOCUMENT, inject, linkedSignal, Service, signal } from '@angular/core';
-import type { FeatureCollection, MultiLineString } from 'geojson';
+import { computed, DestroyRef, DOCUMENT, inject, Service, signal } from '@angular/core';
+import { latestValue } from './latest-value';
 import type { components } from './openapi';
 
 /** Describes a scheduled line using the public names, mode and colors from the API. */
@@ -22,13 +22,7 @@ export class RunningLines {
     params: { date: this.day() },
   }));
   /** The last lines that loaded, kept on the map while the next day loads or when a load fails. */
-  readonly latest = linkedSignal<
-    FeatureCollection<MultiLineString, LineProperties> | undefined,
-    FeatureCollection<MultiLineString, LineProperties> | undefined
-  >({
-    source: () => (this.routes.hasValue() ? this.routes.value() : undefined),
-    computation: (next, previous) => next ?? previous?.value,
-  }).asReadonly();
+  readonly latest = latestValue(this.routes);
   /** Whether the timetable does not cover today, which a later feed import can fix. */
   readonly unavailable = computed(() => {
     const error = this.routes.error();
