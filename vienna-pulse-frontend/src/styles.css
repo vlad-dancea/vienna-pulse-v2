@@ -1,2 +1,3 @@
-@import 'tailwindcss';
+/* Scan only src/ for classes, so words in configuration and Worker files cannot add CSS rules. */
+@import 'tailwindcss' source('.');
 @import 'maplibre-gl/dist/maplibre-gl.css';
