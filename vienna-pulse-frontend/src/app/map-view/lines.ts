@@ -9,11 +9,16 @@ export const routeLayers: { mode: string; filter: ExpressionSpecification }[] = 
   { mode: 'subway', filter: ['==', lineProperty('type'), 'subway'] },
 ];
 
+/** The color of a line the feed gives none, by its mode. */
+export function modeColor(type: string): string {
+  return type === 'subway' ? '#7c3aed' : type === 'tram' ? '#b91c1c' : '#0369a1';
+}
+
 /** Gives lines and their vehicles the line's color, or one color per mode when the feed has none. */
 export const lineColor: ExpressionSpecification = [
   'coalesce',
   lineProperty('color'),
-  ['match', lineProperty('type'), 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
+  ['match', lineProperty('type'), 'subway', modeColor('subway'), 'tram', modeColor('tram'), modeColor('bus')],
 ];
 
 const lineLayout: LineLayerSpecification['layout'] = {

@@ -1,0 +1,65 @@
+<div class="sticky top-0 flex items-center justify-between gap-3 bg-white px-4 pt-2 pb-1">
+  <h2 #heading id="departures-heading" tabindex="-1" class="text-lg font-semibold">{{ title() }}</h2>
+  <button
+    type="button"
+    class="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+    (click)="closed.emit()"
+  >
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="size-5" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M5 5l10 10M15 5L5 15" stroke-linecap="round" />
+    </svg>
+    <span class="sr-only">Close</span>
+  </button>
+</div>
+
+<div class="px-4 pb-4">
+  <!-- Screen readers announce changes inside a live region, so it stays while messages come and go. -->
+  <div role="status">
+    @if (!rows().length) {
+      <p class="mt-1 text-sm text-slate-600">
+        @if (unknown()) {
+          This stop is not in the timetable.
+        } @else if (departures.error()) {
+          Departures could not be loaded.
+        } @else if (departures.isLoading()) {
+          Loading departures...
+        } @else {
+          No departures in the next hour.
+        }
+      </p>
+    }
+  </div>
+  @if (retryShown()) {
+    <button
+      id="retry-departures"
+      type="button"
+      class="mt-2 min-h-11 rounded-lg px-3 text-sm font-medium underline underline-offset-4 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+      (click)="retry()"
+    >
+      Retry departures
+    </button>
+  }
+
+  <ul class="divide-y divide-slate-100">
+    @for (row of rows(); track row.key) {
+      <li class="flex items-center gap-3 py-2">
+        <span
+          class="min-w-11 shrink-0 rounded-md px-1.5 py-1 text-center text-sm font-bold"
+          [style.background-color]="row.background"
+          [style.color]="row.text"
+        >
+          {{ row.line }}
+        </span>
+        <span class="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]">{{ row.headsign }}</span>
+        <span class="grid shrink-0 grid-cols-2 gap-x-3">
+          @for (departure of row.departures; track $index) {
+            <time class="w-14 text-right" [attr.datetime]="departure.time">
+              <span class="block text-sm font-semibold tabular-nums">{{ departure.wait }}</span>
+              <span class="block text-xs text-slate-600 tabular-nums">{{ departure.clock }}</span>
+            </time>
+          }
+        </span>
+      </li>
+    }
+  </ul>
+</div>
