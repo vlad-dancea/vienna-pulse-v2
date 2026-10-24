@@ -63,8 +63,12 @@ a rollback only swaps the image back, so migrations must keep working with the p
 
 A pull request that changes the frontend runs the same checks. If its branch is in this
 repository, its checked build is also deployed as a [Cloudflare Worker Preview](https://developers.cloudflare.com/workers/previews/)
-at `https://pr-<number>.pulse.vladdancea.com`, and the smoke test runs against it. A
-`frontend-preview` status on the pull request's commit links to it. Each push updates the same
+at `https://pr-<number>.pulse.vladdancea.com`, and the smoke test runs against it. The smoke test
+serves the deployed build in Cloudflare's local runtime with and without its `_headers`, so the
+difference is what Cloudflare's own code makes of that file, and checks that the Preview sends
+those headers. A pull request that changes the headers can therefore pass, and its own `check`
+holds them to its policy in `worker/headers.mjs`. A `frontend-preview` status on the pull
+request's commit links to it. Each push updates the same
 Preview, and closing the pull request deletes it. Pull requests from forks are only checked.
 
 The Cloudflare token never reaches code from a pull request. `frontend.yml` checks the pull

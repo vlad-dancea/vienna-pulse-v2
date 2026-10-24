@@ -3,7 +3,13 @@ import { readFile, readdir } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import { createTestHarness } from 'wrangler';
 import config from '../wrangler.json' with { type: 'json' };
-import { assertRevalidated, assertSiteHeaders } from './headers.mjs';
+import {
+  assertHeadersAsBuilt,
+  assertRevalidated,
+  assertSiteHeaders,
+  securityHeaders,
+  serveBuiltHeaders,
+} from './headers.mjs';
 
 let server;
 
@@ -42,6 +48,31 @@ test('serves the production shell, styles, lazy JavaScript and map worker with t
     const response = await server.fetch(path, { headers: { 'Sec-Fetch-Mode': 'cors' } });
     assert.match(response.headers.get('Content-Type'), /text\/html/);
     assertRevalidated(path, response.headers);
+  }
+});
+
+test('finds the headers that the built _headers sets on each response, which a deployment must send', async () => {
+  const directory = 'dist/vienna-pulse-frontend/browser';
+  const [hashed] = (await readdir(directory)).filter((file) => /-[A-Z0-9]{8}\.js$/.test(file));
+  const built = await serveBuiltHeaders(config, directory);
+  try {
+    const site = Object.keys(securityHeaders).map((name) => name.toLowerCase());
+    const names = async (url) => [...(await built.headers(new URL(url))).keys()].sort();
+    assert.deepEqual(await names('https://pulse.vladdancea.com/'), [...site].sort());
+    assert.deepEqual(await names(`https://pulse.vladdancea.com/${hashed}`), [...site, 'cache-control'].sort());
+    assert.deepEqual(await names('https://pr-1.pulse.vladdancea.com/'), [...site, 'x-robots-tag'].sort());
+    // The smoke test compares a deployment this way, so a missing header or long caching must fail it.
+    const expected = await built.headers(new URL('https://pulse.vladdancea.com/'));
+    const served = (await server.fetch('/')).headers;
+    assertHeadersAsBuilt('/', expected, served);
+    const withoutPolicy = new Headers(served);
+    withoutPolicy.delete('Content-Security-Policy');
+    assert.throws(() => assertHeadersAsBuilt('/', expected, withoutPolicy), /content-security-policy/);
+    const cached = new Headers(served);
+    cached.set('Cache-Control', 'public, max-age=31536000, immutable');
+    assert.throws(() => assertHeadersAsBuilt('/', expected, cached), /caching/);
+  } finally {
+    await built.close();
   }
 });
 
