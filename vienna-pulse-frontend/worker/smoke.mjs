@@ -31,8 +31,13 @@ for (let attempt = 1; ; attempt++) {
       assert.equal(await response.text(), path === '/' ? index : await readFile(`${directory}${path}`, 'utf8'));
     }
     // A chunk removed by a deploy gets the SPA fallback, which must not be cached as the chunk.
-    const removed = await fetch(`${base}/chunk-REMOVED1.js`, { signal: AbortSignal.timeout(15_000) });
-    assertRevalidated('/chunk-REMOVED1.js', removed.headers);
+    // wrangler preview uploads a placeholder script for a Worker without one, and a Preview sends
+    // requests for missing files that are not navigations to that script, so only production has
+    // the fallback for them.
+    if (base === production) {
+      const removed = await fetch(`${base}/chunk-REMOVED1.js`, { signal: AbortSignal.timeout(15_000) });
+      assertRevalidated('/chunk-REMOVED1.js', removed.headers);
+    }
     // The site reads the API from another origin, so the API must allow the site's.
     const response = await fetch(`${api}/api/stops`, {
       headers: { Origin: base },

@@ -79,6 +79,9 @@ A Preview is a separate copy of the same Worker, and production traffic never re
 
 - `wrangler preview` refuses a configuration without a `previews` block, so `wrangler.json` keeps
   an empty one. Previews have no settings of their own.
+- `wrangler preview` uploads a placeholder script for a Worker without one. A navigation to a
+  path that is not a file still gets `index.html`, but other requests for missing files, such as
+  a removed chunk, get the placeholder's plain 404 on a Preview.
 - `wrangler.json` enables `pulse.vladdancea.com` as a *preview-only* custom domain
   (`enabled: false`, `previews_enabled: true`). Cloudflare serves `*.pulse.vladdancea.com` from it
   with its own wildcard certificate, while the hostname itself keeps the production route and the
