@@ -11,35 +11,16 @@ import {
   viewChild,
 } from '@angular/core';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
-import type { ExpressionSpecification, FilterSpecification, GeoJSONSource, LineLayerSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, FilterSpecification, GeoJSONSource } from 'maplibre-gl';
+import { NetworkStops } from '../timetable/network-stops';
+import { RunningLines } from '../timetable/running-lines';
+import { RunningVehicles } from '../timetable/running-vehicles';
 import { addDistricts } from './districts';
-import { RunningLines } from './running-lines';
-import type { LineProperties } from './running-lines';
-import { NetworkStops } from './network-stops';
-import type { StopProperties } from './network-stops';
-import { MovingVehicles } from './moving-vehicles';
-import { RunningVehicles } from './running-vehicles';
-import type { VehicleProperties } from './running-vehicles';
-
-// MapLibre reads properties by name, so the names are checked against the API's types here: a field
-// the backend renames fails type-checking instead of leaving the map without colors or filters.
-// Lines and vehicles share their filters and colors, so a line property must exist in both.
-const lineProperty = (name: keyof LineProperties & keyof VehicleProperties): ExpressionSpecification => ['get', name];
-const stopProperty = (name: keyof StopProperties): ExpressionSpecification => ['get', name];
-
-const routeLayers: { mode: string; filter: ExpressionSpecification }[] = [
-  // Keep any other API route types visible with buses, below the tram and U-Bahn layers.
-  { mode: 'bus', filter: ['!', ['in', lineProperty('type'), ['literal', ['tram', 'subway']]]] },
-  { mode: 'tram', filter: ['==', lineProperty('type'), 'tram'] },
-  { mode: 'subway', filter: ['==', lineProperty('type'), 'subway'] },
-];
-
-// Lines and their vehicles have the line's color, or one color per mode when the feed has none.
-const lineColor: ExpressionSpecification = [
-  'coalesce',
-  lineProperty('color'),
-  ['match', lineProperty('type'), 'subway', '#7c3aed', 'tram', '#b91c1c', '#0369a1'],
-];
+import { lineLayers, lineNamesLayer, routeLayers } from './lines';
+import { lineProperty, stopProperty } from './properties';
+import { stopsLayer } from './stops';
+import { VehicleAnimation } from './vehicle-animation';
+import { vehiclesLayer } from './vehicles';
 
 /** Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls. */
 @Component({
@@ -64,7 +45,7 @@ export class MapView {
   private readonly stopRetry = viewChild<ElementRef<HTMLButtonElement>>('stopRetry');
   private readonly lineRetry = viewChild<ElementRef<HTMLButtonElement>>('lineRetry');
   private readonly map = signal<MapLibreMap | undefined>(undefined);
-  private readonly movingVehicles = signal<MovingVehicles | undefined>(undefined);
+  private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
   protected readonly styleFailed = signal(false);
   protected readonly stopRetryShown = computed(() => !!this.stops.stops.error() && !this.stops.latest());
   protected readonly lineRetryShown = computed(
@@ -114,12 +95,15 @@ export class MapView {
     });
 
     effect(() => {
-      const moving = this.movingVehicles();
+      const animation = this.vehicleAnimation();
       const vehicles = this.vehicles.latest();
-      if (moving) {
+      if (animation) {
         // Gliding for the whole time between two refreshes keeps the vehicles moving.
         const reduceMotion = document.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        moving.show(vehicles ?? { type: 'FeatureCollection', features: [] }, reduceMotion ? 0 : this.vehicles.interval);
+        animation.show(
+          vehicles ?? { type: 'FeatureCollection', features: [] },
+          reduceMotion ? 0 : this.vehicles.interval,
+        );
       }
     });
 
@@ -175,91 +159,26 @@ export class MapView {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        const lineLayout: LineLayerSpecification['layout'] = {
-          'line-cap': 'round',
-          'line-join': 'round',
-        };
-        // Each mode's casing must also cover lower-priority strokes at crossings.
-        for (const layer of routeLayers) {
-          map.addLayer({
-            id: `lines-${layer.mode}-casing`,
-            type: 'line',
-            source: 'lines',
-            filter: layer.filter,
-            layout: lineLayout,
-            paint: {
-              'line-color': '#ffffff',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 9],
-            },
-          });
-          map.addLayer({
-            id: `lines-${layer.mode}`,
-            type: 'line',
-            source: 'lines',
-            filter: layer.filter,
-            layout: lineLayout,
-            paint: {
-              'line-color': lineColor,
-              'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 5],
-            },
-          });
+        for (const layer of lineLayers) {
+          map.addLayer(layer);
         }
         map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({
-          id: 'stops',
-          type: 'circle',
-          source: 'stops',
-          paint: {
-            'circle-color': '#374151',
-            'circle-stroke-color': '#ffffff',
-            'circle-stroke-width': 1,
-            // Small enough for thousands of stops at city zoom, easy to see on a street.
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 6],
-          },
-        });
-        map.addLayer({
-          id: 'line-names',
-          type: 'symbol',
-          source: 'lines',
-          minzoom: 12,
-          layout: {
-            'symbol-placement': 'line',
-            'text-font': ['Noto Sans Bold'],
-            'text-field': lineProperty('name'),
-            'text-size': 12,
-            'symbol-spacing': 250,
-          },
-          paint: {
-            'text-color': '#111827',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2,
-          },
-        });
+        map.addLayer(stopsLayer);
+        map.addLayer(lineNamesLayer);
         // Vehicles go above the line names, because they are what changes on the map.
         map.addSource('vehicles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({
-          id: 'vehicles',
-          type: 'circle',
-          source: 'vehicles',
-          paint: {
-            'circle-color': lineColor,
-            'circle-stroke-color': '#ffffff',
-            'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 11, 1, 16, 2],
-            // A little larger than the stops, so a vehicle waiting at a stop covers it.
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 8],
-          },
-        });
+        map.addLayer(vehiclesLayer);
         addDistricts(map);
         const vehicles = map.getSource<GeoJSONSource>('vehicles');
         if (vehicles && document.defaultView) {
-          this.movingVehicles.set(new MovingVehicles(vehicles, document.defaultView));
+          this.vehicleAnimation.set(new VehicleAnimation(vehicles, document.defaultView));
         }
         this.map.set(map);
       });
 
       // Releases the map's WebGL context and listeners when the view goes away.
       destroyRef.onDestroy(() => {
-        this.movingVehicles()?.stop();
+        this.vehicleAnimation()?.stop();
         map.remove();
       });
     });
