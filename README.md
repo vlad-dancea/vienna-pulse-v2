@@ -22,7 +22,6 @@ flowchart LR
     subgraph cloudflare["Cloudflare"]
         assets["Static files<br/>(Angular app)"]
         api["pulse-api<br/>hostname"]
-        worker["Worker"]
     end
     subgraph server["Hetzner server (Docker Compose)"]
         cloudflared["cloudflared"]
@@ -31,10 +30,8 @@ flowchart LR
     end
     browser -->|"pages and scripts"| assets
     browser -->|"/api"| api
-    browser -.->|"/api, old tabs"| worker
     browser --> tiles
     api -->|"tunnel"| cloudflared
-    worker -->|"tunnel"| cloudflared
     cloudflared --> backend
     backend -->|"timetable schema"| postgres
     feed -->|"daily import"| backend
@@ -43,7 +40,7 @@ flowchart LR
 ### Frontend
 
 The Angular app is a set of static files, which Cloudflare serves from its edge with Workers
-Static Assets. A path outside `/api` that is not a file gets `index.html`, so Angular's router handles it and sends a path it does not know to the map. The
+Static Assets. A path that is not a file gets `index.html`, so Angular's router handles it and sends a path it does not know to the map. The
 browser loads the base map from OpenFreeMap and everything about the network from the API at
 `https://pulse-api.vladdancea.com/api`. The production build sets that origin in
 [`environment.ts`](vienna-pulse-frontend/src/environments/environment.ts), and
@@ -60,22 +57,19 @@ those for a year.
 
 ### Cloudflare Worker
 
-The API has a hostname of its own because every request that runs a Worker counts against the
-Workers Free plan's 100,000 a day, and one open map polls `/api/vehicles` 5,760 times a day.
-`pulse-api.vladdancea.com` has no Worker in front of it, so polling costs nothing there.
-
-`/api` and `/api/*` on `pulse.vladdancea.com` still run the [Worker](vienna-pulse-frontend/worker/index.ts),
-as configured in [`wrangler.json`](vienna-pulse-frontend/wrangler.json), for tabs that loaded the
-site before the switch. In production it passes the request on unchanged, and Cloudflare sends it
-through the tunnel to the backend. A pull request Preview has no tunnel of its own, so its Worker
-sends those requests to production.
+[`wrangler.json`](vienna-pulse-frontend/wrangler.json) deploys the built files as a Worker without
+a script, so Cloudflare answers every request on `pulse.vladdancea.com` from those files. Requests
+for static files are free and unlimited, while every request that runs Worker code counts against
+the Workers Free plan's 100,000 a day. The API has a hostname of its own for the same reason: one
+open map polls `/api/vehicles` 5,760 times a day, and `pulse-api.vladdancea.com` has no Worker in
+front of it.
 
 ### Tunnel and server
 
 The backend runs on one Hetzner server as the Docker Compose stack in
 [`deploy/compose.yaml`](deploy/compose.yaml): Spring Boot, PostgreSQL and cloudflared. cloudflared
-connects out to Cloudflare, which forwards `/api/*` on `pulse-api.vladdancea.com` and
-`pulse.vladdancea.com` to the backend over that connection, so the server has no open ports to the internet. The database sits on an internal network without
+connects out to Cloudflare, which forwards `/api/*` on `pulse-api.vladdancea.com` to the backend
+over that connection, so the server has no open ports to the internet. The database sits on an internal network without
 internet access. Administrators and CI reach the server over Tailscale.
 
 ### Daily import

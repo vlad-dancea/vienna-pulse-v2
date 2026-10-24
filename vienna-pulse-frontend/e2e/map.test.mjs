@@ -84,10 +84,8 @@ let server;
 let origin;
 
 test.beforeAll(async () => {
-  // The production Worker and assets.
-  server = createTestHarness({
-    workers: [{ config: { ...config, main: 'dist/worker/index.js', no_bundle: true } }],
-  });
+  // The production configuration and its built files.
+  server = createTestHarness({ workers: [{ config }] });
   origin = (await server.listen()).url.origin;
 });
 
