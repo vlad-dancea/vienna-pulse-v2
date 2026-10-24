@@ -1,5 +1,3 @@
-import { once } from 'node:events';
-import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
 import { createTestHarness } from 'wrangler';
 import config from '../wrangler.json' with { type: 'json' };
@@ -35,6 +33,8 @@ const points = Object.fromEntries(
 );
 const at = ([dx, dy]) => offset(dx + 0.5, dy + 0.5);
 
+// The production build reads the API from its own hostname, so the route below stands in for it.
+const apiOrigin = 'https://pulse-api.vladdancea.com';
 const api = {
   '/api/stops': {
     type: 'FeatureCollection',
@@ -80,36 +80,19 @@ const style = {
   layers: [{ id: 'background', type: 'background', paint: { 'background-color': background } }],
 };
 
-const backend = createServer((request, response) => {
-  const body = api[new URL(request.url, 'http://backend').pathname];
-  response.writeHead(body ? 200 : 404, { 'Content-Type': 'application/json' });
-  response.end(JSON.stringify(body ?? {}));
-});
 let server;
 let origin;
 
 test.beforeAll(async () => {
-  backend.listen(0, '127.0.0.1');
-  await once(backend, 'listening');
-  // The production Worker and assets, with the tunnel origin replaced by the stand-in backend.
+  // The production Worker and assets.
   server = createTestHarness({
-    workers: [
-      {
-        config: {
-          ...config,
-          main: 'dist/worker/index.js',
-          no_bundle: true,
-          dev: { host: `127.0.0.1:${backend.address().port}`, upstream_protocol: 'http' },
-        },
-      },
-    ],
+    workers: [{ config: { ...config, main: 'dist/worker/index.js', no_bundle: true } }],
   });
   origin = (await server.listen()).url.origin;
 });
 
 test.afterAll(async () => {
   await server?.close();
-  await new Promise((resolve, reject) => backend.close((error) => (error ? reject(error) : resolve())));
 });
 
 test.beforeEach(async ({ context }) => {
@@ -131,6 +114,12 @@ test.beforeEach(async ({ context }) => {
       return route.fulfill({ json: { type: 'FeatureCollection', features: [] } });
     }
     if (url.origin === origin) return route.continue();
+    // Chromium skips CORS checks on responses a route fulfills, so the backend's CorsTest and the
+    // smoke test cover those headers.
+    if (url.origin === apiOrigin) {
+      const body = api[url.pathname];
+      return route.fulfill({ status: body ? 200 : 404, json: body ?? {} });
+    }
     if (url.pathname === '/styles/positron') return route.fulfill({ json: style });
     if (url.pathname.startsWith('/fonts/')) return route.fulfill({ body: '' });
     return route.abort();

@@ -37,15 +37,16 @@ Every push to `main` that touches the frontend or the backend's `openapi.json` r
    ESLint, Angular tests, production build, Worker type checking and packaging, and integration
    tests in Cloudflare's local runtime. The integration tests use a temporary local HTTP origin
    to verify API forwarding without depending on production. A Playwright test then opens the
-   build from that runtime in headless Chromium, with a stand-in API and base map, and checks
-   that the map draws and filters stops, lines and vehicles under the Content-Security-Policy
-   from `_headers`.
+   build from that runtime in headless Chromium, with stand-ins for `pulse-api` and the base map,
+   and checks that the map draws and filters stops, lines and vehicles under the
+   Content-Security-Policy from `_headers`.
 2. `deploy` downloads the checked static files and bundled Worker, then deploys that artifact
    with the pinned Wrangler CLI. Production deployments run one at a time.
 3. The frontend's smoke test checks that the public JavaScript and map worker match the build,
    that the build calls `pulse-api.vladdancea.com`, and that `/api/stops` serves GeoJSON through
    the tunnel on both hostnames, with the site's origin allowed on the API's. The backend's smoke
-   test then checks every API endpoint, as after a backend deploy.
+   test then checks every API endpoint through the Worker, which still forwards `/api` for tabs
+   opened before the switch.
 
 Pull requests run the same checks and get a [Preview](#pull-request-previews) instead of a
 production deployment. Frontend deployments do not restart the backend.
@@ -60,7 +61,7 @@ Every push to `main` that touches the backend runs `.github/workflows/backend.ym
    The deploy user's key can only run [`vps/pulse-deploy`](vps/pulse-deploy), which checks that the
    commit is on `main`, fetches `compose.yaml` from that commit, pulls the images, starts them, waits
    until every container is healthy and rolls back if they are not. The job then runs the
-   backend's `smoke` task through Cloudflare. It checks that `/api/stops` and `/api/lines` serve
+   backend's `smoke` task through Cloudflare at `pulse-api.vladdancea.com`. It checks that `/api/stops` and `/api/lines` serve
    features, that `/api/vehicles` serves a FeatureCollection (empty at night) and that the first
    stop's departures answer. A failed smoke test fails the job, but the release stays live:
    `pulse-deploy` rolls back only when a container's health check fails.
@@ -113,7 +114,9 @@ mise run //vienna-pulse-frontend:deploy
 mise run //vienna-pulse-frontend:smoke
 ```
 
-`mise run //vienna-pulse-backend:smoke` checks every API endpoint and needs no credentials.
+`mise run //vienna-pulse-backend:smoke` checks every API endpoint at `pulse-api.vladdancea.com`
+and needs no credentials. `SMOKE_URL` points it at another hostname, such as
+`https://pulse.vladdancea.com` for the Worker's path.
 
 A Preview can also be deployed and removed by hand:
 
