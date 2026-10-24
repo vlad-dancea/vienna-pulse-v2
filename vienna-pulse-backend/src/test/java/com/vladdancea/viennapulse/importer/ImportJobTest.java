@@ -174,7 +174,7 @@ class ImportJobTest {
 
         importJob.run();
 
-        assertThat(output).contains("Feed download failed", "GTFS download failed with HTTP 503");
+        assertThat(output).contains("Feed import failed", "GTFS download failed with HTTP 503");
         assertThat(timetable()).isEqualTo(timetable);
     }
 
@@ -204,7 +204,7 @@ class ImportJobTest {
 
         importFeed(files);
 
-        assertThat(output).contains("Storing the timetable failed", "Key (id)=(1.T2.22-2-j26-1.1.H) already exists.");
+        assertThat(output).contains("Feed import failed", "Key (id)=(1.T2.22-2-j26-1.1.H) already exists.");
         assertThat(FeedServer.downloads()).isEmpty();
         assertThat(timetable()).isEqualTo(timetable);
     }
