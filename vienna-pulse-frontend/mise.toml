@@ -48,6 +48,7 @@ run = "pnpm exec wrangler preview delete --skip-confirmation"
 
 [tasks.smoke]
 description = "Verify the deployed frontend, JavaScript and map worker through Cloudflare, and that the API allows it (SMOKE_URL picks a Preview)"
+depends = ["install"]
 run = "node worker/smoke.mjs"
 
 [tasks.test]
