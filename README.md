@@ -50,6 +50,8 @@ browser loads the base map from OpenFreeMap and everything about the network fro
 [`api-origin.ts`](vienna-pulse-frontend/src/app/api-origin.ts) puts it in front of every `/api`
 request. The API is another origin than the site, so the backend allows the site and its Previews
 to read it with CORS. The map is in [`map-view.ts`](vienna-pulse-frontend/src/app/map-view/map-view.ts).
+The API types and the services that load them are in
+[`timetable/`](vienna-pulse-frontend/src/app/timetable), which lint keeps free of MapLibre.
 
 [`public/_headers`](vienna-pulse-frontend/public/_headers) sends a Content-Security-Policy that
 allows scripts only from the site itself and connections to it, the API and OpenFreeMap, plus the
