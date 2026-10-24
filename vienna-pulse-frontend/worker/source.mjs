@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { directory } from './build.mjs';
 
 // `build` records the commit it built from beside the served files, so the record travels in CI's
 // artifact without being uploaded. `deploy` then refuses a build that production would not get from
 // that commit: one that is stale, from another branch or from uncommitted changes.
-const record = 'dist/vienna-pulse-frontend/source.json';
+const record = join(dirname(directory), 'source.json');
 // Angular empties the output folder when it starts, so the state before the build waits in its cache.
 const started = '.angular/source.json';
 const rebuild = 'Run `mise run //vienna-pulse-frontend:build` and deploy again.';
