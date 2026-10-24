@@ -51,29 +51,10 @@ public class TimetableHealthIndicator extends AbstractHealthIndicator {
     // service without trips draws nothing.
     private boolean runsOn(LocalDate day) {
         return jdbc.sql("""
-                        WITH services AS (
-                            (SELECT service_id
-                             FROM timetable.service_calendars
-                             WHERE CAST(:day AS date) BETWEEN start_date AND end_date
-                               AND CASE extract(isodow FROM CAST(:day AS date))
-                                       WHEN 1 THEN monday
-                                       WHEN 2 THEN tuesday
-                                       WHEN 3 THEN wednesday
-                                       WHEN 4 THEN thursday
-                                       WHEN 5 THEN friday
-                                       WHEN 6 THEN saturday
-                                       WHEN 7 THEN sunday
-                                   END
-                             EXCEPT
-                             SELECT service_id
-                             FROM timetable.calendar_dates
-                             WHERE date = :day AND exception_type = 'REMOVED')
-                            UNION
-                            SELECT service_id
-                            FROM timetable.calendar_dates
-                            WHERE date = :day AND exception_type = 'ADDED'
+                        SELECT EXISTS (
+                            SELECT FROM timetable.trips
+                            WHERE service_id IN (SELECT service_id FROM pulse.running_services(CAST(:day AS date)))
                         )
-                        SELECT EXISTS (SELECT FROM timetable.trips WHERE service_id IN (SELECT service_id FROM services))
                         """).param("day", day).query(Boolean.class).single();
     }
 
