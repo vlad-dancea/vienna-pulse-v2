@@ -174,6 +174,21 @@ class LiveDeparturesTest {
         assertThat(server.requests()).containsExactly(PRATERSTERN);
     }
 
+    // Karlsplatz waits for the next round, which starts an interval after the running one ends, so
+    // its answer waits for that end too.
+    @Test
+    void countsTheSecondsToTheNextRoundFromTheEndOfTheRunningOne() throws InterruptedException {
+        var live = live(100);
+        server.answerAfter(Duration.ofMillis(300));
+        clock.set(MonitorServer.ANSWERED_AT);
+        live.open("at:49:1040", clock.instant());
+        assertThat(server.requests(1)).containsExactly(PRATERSTERN);
+
+        var started = System.nanoTime();
+        assertThat(request(live, "at:49:657")).isEqualTo(Live.pending(15));
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThan(Duration.ofMillis(200));
+    }
+
     // Departures requests for three stations and the loop find the gate open at the same moment, many
     // times over, because a race shows only now and then.
     @Test

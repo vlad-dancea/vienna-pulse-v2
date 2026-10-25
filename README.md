@@ -176,8 +176,9 @@ server:
 - A departures request whose station has no answer from the last minute starts a round itself
   when the gate is open. It sends the round before it reads the timetable and waits for the answer
   after, so the database query hides the wait. A request for a station in a running round waits
-  for that round instead. Either waits at most until the round's timeout, 2 seconds after it
-  started.
+  for that round instead, and so does one whose station must wait for the next round, because the
+  running round decides when that starts. Each waits at most until the round's timeout, 2 seconds
+  after it started.
 - After a 403, a 429 or code 316, the gate stays shut for 5 minutes. Any other failure, or no
   answer within 2 seconds, leaves the board with the timetable's times until the next round, so a
   failing realtime API never fails a departures request.

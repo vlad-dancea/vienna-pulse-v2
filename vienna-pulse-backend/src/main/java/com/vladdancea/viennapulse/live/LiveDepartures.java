@@ -99,8 +99,9 @@ public class LiveDepartures {
     }
 
     /// The live departures of the stop with the merged id `stopId`, like `at:49:1320`. When its station
-    /// has no answer from the last minute and a running round asks about it, it waits for that round,
-    /// but no longer than `pulse.live.timeout` after the round started.
+    /// has no answer from the last minute and a round is running, it waits for that round, but no
+    /// longer than `pulse.live.timeout` after the round started. The round either fetches the station
+    /// or sets when the next one may start.
     public Live await(String stopId, Instant now) {
         var station = station(stopId);
         if (station == null) {
@@ -108,8 +109,8 @@ public class LiveDepartures {
         }
         var answer = answer(station, now);
         if (answer == null) {
-            var round = runningFor(station);
-            if (round != null && !endsInTime(round)) {
+            var round = running();
+            if (round != null && !endsInTime(round) && round.stations().contains(station)) {
                 // Wiener Linien took too long, which the round is about to record.
                 return Live.UNAVAILABLE;
             }
@@ -216,8 +217,7 @@ public class LiveDepartures {
                 if (blocked) {
                     pausedUntil = end.plus(properties.blockedPause());
                 }
-                var next = end.plus(properties.roundInterval());
-                nextRequest = next.isAfter(pausedUntil) ? next : pausedUntil;
+                nextRequest = later(end.plus(properties.roundInterval()), pausedUntil);
                 running = null;
             }
             round.done().countDown();
@@ -241,9 +241,9 @@ public class LiveDepartures {
         return answer == null ? Instant.MIN : answer.at();
     }
 
-    private @Nullable Round runningFor(int station) {
+    private @Nullable Round running() {
         synchronized (gate) {
-            return running != null && running.stations().contains(station) ? running : null;
+            return running;
         }
     }
 
@@ -259,12 +259,16 @@ public class LiveDepartures {
     }
 
     // Whole seconds, rounded up, until the next round may start, and at least one, which the loop may
-    // take to see the gate open. While a round runs, the next starts an interval after it ends, and
-    // Wiener Linien usually answer within a fifth of a second.
+    // take to see the gate open. A round still running after its deadline is about to end.
     private int secondsToNextRound(Instant steadyNow) {
-        var next = running != null ? steadyNow.plus(properties.roundInterval()) : nextRequest;
+        var next =
+                running != null ? later(running.deadline(), steadyNow).plus(properties.roundInterval()) : nextRequest;
         var nanos = Duration.between(steadyNow, next).toNanos();
         return (int) Math.max(1, Math.ceilDiv(nanos, Duration.ofSeconds(1).toNanos()));
+    }
+
+    private static Instant later(Instant first, Instant second) {
+        return first.isAfter(second) ? first : second;
     }
 
     // Counts from an arbitrary instant and only moves on, unlike the system clock.
