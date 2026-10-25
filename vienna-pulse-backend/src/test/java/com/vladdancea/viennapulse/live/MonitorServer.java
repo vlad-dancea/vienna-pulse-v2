@@ -129,6 +129,16 @@ public final class MonitorServer implements AutoCloseable {
         return List.copyOf(requests);
     }
 
+    /// The platforms each `monitor` request asked about, once `count` requests arrived or 5 seconds
+    /// passed, for requests the backend sends on threads of its own.
+    public List<List<Integer>> requests(int count) throws InterruptedException {
+        var giveUp = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (requests.size() < count && System.nanoTime() < giveUp) {
+            Thread.sleep(10);
+        }
+        return requests();
+    }
+
     private static List<Integer> platforms(HttpExchange exchange) {
         var query = exchange.getRequestURI().getQuery();
         return Arrays.stream(query == null ? new String[0] : query.split("&"))

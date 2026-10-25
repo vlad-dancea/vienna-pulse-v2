@@ -119,7 +119,7 @@ which days the timetable covers and where a service day's times start, are SQL f
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
 | `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors, the headsign and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
-| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop. Times are in Vienna. An unknown stop gets a 404. |
+| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop, with `liveIn`, the seconds until the next round, while it is `pending`. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
 its arrival and departure. The timetable gives whole minutes, so two stops can share one, and the
@@ -162,26 +162,45 @@ server:
 - A departures request opens the stop's station for a minute. The station's number is 60200000
   plus the third part of the stop's id, so `at:49:1320` is 60201320. The stops outside Vienna,
   with ids from `at:43:`, have none.
-- The next round starts 15 seconds after the last one ended. It sends one request for the
-  platforms of every open station, at most 100, and the stations that do not fit go first in the
-  next round. With no station open it sends nothing, so the backend asks at most 4 times a minute,
-  however many people use the map. The platforms of each station come from Wiener Linien's
+- A round sends one request for the platforms of every open station, at most 100, and the
+  stations that do not fit go first in the next round. With no station open it sends nothing. The
+  platforms of each station come from Wiener Linien's
   [list of platforms](https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-ogd-haltepunkte.csv),
   which the backend loads at startup and again once a day, or within the hour after a failed load.
-- After a 403, a 429 or code 316, it stops asking for 5 minutes. Any other failure, or no answer
-  within 2 seconds, leaves the board with the timetable's times until the next round. A departures
-  request only reads what the last round fetched, so a failing realtime API never fails it.
+- One gate decides when a round may start: 15 seconds after the last request ended, and never
+  while one runs. Departures requests and a loop that checks the gate every second take it under
+  one lock, so two requests never start within 15 seconds, however many people use the map at
+  once, and the backend asks at most 4 times a minute. The gate counts on a clock that only moves
+  on, so setting the server's clock cannot shorten the wait, and it stays shut for the first 15
+  seconds after a start, in case the process before asked just before it stopped.
+- A departures request whose station has no answer from the last minute starts a round itself
+  when the gate is open. It sends the round before it reads the timetable and waits for the answer
+  after, so the database query hides the wait. A request for a station in a running round waits
+  for that round instead, and so does one whose station must wait for the next round, because the
+  running round decides when that starts. Each waits at most until the round's timeout, 2 seconds
+  after it started.
+- After a 403, a 429 or code 316, the gate stays shut for 5 minutes. Any other failure, or no
+  answer within 2 seconds, leaves the board with the timetable's times until the next round, so a
+  failing realtime API never fails a departures request.
 - The requests go through Apache HttpClient with its retries turned off, and follow no redirect,
   since either would make a second request in the same round. Java's own client sends a GET again
   by itself when the connection drops before an answer. Everything else in the backend uses Java's
   client.
 
-The first answer for a newly opened stop has the planned times only, because the backend answers
-at once instead of waiting for the next round. Its `liveStatus` says whether a later one will have
-more: `pending` until a round has fetched the station, `live` once one has in the last minute, so
-a departure without a live time has no live data, and `unavailable` when there is none, because the
-stop has no station or Wiener Linien failed or blocked the backend. An answer more than a minute
-old, from a station waiting for its turn while many are open, counts as `pending` again.
+With one person on the map, the first answer for a stop already has its live times. A stop
+opened within 15 seconds of the last request waits for the next round, because the rules allow
+nothing sooner, and its first answer has the planned times only. The `liveStatus` says whether a
+later answer will have more:
+
+- `pending`: no round has fetched the station yet. `liveIn` says in how many whole seconds,
+  rounded up, the next round may start, and is null for the other two.
+- `live`: a round fetched it in the last minute, so a departure without a live time has no live
+  data.
+- `unavailable`: there is no live data, because the stop has no station or Wiener Linien failed
+  or blocked the backend.
+
+An answer more than a minute old, from a station waiting for its turn while many are open, counts
+as none.
 
 The live departures carry no trip id, so each is paired with a timetable departure of the same
 line and direction whose planned times are at most two minutes apart, the closest first. Wiener
@@ -285,9 +304,10 @@ and from the timetable otherwise. A green signal marks the live times. When the 
 minute or more away from the planned one, the planned time appears struck through beside it, and
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
-The first answer for a stop the backend has not fetched recently has planned times only, so each
-time shows a loader, and the panel asks again after 15 seconds instead of 30, since the backend
-fetches the stop in its next round, at most 15 seconds later (see [Live departures](#live-departures)).
+When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
+fetched recently has planned times only, so each time shows a loader, and the panel asks again
+after 15 seconds instead of 30, since the backend fetches the stop in its next round, at most 15
+seconds later (see [Live departures](#live-departures)).
 The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
 license asks.
 

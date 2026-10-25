@@ -292,6 +292,10 @@
               "$ref" : "#/components/schemas/Departure"
             }
           },
+          "liveIn" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
           "liveStatus" : {
             "type" : "string",
             "enum" : [ "pending", "live", "unavailable" ]
@@ -300,7 +304,7 @@
             "$ref" : "#/components/schemas/Stop"
           }
         },
-        "required" : [ "departures", "liveStatus", "stop" ]
+        "required" : [ "departures", "liveIn", "liveStatus", "stop" ]
       },
       "FeatureCollectionMultiLineStringLineProperties" : {
         "type" : "object",
