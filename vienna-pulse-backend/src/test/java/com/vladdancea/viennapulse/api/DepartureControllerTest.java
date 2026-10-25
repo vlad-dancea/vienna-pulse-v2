@@ -1,5 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.TimetableFixture;
@@ -126,7 +128,7 @@ class DepartureControllerTest {
                 .cacheControl(CacheControl.noCache())
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "pending",
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live",
                          "departures": [
                            {"plannedTime": "2026-10-20T00:30:00+02:00", "liveTime": null, "headsign": "now",
                             "platform": "at:49:1320:0:2",
@@ -234,9 +236,10 @@ class DepartureControllerTest {
                 .isEqualTo(24);
     }
 
-    // The fake monitor's answer came from Praterstern at 21:47:55 on Saturday 2026-10-24.
+    // The fake monitor's answer came from Praterstern at 21:47:55 on Saturday 2026-10-24. Nobody had
+    // the station open, so the request asks for it at once and waits for the answer.
     @Test
-    void addsTheLiveTimesOnceARoundFetchedTheStation() {
+    void addsTheLiveTimesToTheFirstAnswer() {
         clock.set(MonitorServer.ANSWERED_AT);
         timetable.addWeeklyService("saturdays", LocalDate.parse("2026-10-24"));
         timetable.addStop(PRATERSTERN + ":0:1", "Praterstern");
@@ -264,31 +267,8 @@ class DepartureControllerTest {
                 .expectBody()
                 .json(
                         """
-                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "pending", "departures": [
-                          %s, %s, %s, %s, %s, %s
-                        ]}
-                        """.formatted(
-                                        praterstern("21:49:00", null, "Wien Heiligenstadt", ":0:3", BUS_5B),
-                                        praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", U1),
-                                        praterstern("21:49:00", null, "Wien Oberlaa", ":0:1", U1),
-                                        praterstern("21:56:00", null, "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
-                                        praterstern("21:57:00", null, "Wien Alaudagasse", ":0:1", U1),
-                                        praterstern("22:10:00", null, "Wien Bruno-Marek-Allee", ":0:2", TRAM_O)),
-                        JsonCompareMode.STRICT);
-
-        live.round();
-
-        client.get()
-                .uri("/api/stops/at:49:1040/departures")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json(
-                        """
-                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live", "departures": [
-                          %s, %s, %s, %s, %s, %s
-                        ]}
+                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live",
+                         "departures": [%s, %s, %s, %s, %s, %s]}
                         """.formatted(
                                         praterstern("21:49:00", "21:49:00", "Wien Heiligenstadt", ":0:3", BUS_5B),
                                         praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", U1),
@@ -297,6 +277,7 @@ class DepartureControllerTest {
                                         praterstern("21:56:00", "21:57:40", "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
                                         praterstern("21:57:00", "21:58:25", "Wien Alaudagasse", ":0:1", U1)),
                         JsonCompareMode.STRICT);
+        assertThat(monitor.requests()).hasSize(1);
     }
 
     @Test
@@ -324,7 +305,7 @@ class DepartureControllerTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "pending",
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live",
                          "departures": []}
                         """, JsonCompareMode.STRICT);
     }

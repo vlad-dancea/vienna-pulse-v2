@@ -40,7 +40,9 @@ public class DepartureService {
 
     /// The next two departures of each line and headsign, soonest first, from any platform of the
     /// stop whose merged id, like `at:49:1320`, the map shows, and whether Wiener Linien's live times
-    /// for them have been fetched. Fails with a 404 for an unknown stop.
+    /// for them have been fetched. Fails with a 404 for an unknown stop. When the stop's station has no
+    /// live times yet and the fair-use rules allow a request, it asks Wiener Linien while it reads the
+    /// timetable, and waits for their answer at most until that request times out.
     ///
     /// A departure leaves at its live time where Wiener Linien have one, and at its planned time
     /// otherwise, which sets the order and decides which two of each line and headsign the board
@@ -61,6 +63,9 @@ public class DepartureService {
     /// The stop's name comes from the same statement as its departures, because an import can swap
     /// in the next timetable between two.
     public Departures departures(String stopId, Instant now) {
+        // Wiener Linien usually answer before the database does, so a round this starts costs the
+        // answer nothing.
+        liveDepartures.open(stopId, now);
         var rows = jdbc.sql("""
                         WITH platforms AS (
                             SELECT id, name
@@ -142,7 +147,7 @@ public class DepartureService {
             throw Problems.notFound("There is no stop '%s'".formatted(stopId));
         }
         var planned = rows.stream().map(Row::planned).filter(Objects::nonNull).toList();
-        var live = liveDepartures.open(stopId, now);
+        var live = liveDepartures.await(stopId, now);
         var liveTimes = live.times(planned.stream()
                 .map(departure -> new PlannedDeparture(
                         departure.line().properties().name(),
