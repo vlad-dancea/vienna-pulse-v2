@@ -116,11 +116,14 @@ public class DepartureService {
                                 JOIN timetable.trips t ON t.id = c.trip_id
                                 WHERE c.day = d.day
                                   AND t.service_id IN (SELECT service_id FROM running r WHERE r.day = d.day)
-                                  -- The last call of a trip only arrives, though the feed lets passengers board.
-                                  AND EXISTS (SELECT
-                                              FROM timetable.stop_times later
-                                              WHERE later.trip_id = c.trip_id AND later.sequence > c.sequence)
+                                -- Most trips at a stop do not run on a given day. The fence drops them before the
+                                -- check below, which reads the large primary key of the stop times once per call.
+                                OFFSET 0
                             ) AS next
+                            -- The last call of a trip only arrives, though the feed lets passengers board.
+                            WHERE EXISTS (SELECT
+                                          FROM timetable.stop_times later
+                                          WHERE later.trip_id = next.trip_id AND later.sequence > next.sequence)
                         )
                         SELECT stop.name AS stop_name,
                                next.time,
