@@ -28,6 +28,16 @@ record Itinerary(List<Knot> knots, List<ShapePoint> shape) {
             first = last + 1;
         }
         knots = shared;
+        // A few shapes give two points up to 108 m apart the same distance, which no distance places
+        // the vehicle between, so it would jump. Keeping only the last of them makes it go straight.
+        var points = new ArrayList<ShapePoint>();
+        for (var point : shape) {
+            if (!points.isEmpty() && points.getLast().distance() == point.distance()) {
+                points.removeLast();
+            }
+            points.add(point);
+        }
+        shape = points;
     }
 
     /// How far along its shape the trip is at `second`, counted on its service day like the stop times.
