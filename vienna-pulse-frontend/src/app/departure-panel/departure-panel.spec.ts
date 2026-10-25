@@ -95,9 +95,8 @@ describe('DeparturePanel', () => {
       '4A Karlsplatz 7 min 18:07',
       '13A Skodagasse 2 min 18:02',
     ]);
-    // White on the U3's orange is too faint to read, so its name is black.
     const badge = element.querySelector<HTMLElement>('li span');
-    expect([badge?.style.backgroundColor, badge?.style.color]).toEqual(['rgb(239, 124, 0)', 'rgb(0, 0, 0)']);
+    expect([badge?.style.backgroundColor, badge?.style.color]).toEqual(['rgb(239, 124, 0)', 'rgb(255, 255, 255)']);
     expect(element.querySelector('time')?.getAttribute('datetime')).toBe('2026-10-24T18:00:00+02:00');
   });
 

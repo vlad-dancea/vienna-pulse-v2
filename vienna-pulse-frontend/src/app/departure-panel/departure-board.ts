@@ -62,30 +62,10 @@ function modeRank(type: string): number {
 }
 
 /**
- * The line's colors for its badge. Some feed colors, such as white on the U3's orange, fall short of
- * the 4.5:1 contrast WCAG AA asks of text, so their badges get black or white text instead.
+ * The line's colors for its badge: the feed's, or white text on the mode's color for a line without
+ * them. White on the U2's, U3's and U4's colors falls short of the 4.5:1 contrast WCAG AA asks of
+ * text, but it is the feed's own choice, and the line names are short and bold.
  */
 function badgeColors(line: DepartureLine): { background: string; text: string } {
-  const background = line.color ?? modeColor(line.type);
-  if (line.textColor && contrast(line.textColor, background) >= 4.5) {
-    return { background, text: line.textColor };
-  }
-  return {
-    background,
-    text: contrast('#000000', background) > contrast('#ffffff', background) ? '#000000' : '#ffffff',
-  };
-}
-
-/** The contrast ratio of two `#rrggbb` colors, as WCAG defines it. */
-function contrast(first: string, second: string): number {
-  const [a, b] = [luminance(first), luminance(second)];
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
-
-function luminance(color: string): number {
-  const channel = (start: number) => {
-    const value = parseInt(color.slice(start, start + 2), 16) / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  return { background: line.color ?? modeColor(line.type), text: line.textColor ?? '#ffffff' };
 }
