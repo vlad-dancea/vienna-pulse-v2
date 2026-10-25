@@ -7,7 +7,7 @@
 /// [LiveDepartures] sends at most one request per round for every station the board has open, and
 /// none while no station is open. [Platforms] knows which platforms to ask about, [MonitorClient]
 /// asks, and [Matching] pairs the answers with the timetable's departures, since they carry no trip
-/// id.
+/// id. [DepartureRecorder] keeps every answer for statistics of how punctual the lines are.
 @NullMarked
 package com.vladdancea.viennapulse.live;
 

@@ -28,6 +28,25 @@ final class Matching {
     /// The live departure paired with each departure of `timetable`, in the same order, or `null`
     /// for the departures without one.
     static List<@Nullable LiveDeparture> pair(List<PlannedDeparture> timetable, List<LiveDeparture> live) {
+        var paired = new ArrayList<@Nullable LiveDeparture>();
+        timetable.forEach(any -> paired.add(null));
+        indexes(timetable, live)
+                .forEach((timetableIndex, liveIndex) -> paired.set(timetableIndex, live.get(liveIndex)));
+        return paired;
+    }
+
+    /// The timetable departure paired with each departure of `live`, in the same order, or `null` for
+    /// the live departures without one.
+    static List<@Nullable PlannedDeparture> planned(List<PlannedDeparture> timetable, List<LiveDeparture> live) {
+        var paired = new ArrayList<@Nullable PlannedDeparture>();
+        live.forEach(any -> paired.add(null));
+        indexes(timetable, live)
+                .forEach((timetableIndex, liveIndex) -> paired.set(liveIndex, timetable.get(timetableIndex)));
+        return paired;
+    }
+
+    // The live departure index paired with each timetable departure index.
+    private static Map<Integer, Integer> indexes(List<PlannedDeparture> timetable, List<LiveDeparture> live) {
         var timetableByLine = new HashMap<String, List<Integer>>();
         for (var i = 0; i < timetable.size(); i++) {
             timetableByLine
@@ -41,20 +60,18 @@ final class Matching {
                     .computeIfAbsent(TIMETABLE_NAMES.getOrDefault(line, line), any -> new ArrayList<>())
                     .add(i);
         }
-        var paired = new ArrayList<@Nullable LiveDeparture>();
-        timetable.forEach(any -> paired.add(null));
+        var indexes = new HashMap<Integer, Integer>();
         liveByLine.forEach((line, liveIndexes) -> {
             var timetableIndexes = timetableByLine.getOrDefault(line, List.of());
             var same = pairs(timetable, timetableIndexes, live, liveIndexes, false);
             var reversed = pairs(timetable, timetableIndexes, live, liveIndexes, true);
-            (reversed.size() > same.size() ? reversed : same)
-                    .forEach((timetableIndex, liveIndex) -> paired.set(timetableIndex, live.get(liveIndex)));
+            indexes.putAll(reversed.size() > same.size() ? reversed : same);
         });
-        return paired;
+        return indexes;
     }
 
-    // The live departure index paired with each timetable departure index, closest planned times first,
-    // each departure at most once.
+    // The live departure index paired with each timetable departure index of one line, closest planned
+    // times first, each departure at most once.
     private static Map<Integer, Integer> pairs(
             List<PlannedDeparture> timetable,
             List<Integer> timetableIndexes,

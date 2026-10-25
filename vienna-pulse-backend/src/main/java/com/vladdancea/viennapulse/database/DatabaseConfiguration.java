@@ -12,17 +12,18 @@ import org.springframework.jdbc.datasource.DelegatingDataSource;
 /// Sets up the database client for short statements next to the one Spring Boot configures.
 @Configuration(proxyBeanMethods = false)
 class DatabaseConfiguration {
-    // The API's queries take about a second in production. One that takes five holds a connection
-    // of the small pool that other requests wait for, so it is cancelled instead of waited for.
+    // The API's queries take about a second in production, and recording a round's live departures
+    // far less. One that takes five holds a connection of the small pool that other requests wait
+    // for, so it is cancelled instead of waited for.
     private static final int QUERY_TIMEOUT_SECONDS = 5;
     // PgJDBC cancels a query over the limit by asking the database, which a database that stopped
     // answering ignores. Twice the query limit leaves the cancellation time to arrive.
     private static final int NETWORK_TIMEOUT_MILLISECONDS = 10_000;
 
-    /// The database client of the API services, which cancels any query that runs for more than 5
-    /// seconds and gives up on a database that sends nothing for 10. It is not a default candidate,
-    /// so Spring Boot still configures the importer's client, whose statements take minutes, and
-    /// injects this one only where [TimeLimited] asks.
+    /// The database client of the API services and of the recorder of live departures, which cancels
+    /// any statement that runs for more than 5 seconds and gives up on a database that sends nothing
+    /// for 10. It is not a default candidate, so Spring Boot still configures the importer's client,
+    /// whose statements take minutes, and injects this one only where [TimeLimited] asks.
     @Bean(defaultCandidate = false)
     @TimeLimited
     JdbcClient timeLimitedJdbcClient(DataSource dataSource) {

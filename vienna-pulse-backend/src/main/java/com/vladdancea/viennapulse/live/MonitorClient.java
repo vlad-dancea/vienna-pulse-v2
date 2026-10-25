@@ -143,7 +143,8 @@ public class MonitorClient {
                             line.name(),
                             line.direction(),
                             instant(planned),
-                            real == null ? null : instant(real)));
+                            real == null ? null : instant(real),
+                            departure.departureTime().countdown()));
                 }
             }
         }
@@ -188,5 +189,5 @@ public class MonitorClient {
     record Departure(DepartureTime departureTime) {}
 
     record DepartureTime(
-            @Nullable String timePlanned, @Nullable String timeReal) {}
+            @Nullable String timePlanned, @Nullable String timeReal, int countdown) {}
 }

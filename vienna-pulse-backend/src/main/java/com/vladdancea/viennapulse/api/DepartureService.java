@@ -133,6 +133,7 @@ public class DepartureService {
                         )
                         SELECT stop.name AS stop_name,
                                next.time,
+                               next.trip_id,
                                next.route_id,
                                next.headsign,
                                next.direction_id,
@@ -160,13 +161,16 @@ public class DepartureService {
             throw Problems.notFound("There is no stop '%s'".formatted(stopId));
         }
         var planned = rows.stream().map(Row::planned).filter(Objects::nonNull).toList();
-        var live = liveDepartures.await(stopId, now);
-        var liveTimes = live.times(planned.stream()
+        var timetable = planned.stream()
                 .map(departure -> new PlannedDeparture(
+                        departure.trip(),
+                        departure.line().id(),
                         departure.line().properties().name(),
                         departure.direction(),
                         departure.time().toInstant()))
-                .toList());
+                .toList();
+        var live = liveDepartures.await(stopId, now, timetable);
+        var liveTimes = live.times(timetable);
         var leaving = new ArrayList<Departure>();
         for (var i = 0; i < planned.size(); i++) {
             var liveTime = liveTimes.get(i);
@@ -202,15 +206,18 @@ public class DepartureService {
         }
         return new Planned(
                 time.atZoneSameInstant(Timetable.ZONE).toOffsetDateTime(),
+                row.getString("trip_id"),
                 new Line(row.getString("route_id"), LineProperties.from(row)),
                 row.getString("headsign"),
                 row.getString("stop_id"),
                 row.getObject("direction_id", Integer.class));
     }
 
-    // A departure in the timetable, with the direction id of its trip, which only the live times need.
+    // A departure in the timetable, with the id and direction id of its trip, which only the live times
+    // need.
     private record Planned(
             OffsetDateTime time,
+            String trip,
             Line line,
             @Nullable String headsign,
             String platform,

@@ -1,6 +1,7 @@
 package com.vladdancea.viennapulse.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
@@ -24,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -62,6 +64,9 @@ class DepartureControllerTest {
 
     @Autowired
     MonitorServer monitor;
+
+    @Autowired
+    JdbcClient jdbc;
 
     @BeforeEach
     void removeTheTimetable() {
@@ -259,6 +264,7 @@ class DepartureControllerTest {
     // the station open, so the request asks for it at once and waits for the answer.
     @Test
     void addsTheLiveTimesToTheFirstAnswer() {
+        jdbc.sql("DELETE FROM public.live_departures WHERE station = 60201040").update();
         clock.set(MonitorServer.ANSWERED_AT);
         timetable.addWeeklyService("saturdays", LocalDate.parse("2026-10-24"));
         timetable.addStop(PRATERSTERN + ":0:1", "Praterstern");
@@ -297,6 +303,12 @@ class DepartureControllerTest {
                                         praterstern("21:57:00", "21:58:25", "Wien Alaudagasse", ":0:1", U1)),
                         JsonCompareMode.STRICT);
         assertThat(monitor.requests()).hasSize(1);
+        // The round records the answer after the request has it.
+        await().untilAsserted(() -> assertThat(
+                        jdbc.sql("SELECT count(*) FROM public.live_departures WHERE station = 60201040")
+                                .query(Integer.class)
+                                .single())
+                .isEqualTo(6));
     }
 
     @Test
