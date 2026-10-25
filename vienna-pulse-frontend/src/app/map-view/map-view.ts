@@ -183,6 +183,15 @@ export class MapView {
           [16.1, 47.95],
           [16.65, 48.4],
         ],
+        // Wiener Linien publish the departure panel's live times under CC BY 4.0, which asks for
+        // credit. These options replace MapLibre's defaults, so they repeat its compact control and link.
+        attributionControl: {
+          compact: true,
+          customAttribution: [
+            '<a href="https://maplibre.org/" target="_blank">MapLibre</a>',
+            'Echtzeitdaten: <a href="https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de">Wiener Linien</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)',
+          ],
+        },
       });
 
       // Without its style MapLibre never fires load, so the page would stay empty without a word.

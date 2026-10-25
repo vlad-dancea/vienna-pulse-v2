@@ -8,7 +8,21 @@ export interface BoardRow {
   background: string;
   text: string;
   headsign: string;
-  departures: { time: string; clock: string; wait: string }[];
+  departures: BoardDeparture[];
+}
+
+/** One departure in a row of the board. */
+export interface BoardDeparture {
+  /** When it leaves, at its live time where Wiener Linien have one and its planned time otherwise. */
+  time: string;
+  clock: string;
+  wait: string;
+  /** Whether Wiener Linien have a live time for it. */
+  live: boolean;
+  /** The planned clock time, shown struck through when the live time is a minute or more away from it. */
+  planned: string | null;
+  /** Whether it leaves so much later than planned that the board marks it. */
+  late: boolean;
 }
 
 // The order of the map's mode filter. Other modes follow the buses.
@@ -16,15 +30,19 @@ const modes = ['subway', 'tram', 'bus'];
 
 const clock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit' });
 
+// How late a departure has to be for the board to mark it.
+const lateAfter = 3 * 60_000;
+
 /**
  * Groups the departures that have not left at `now` by line and headsign, with each group's next two,
- * like the displays at the stops. Rows are sorted by mode and line, so a line keeps its place as
+ * like the displays at the stops. A departure leaves at its live time where there is one, which can be
+ * an hour after its planned time. Rows are sorted by mode and line, so a line keeps its place as
  * departures leave and the board refreshes.
  */
 export function boardRows(departures: readonly Departure[], now: number): BoardRow[] {
   const rows = new Map<string, { line: DepartureLine; headsign: string | null; departures: Departure[] }>();
   for (const departure of departures) {
-    if (Date.parse(departure.plannedTime) < now) {
+    if (Date.parse(departure.liveTime ?? departure.plannedTime) < now) {
       continue;
     }
     const key = JSON.stringify([departure.line.id, departure.headsign]);
@@ -45,15 +63,23 @@ export function boardRows(departures: readonly Departure[], now: number): BoardR
       ...badgeColors(row.line),
       // The displays at the stops leave out the "Wien " that most headsigns start with.
       headsign: row.headsign?.replace(/^Wien /, '') ?? '',
-      departures: row.departures.slice(0, 2).map((departure) => {
-        const minutes = Math.floor((Date.parse(departure.plannedTime) - now) / 60_000);
-        return {
-          time: departure.plannedTime,
-          clock: clock.format(Date.parse(departure.plannedTime)),
-          wait: minutes < 1 ? 'now' : `${minutes.toString()} min`,
-        };
-      }),
+      departures: row.departures.slice(0, 2).map((departure) => boardDeparture(departure, now)),
     }));
+}
+
+function boardDeparture(departure: Departure, now: number): BoardDeparture {
+  const time = departure.liveTime ?? departure.plannedTime;
+  const leaves = Date.parse(time);
+  const planned = Date.parse(departure.plannedTime);
+  const minutes = Math.floor((leaves - now) / 60_000);
+  return {
+    time,
+    clock: clock.format(leaves),
+    wait: minutes < 1 ? 'now' : `${minutes.toString()} min`,
+    live: departure.liveTime !== null,
+    planned: Math.abs(leaves - planned) >= 60_000 ? clock.format(planned) : null,
+    late: leaves - planned >= lateAfter,
+  };
 }
 
 function modeRank(type: string): number {

@@ -582,6 +582,7 @@ describe('MapView', () => {
     const line = { longName: null, color: null, textColor: null };
     http.expectOne('/api/stops/tram/departures').flush({
       stop: { id: 'tram', name: 'Tram' },
+      liveStatus: 'unavailable',
       departures: [
         {
           plannedTime: soon,
@@ -634,7 +635,11 @@ describe('MapView', () => {
     loadMap();
     http.expectOne((request) => request.url === '/api/lines').flush(routes);
     http.expectOne('/api/vehicles').flush(noVehicles);
-    http.expectOne('/api/stops/bus/departures').flush({ stop: { id: 'bus', name: 'Bus' }, departures: [] });
+    http.expectOne('/api/stops/bus/departures').flush({
+      stop: { id: 'bus', name: 'Bus' },
+      liveStatus: 'unavailable',
+      departures: [],
+    });
     TestBed.tick();
     expect(map.easeTo).not.toHaveBeenCalled();
 

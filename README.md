@@ -10,7 +10,7 @@ stop's next departures.
 | Folder | What it is |
 | --- | --- |
 | [`vienna-pulse-backend`](vienna-pulse-backend) | Spring Boot (Java 25): imports the GTFS feed into PostgreSQL every morning and serves stops, scheduled lines and scheduled vehicle positions as GeoJSON, and a stop's next departures with Wiener Linien's live times as JSON |
-| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops, scheduled routes and the running vehicles |
+| [`vienna-pulse-frontend`](vienna-pulse-frontend) | Angular 22 (TypeScript): a full-screen map of Vienna with stops, scheduled routes, the running vehicles and a stop's next departures with their live times |
 | [`deploy`](deploy) | The production stack and how it is deployed |
 
 ## Architecture
@@ -197,7 +197,8 @@ A departure planned up to an hour ago stays on the board while its live time is 
 the two departures shown for each line and headsign are the soonest by live time where there is
 one. The live time is what the displays at the stops show, but a delay computed from it can
 mislead: during a U3 disruption, Wiener Linien paired a train planned for 20:15 with 21:02 and one
-planned for 20:33 with 20:23. The map's departure panel does not show the live times yet.
+planned for 20:33 with 20:23. The [map view](#map-view) shows the live times in its departure
+panel.
 
 `mise run dev` asks Wiener Linien too, within the same limits. The tests never do: they answer
 from [`MonitorServer`](vienna-pulse-backend/src/test/java/com/vladdancea/viennapulse/live/MonitorServer.java),
@@ -274,6 +275,21 @@ base map style could not be loaded. While the backend is upgrading or
 importing for the first time, the frontend keeps available stops visible and rechecks once a
 minute until classifications arrive. The map keeps MapLibre's own mouse, touch and keyboard
 controls.
+
+Clicking a stop opens its departures beside the map, or in a sheet over the lower half of the map
+on phones, and puts the stop in the URL as `?stop=at:49:1320`, so a link opens it. The panel lists
+the next two departures of each line and headsign in the next hour, like the displays at the
+stops, sorted by mode and line, and only for the mode the filter shows. Each departure shows the
+minutes until it leaves and its clock time, both from Wiener Linien's live time where there is one
+and from the timetable otherwise. A green signal marks the live times. When the live time is a
+minute or more away from the planned one, the planned time appears struck through beside it, and
+screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
+The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
+The first answer for a stop the backend has not fetched recently has planned times only, so each
+time shows a loader, and the panel asks again after 15 seconds instead of 30, since the backend
+fetches the stop in its next round, at most 15 seconds later (see [Live departures](#live-departures)).
+The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
+license asks.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
