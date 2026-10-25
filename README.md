@@ -124,7 +124,8 @@ which days the timetable covers and where a service day's times start, are SQL f
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
 its arrival and departure. Trips without a shape, or without distances along it, are left out. The trip spans
 the importer records find the running trips without reading every stop time. A path has a waypoint
-wherever the vehicle reaches or leaves a stop or passes a point of its shape. Thirty seconds is two requests of a map, so its vehicles keep moving
+wherever the vehicle reaches or leaves a stop or passes a point of its shape, except where the path
+passes within a metre anyway. Thirty seconds is two requests of a map, so its vehicles keep moving
 when one answer fails or comes late.
 
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time

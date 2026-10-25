@@ -142,12 +142,17 @@ class VehicleControllerTest {
     @Test
     void followsTheShapeAndWaitsAtStopsForThirtySeconds() {
         timetable.addWeeklyService("tuesdays", DAY);
+        // The L, with a point halfway between the corner and a stop, which the path passes anyway.
+        timetable.addShapePoint("corner", 1, 16.0, 48.0, 0.0);
+        timetable.addShapePoint("corner", 2, 16.1, 48.0, 1000.0);
+        timetable.addShapePoint("corner", 3, 16.1, 48.005, 1050.0);
+        timetable.addShapePoint("corner", 4, 16.1, 48.1, 2000.0);
         // 10 m a second, 50 m before the corner, until it waits at a stop 100 m past it.
         timetable.addTrip(
                 "corner",
                 "u1",
                 "tuesdays",
-                SHAPE,
+                "corner",
                 call(1, null, "00:03:25", 0),
                 call(2, "00:05:15", "00:05:25", 1100),
                 call(3, "00:06:55", null, 2000));
