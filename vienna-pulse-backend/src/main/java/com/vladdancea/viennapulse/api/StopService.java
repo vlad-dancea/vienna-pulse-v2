@@ -3,6 +3,7 @@ package com.vladdancea.viennapulse.api;
 import com.vladdancea.viennapulse.api.geojson.Feature;
 import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import com.vladdancea.viennapulse.api.geojson.Point;
+import com.vladdancea.viennapulse.database.TimeLimited;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class StopService {
-    @ApiDatabase
+    @TimeLimited
     private final JdbcClient jdbc;
 
     /// Every stop, ordered by id, with its platforms merged into one point in their middle. A fixed

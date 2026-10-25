@@ -4,6 +4,7 @@ import com.vladdancea.viennapulse.api.Itinerary.Knot;
 import com.vladdancea.viennapulse.api.Itinerary.ShapePoint;
 import com.vladdancea.viennapulse.api.geojson.Feature;
 import com.vladdancea.viennapulse.api.geojson.Point;
+import com.vladdancea.viennapulse.database.TimeLimited;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -23,7 +24,7 @@ public class VehicleService {
     /// vehicles keep moving when one answer fails or comes late.
     static final Duration PATH = Duration.ofSeconds(30);
 
-    @ApiDatabase
+    @TimeLimited
     private final JdbcClient jdbc;
 
     /// A point for every trip that has left its first stop and not yet reached its last at `now`,

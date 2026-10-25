@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
 @AutoConfigureRestTestClient
 @Import(TestcontainersConfiguration.class)
 class DatabaseFailureTest {
-    // The limits in ApiConfiguration and application.properties, plus time for the request itself.
+    // The limits in DatabaseConfiguration and application.properties, plus time for the request itself.
     private static final Duration QUERY_LIMIT = Duration.ofSeconds(5);
     private static final Duration CONNECTION_WAIT = Duration.ofSeconds(2);
     private static final Duration NETWORK_LIMIT = Duration.ofSeconds(10);

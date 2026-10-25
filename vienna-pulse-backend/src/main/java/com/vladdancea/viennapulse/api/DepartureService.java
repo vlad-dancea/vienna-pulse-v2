@@ -2,6 +2,7 @@ package com.vladdancea.viennapulse.api;
 
 import com.vladdancea.viennapulse.api.Departures.Departure;
 import com.vladdancea.viennapulse.api.Departures.Line;
+import com.vladdancea.viennapulse.database.TimeLimited;
 import com.vladdancea.viennapulse.live.LiveDepartures;
 import com.vladdancea.viennapulse.live.PlannedDeparture;
 import java.sql.ResultSet;
@@ -33,7 +34,7 @@ public class DepartureService {
     /// How many departures of each line and headsign the board shows.
     private static final int PER_LINE = 2;
 
-    @ApiDatabase
+    @TimeLimited
     private final JdbcClient jdbc;
 
     private final LiveDepartures liveDepartures;

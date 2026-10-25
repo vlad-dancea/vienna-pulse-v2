@@ -1,5 +1,6 @@
 package com.vladdancea.viennapulse.api;
 
+import com.vladdancea.viennapulse.database.TimeLimited;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 class TimetableVersion {
-    @ApiDatabase
+    @TimeLimited
     private final JdbcClient jdbc;
 
     /// The internal id of the `timetable` schema. Every import loads a new schema and renames it to
