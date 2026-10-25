@@ -305,9 +305,12 @@ minute or more away from the planned one, the planned time appears struck throug
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
 When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
-fetched recently has planned times only, so each time shows a loader, and the panel asks again
-after 15 seconds instead of 30, since the backend fetches the stop in its next round, at most 15
-seconds later (see [Live departures](#live-departures)).
+fetched recently has planned times only, so each time shows a loader. The panel asks again when
+that answer's `liveIn` says the next round may start, because a request that arrives then starts
+the round or joins it and waits for its answer (see [Live departures](#live-departures)). While a
+round outlasts its 2 second timeout, `liveIn` can fall a little short, and the panel gets one more
+`pending` answer first. Without `liveIn`, and after a refresh that failed, it asks every 15 seconds
+instead of 30.
 The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
 license asks.
 

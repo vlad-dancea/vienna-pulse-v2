@@ -46,7 +46,7 @@ export class DeparturePanel {
   readonly closed = output();
 
   // The loaders and the faster refresh follow the same answer, which stays while a reload fails.
-  protected readonly departures = stopDepartures(this.stop, () => this.pending());
+  protected readonly departures = stopDepartures(this.stop, () => this.loaded());
   private readonly latest = latestValue(this.departures);
   /** The last departures that loaded for this stop, kept while they reload and after a reload fails. */
   private readonly loaded = computed(() => {
