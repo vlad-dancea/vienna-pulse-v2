@@ -118,12 +118,16 @@ which days the timetable covers and where a service day's times start, are SQL f
 | --- | --- |
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
-| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors and the headsign as properties. |
+| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors, the headsign and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
 | `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
-its arrival and departure. Trips without a shape, or without distances along it, are left out. The trip spans
-the importer records find the running trips without reading every stop time.
+its arrival and departure. The timetable gives whole minutes, so two stops can share one, and the
+vehicle is then halfway between them at that minute instead of jumping. Trips without a shape, or without distances along it, are left out. The trip spans
+the importer records find the running trips without reading every stop time. A path has a waypoint
+wherever the vehicle reaches or leaves a stop or passes a point of its shape, except where the path
+passes within a metre anyway. Thirty seconds is two requests of a map, so its vehicles keep moving
+when one answer fails or comes late.
 
 Successful responses carry an ETag and `Cache-Control: no-cache`, so a browser asks again each time
 and gets an empty 304 while nothing changed. Errors use the problem details format of RFC 9457, and

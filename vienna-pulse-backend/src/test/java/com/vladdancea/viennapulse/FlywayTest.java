@@ -30,6 +30,9 @@ class FlywayTest {
     @Autowired
     TimetableFixture timetable;
 
+    @Autowired
+    TestClock clock;
+
     // Production restarts against a database it migrated before, where the `pulse` schema exists and
     // comes first in the `pulse` user's search path. A second migration finds the history the first
     // one wrote, as the next start of the application does.
@@ -42,6 +45,7 @@ class FlywayTest {
 
         // Vehicles read the timetable through the functions in the `pulse` schema.
         timetable.clear();
+        clock.set("2026-10-20T06:03:00Z");
         client.get()
                 .uri("/api/vehicles")
                 .exchange()
@@ -49,7 +53,7 @@ class FlywayTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"type": "FeatureCollection", "features": []}
+                        {"type": "FeatureCollection", "time": "2026-10-20T06:03:00Z", "features": []}
                         """, JsonCompareMode.STRICT);
     }
 }

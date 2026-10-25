@@ -17,8 +17,9 @@ public class VehicleController {
     private final CachedResponses responses;
 
     /// Where the timetable puts every running vehicle at the start of the current five-second step,
-    /// as GeoJSON points that are also served as plain JSON for MapLibre. Every request in a step
-    /// gets the same positions, and the ETag answers with an empty 304 until the next step.
+    /// as GeoJSON points that are also served as plain JSON for MapLibre, with the path each one
+    /// follows from there. Every request in a step gets the same answer, and the ETag answers with an
+    /// empty 304 until the next step.
     @GetMapping(
             path = "/api/vehicles",
             produces = {FeatureCollection.MEDIA_TYPE, MediaType.APPLICATION_JSON_VALUE})
