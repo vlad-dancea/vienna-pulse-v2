@@ -6,6 +6,7 @@ import { RunningVehicles } from './running-vehicles';
 
 const tram = {
   type: 'FeatureCollection',
+  time: '2026-10-20T06:00:00Z',
   features: [
     {
       type: 'Feature',
@@ -19,6 +20,10 @@ const tram = {
         color: null,
         textColor: null,
         headsign: 'Oper',
+        path: [
+          [16.37, 48.2, 0],
+          [16.38, 48.2, 30],
+        ],
       },
     },
   ],
@@ -58,9 +63,10 @@ describe('RunningVehicles refreshes', () => {
 
     vi.advanceTimersByTime(15_000);
     TestBed.tick();
-    http.expectOne('/api/vehicles').flush({ type: 'FeatureCollection', features: [] });
+    const none = { type: 'FeatureCollection', time: '2026-10-20T06:00:30Z', features: [] };
+    http.expectOne('/api/vehicles').flush(none);
     await TestBed.inject(ApplicationRef).whenStable();
-    expect(running.latest()).toEqual({ type: 'FeatureCollection', features: [] });
+    expect(running.latest()).toEqual(none);
 
     TestBed.resetTestingModule();
     expect(vi.getTimerCount()).toBe(0);

@@ -1,18 +1,28 @@
-import type { Feature, FeatureCollection, Point, Position } from 'geojson';
+import type { Feature, Point, Position } from 'geojson';
 import type { GeoJSONSource } from 'maplibre-gl';
-import type { VehicleProperties } from '../timetable/running-vehicles';
+import type { VehicleProperties, Vehicles } from '../timetable/running-vehicles';
 
-interface Glide {
-  vehicle: Feature<Point, VehicleProperties>;
-  from: Position;
+/** What the map draws for a vehicle: everything the API sends but its path. */
+export type DrawnProperties = Omit<VehicleProperties, 'path'>;
+
+/** Where a vehicle is at a time of the page's clock, `performance.now()`. */
+type Waypoint = [time: number, longitude: number, latitude: number];
+
+interface Moving {
+  vehicle: Feature<Point, DrawnProperties>;
+  waypoints: Waypoint[];
 }
 
-/** Draws vehicles into a map source, moving each one at an even pace to its latest position. */
+/** Draws vehicles into a map source, moving each one along the path the latest answer gives it. */
 export class VehicleAnimation {
-  private glides: Glide[] = [];
-  private start = 0;
-  private duration = 0;
-  // Counts the updates, so a draw that started before one knows to draw again.
+  private moving: Moving[] = [];
+  // Turns a time of the API into one of the page's clock. It is set from the first answer, so the
+  // vehicles start where their paths start, and kept, so the next answers continue where they are.
+  private shift: number | undefined;
+  // When the paths of the latest answer end on the page's clock, after which nothing moves.
+  private end = 0;
+  private animate = true;
+  // Counts the answers, so a draw that started before one knows to draw again.
   private revision = 0;
   private drawing = false;
   private stopped = false;
@@ -23,21 +33,30 @@ export class VehicleAnimation {
   ) {}
 
   /**
-   * Moves the vehicles from where they are drawn now to `vehicles` over `duration` milliseconds.
-   * Vehicles not drawn yet appear where they are, and vehicles left out disappear.
+   * Moves each of `vehicles` along its path from where it is now, or puts it there at once and keeps
+   * it there unless it should `animate`. Vehicles left out disappear.
    */
-  show(vehicles: FeatureCollection<Point, VehicleProperties>, duration: number) {
+  show(vehicles: Vehicles, animate: boolean) {
     const now = this.window.performance.now();
-    // After a long pause, such as a hidden tab, the drawn positions are minutes old, and racing
-    // across that distance would look like a fault.
-    const stale = now > this.start + 2 * this.duration;
-    const drawn = new Map(stale ? [] : this.glides.map((glide) => [glide.vehicle.id, this.position(glide, now)]));
-    this.glides = vehicles.features.map((vehicle) => ({
-      vehicle,
-      from: drawn.get(vehicle.id) ?? vehicle.geometry.coordinates,
+    const time = Date.parse(vehicles.time);
+    // Paths that ended before now, such as those of a tab hidden for a while, or an answer far from
+    // the page's clock, such as after the computer slept, would leave the vehicles racing across the
+    // gap. Starting the clock again makes them jump to where they are instead.
+    const shift = this.shift;
+    const keep = shift !== undefined && now <= this.end && Math.abs(time + shift - now) <= 10_000;
+    this.shift = keep ? shift : now - time;
+    const start = time + this.shift;
+    const earlier = new Map(keep ? this.moving.map(({ vehicle, waypoints }) => [vehicle.id, waypoints]) : []);
+    this.moving = vehicles.features.map(({ properties: { path, ...properties }, ...vehicle }) => ({
+      vehicle: { ...vehicle, properties },
+      // An answer can start a few seconds after now, and the earlier path covers those.
+      waypoints: [
+        ...ahead(earlier.get(vehicle.id) ?? [], now).filter(([waypoint]) => waypoint < start),
+        ...path.map(([longitude, latitude, seconds]): Waypoint => [start + seconds * 1000, longitude, latitude]),
+      ],
     }));
-    this.start = now;
-    this.duration = duration;
+    this.end = Math.max(start, ...this.moving.map(({ waypoints }) => waypoints.at(-1)?.[0] ?? start));
+    this.animate = animate;
     this.revision++;
     void this.draw();
   }
@@ -61,13 +80,13 @@ export class VehicleAnimation {
         const revision = this.revision;
         await this.source.setData({
           type: 'FeatureCollection',
-          features: this.glides.map((glide) => ({
-            ...glide.vehicle,
-            geometry: { type: 'Point', coordinates: this.position(glide, now) },
+          features: this.moving.map(({ vehicle, waypoints }) => ({
+            ...vehicle,
+            geometry: { type: 'Point', coordinates: position(waypoints, now) ?? vehicle.geometry.coordinates },
           })),
         });
-        const arrived = now >= this.start + this.duration;
-        if (arrived && revision === this.revision) {
+        const still = !this.animate || now >= this.end;
+        if (still && revision === this.revision) {
           return;
         }
         await new Promise((resolve) => this.window.requestAnimationFrame(resolve));
@@ -76,10 +95,28 @@ export class VehicleAnimation {
       this.drawing = false;
     }
   }
+}
 
-  private position({ vehicle, from }: Glide, now: number): Position {
-    const to = vehicle.geometry.coordinates;
-    const share = this.duration > 0 ? Math.min(1, (now - this.start) / this.duration) : 1;
-    return from.map((start, axis) => start + ((to[axis] ?? start) - start) * share);
+// The waypoints from the last one at or before `now` on, which are all that `position` reads from now on.
+function ahead(waypoints: Waypoint[], now: number): Waypoint[] {
+  let first = 0;
+  while ((waypoints[first + 1]?.[0] ?? Infinity) <= now) {
+    first++;
   }
+  return waypoints.slice(first);
+}
+
+// Where a vehicle is at `now`, on the straight line between the waypoints around it. Of two
+// waypoints at the same time, the later one counts.
+function position(waypoints: Waypoint[], now: number): Position | undefined {
+  const [last, next] = ahead(waypoints, now);
+  if (!last) {
+    return undefined;
+  }
+  const [time, longitude, latitude] = last;
+  if (!next || now <= time) {
+    return [longitude, latitude];
+  }
+  const share = (now - time) / (next[0] - time);
+  return [longitude + (next[1] - longitude) * share, latitude + (next[2] - latitude) * share];
 }

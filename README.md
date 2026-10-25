@@ -256,10 +256,12 @@ updates within a minute of midnight and when a suspended tab resumes. Lines use 
 with fallback colors when none are supplied, and show their names at closer zoom levels.
 
 Vehicles come from `/api/vehicles` every 15 seconds while the tab is visible, and again as soon
-as it becomes visible. Each one is a dot in its line's color that glides at an even pace to its
-next position over those 15 seconds, so the vehicles keep moving between two requests. With
-reduced motion turned on, they jump instead. These are positions from the timetable, not live
-ones.
+as it becomes visible. Each one is a dot in its line's color that follows the path the API sends
+for it, along its route and at its timetable's pace, from the first answer on. Each answer covers
+30 seconds and continues where the vehicles are, so they keep moving when one request fails or
+comes late. When the paths have run out, such as in a tab hidden for a while, the vehicles jump to
+where the next answer puts them. With reduced motion turned on, they jump to where they are with
+every answer instead. These are positions from the timetable, not live ones.
 
 The All, U-Bahn, Tram and Bus controls filter routes, vehicles and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while
