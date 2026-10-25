@@ -219,6 +219,33 @@ mislead: during a U3 disruption, Wiener Linien paired a train planned for 20:15 
 planned for 20:33 with 20:23. The [map view](#map-view) shows the live times in its departure
 panel.
 
+Every answer also goes into `public.live_departures`, outside the schema imports replace, for
+statistics of how punctual the lines are. A row is one departure, by platform, line, direction and
+planned time, with its station, its live time and countdown from the last round that listed it,
+when the first and last of those rounds asked, and the trip and route of the timetable departure
+it was paired with. Each round updates the rows it lists, so a row ends with the last prediction
+before the vehicle left. The view `public.observed_departures` keeps the rows a round listed a
+minute or less before their live time, with their delay. The others are predictions from a board
+that closed earlier. A round pairs its answer with the timetable that the station's last
+departures request read. The first round of a station starts before that request reads it, so it
+records the trips only when Wiener Linien answer after the database, and the next round adds them
+otherwise. Trains without a planned time, which Wiener Linien put in on top of the timetable, are
+left out.
+
+The rows cover only the stations someone opened, while they had them open, because the fair-use
+rules allow no other requests, so statistics from them describe those stations and hours, not the
+whole network. Recording sends no request of its own and stores nothing about who opened a
+station. The first answer for a station adds a row for each of its departures in the next 70
+minutes, 66 at Karlsplatz at 23:20 on a Sunday, and each further minute it stays open adds those
+that come into that window. The median delay of each line:
+
+```sql
+SELECT line, count(*), percentile_cont(0.5) WITHIN GROUP (ORDER BY delay) AS median_delay
+FROM public.observed_departures
+GROUP BY line
+ORDER BY line;
+```
+
 `mise run dev` asks Wiener Linien too, within the same limits. The tests never do: they answer
 from [`MonitorServer`](vienna-pulse-backend/src/test/java/com/vladdancea/viennapulse/live/MonitorServer.java),
 which replays an answer Wiener Linien sent.

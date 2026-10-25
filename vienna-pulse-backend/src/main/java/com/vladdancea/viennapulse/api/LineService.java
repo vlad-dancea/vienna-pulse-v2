@@ -4,6 +4,7 @@ import com.vladdancea.viennapulse.api.geojson.Feature;
 import com.vladdancea.viennapulse.api.geojson.FeatureCollection;
 import com.vladdancea.viennapulse.api.geojson.MultiLineString;
 import com.vladdancea.viennapulse.api.geojson.Position;
+import com.vladdancea.viennapulse.database.TimeLimited;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class LineService {
-    @ApiDatabase
+    @TimeLimited
     private final JdbcClient jdbc;
 
     /// Every route with a trip on `date`, ordered by id, drawn along the distinct paths its trips

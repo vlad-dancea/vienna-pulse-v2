@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,11 @@ import org.springframework.stereotype.Component;
 /// interval however many people use the map, and not at all while nobody has a stop open. When
 /// Wiener Linien refuse a request over their limits, the gate stays shut for
 /// `pulse.live.blocked-pause`.
+///
+/// Each round publishes its answer as a [RoundAnswered], which [DepartureRecorder] keeps. It pairs
+/// the answer with the timetable that the last departures request of each station read. The first
+/// round of a station starts before the request reads it, so it has the trips only when Wiener Linien
+/// answer after the database, and the next round adds them otherwise.
 @Component
 @Slf4j
 public class LiveDepartures {
@@ -43,6 +49,7 @@ public class LiveDepartures {
     private final Platforms platforms;
     private final LiveProperties properties;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     // Times the gate, because setting the system clock forward must not shorten the wait between two
     // requests.
     private final InstantSource steadyClock;
@@ -51,6 +58,9 @@ public class LiveDepartures {
     private final Map<Integer, Instant> openUntil = new ConcurrentHashMap<>();
     // The last answer for each open station, which only rounds write.
     private final Map<Integer, Answer> answers = new ConcurrentHashMap<>();
+    // The timetable departures that the last request for each open station read, which only requests
+    // write.
+    private final Map<Integer, List<PlannedDeparture>> timetables = new ConcurrentHashMap<>();
 
     // Guards the gate's three fields below, so that two threads never both find it open.
     private final Object gate = new Object();
@@ -61,8 +71,13 @@ public class LiveDepartures {
     private @Nullable Round running;
 
     @Autowired
-    public LiveDepartures(MonitorClient monitor, Platforms platforms, LiveProperties properties, Clock clock) {
-        this(monitor, platforms, properties, clock, steady());
+    public LiveDepartures(
+            MonitorClient monitor,
+            Platforms platforms,
+            LiveProperties properties,
+            Clock clock,
+            ApplicationEventPublisher events) {
+        this(monitor, platforms, properties, clock, steady(), events);
     }
 
     // Tests pass their clock twice, which moves both clocks at once.
@@ -71,12 +86,14 @@ public class LiveDepartures {
             Platforms platforms,
             LiveProperties properties,
             Clock clock,
-            InstantSource steadyClock) {
+            InstantSource steadyClock,
+            ApplicationEventPublisher events) {
         this.monitor = monitor;
         this.platforms = platforms;
         this.properties = properties;
         this.clock = clock;
         this.steadyClock = steadyClock;
+        this.events = events;
         this.nextRequest = steadyClock.instant().plus(properties.roundInterval());
     }
 
@@ -101,12 +118,14 @@ public class LiveDepartures {
     /// The live departures of the stop with the merged id `stopId`, like `at:49:1320`. When its station
     /// has no answer from the last minute and a round is running, it waits for that round, but no
     /// longer than `pulse.live.timeout` after the round started. The round either fetches the station
-    /// or sets when the next one may start.
-    public Live await(String stopId, Instant now) {
+    /// or sets when the next one may start. The rounds pair their answers for the station with
+    /// `timetable`, the stop's departures in the timetable, until the next request replaces it.
+    public Live await(String stopId, Instant now, List<PlannedDeparture> timetable) {
         var station = station(stopId);
         if (station == null) {
             return Live.UNAVAILABLE;
         }
+        timetables.put(station, List.copyOf(timetable));
         var answer = answer(station, now);
         if (answer == null) {
             var round = running();
@@ -151,6 +170,7 @@ public class LiveDepartures {
             var now = clock.instant();
             openUntil.values().removeIf(until -> !until.isAfter(now));
             answers.keySet().retainAll(openUntil.keySet());
+            timetables.keySet().retainAll(openUntil.keySet());
             var stations = new ArrayList<Integer>();
             var batch = new ArrayList<Integer>();
             // The stations that did not fit into the last request have the oldest answers, so they go
@@ -178,8 +198,18 @@ public class LiveDepartures {
         }
     }
 
-    // Sends the round's request, records the answers and opens the gate again an interval later.
+    // Fetches the round's stations and then publishes what Wiener Linien answered, once no departures
+    // request waits for the round any more.
     private void run(Round round) {
+        var departures = fetch(round);
+        if (departures != null) {
+            events.publishEvent(answered(round, departures));
+        }
+    }
+
+    // Sends the round's request, keeps the answers and opens the gate again an interval later.
+    // Returns the departures of each station, or null when the request failed.
+    private @Nullable Map<Integer, List<LiveDeparture>> fetch(Round round) {
         var blocked = false;
         try {
             var departures = new HashMap<Integer, List<LiveDeparture>>();
@@ -194,6 +224,7 @@ public class LiveDepartures {
             for (var station : round.stations()) {
                 answers.put(station, new Answer(round.at(), List.copyOf(departures.getOrDefault(station, List.of()))));
             }
+            return departures;
         } catch (MonitorClient.Blocked exception) {
             blocked = true;
             // After the pause the stations wait for a new answer instead of showing one minutes old.
@@ -202,6 +233,7 @@ public class LiveDepartures {
                     "Wiener Linien refused the live departures, asking again in {}: {}",
                     properties.blockedPause(),
                     exception.getMessage());
+            return null;
         } catch (RuntimeException exception) {
             for (var station : round.stations()) {
                 answers.put(station, new Answer(round.at(), null));
@@ -211,6 +243,7 @@ public class LiveDepartures {
                     "Could not fetch the live departures of {} stations: {}",
                     round.stations().size(),
                     NestedExceptionUtils.getMostSpecificCause(exception).toString());
+            return null;
         } finally {
             synchronized (gate) {
                 var end = steadyClock.instant();
@@ -222,6 +255,19 @@ public class LiveDepartures {
             }
             round.done().countDown();
         }
+    }
+
+    // The departures of the round's stations, each paired with the timetable its last request read.
+    private RoundAnswered answered(Round round, Map<Integer, List<LiveDeparture>> departures) {
+        var seen = new ArrayList<RoundAnswered.Seen>();
+        for (var station : round.stations()) {
+            var live = departures.getOrDefault(station, List.of());
+            var planned = Matching.planned(timetables.getOrDefault(station, List.of()), live);
+            for (var i = 0; i < live.size(); i++) {
+                seen.add(new RoundAnswered.Seen(station, live.get(i), planned.get(i)));
+            }
+        }
+        return new RoundAnswered(round.at(), List.copyOf(seen));
     }
 
     // The station of a stop that has one in the realtime API, or null.

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -31,15 +32,16 @@ class LiveDeparturesTest {
 
     // The live departures of the recorded answer, by station.
     private static final Live PRATERSTERN_LIVE = Live.live(List.of(
-            departure(2100, "5B", "H", "21:49:00", "21:49:00"),
-            departure(2100, "5B", "H", "22:04:00", "22:04:00"),
-            departure(311, "O", "H", "21:42:00", "21:49:07"),
-            departure(311, "O", "H", "21:57:00", "21:57:40"),
-            departure(4112, "U1", "R", "21:49:30", "21:49:34"),
-            departure(4112, "U1", "R", "21:57:00", "21:58:25")));
+            departure(2100, "5B", "H", "21:49:00", "21:49:00", 1),
+            departure(2100, "5B", "H", "22:04:00", "22:04:00", 16),
+            departure(311, "O", "H", "21:42:00", "21:49:07", 1),
+            departure(311, "O", "H", "21:57:00", "21:57:40", 9),
+            departure(4112, "U1", "R", "21:49:30", "21:49:34", 1),
+            departure(4112, "U1", "R", "21:57:00", "21:58:25", 10)));
     // The third train has no planned time, as a train put in on top of the timetable.
     private static final Live KARLSPLATZ_LIVE = Live.live(List.of(
-            departure(4421, "U4", "H", "21:51:30", "21:52:39"), departure(4421, "U4", "H", "21:59:00", "21:58:05")));
+            departure(4421, "U4", "H", "21:51:30", "21:52:39", 4),
+            departure(4421, "U4", "H", "21:59:00", "21:58:05", 10)));
 
     // How Wiener Linien refuse a client over their limit.
     private static final String QUERY_LIMIT = """
@@ -55,6 +57,9 @@ class LiveDeparturesTest {
     final MonitorServer server = MonitorServer.start();
 
     final TestClock clock = new TestClock();
+
+    // The answers the rounds published.
+    final List<Object> events = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void setTheClock() {
@@ -105,7 +110,7 @@ class LiveDeparturesTest {
 
         // The request goes out before the departures request has read the timetable.
         assertThat(server.requests(1)).containsExactly(PRATERSTERN);
-        assertThat(live.await("at:49:1040", clock.instant())).isEqualTo(PRATERSTERN_LIVE);
+        assertThat(live.await("at:49:1040", clock.instant(), List.of())).isEqualTo(PRATERSTERN_LIVE);
     }
 
     // The production check after a deploy: a second station opened soon after the first waits for
@@ -240,6 +245,34 @@ class LiveDeparturesTest {
                 assertThat(server.requests()).hasSize(1);
             }
         }
+    }
+
+    // A departures request read two of the answer's departures from the timetable while the gate was
+    // shut, and the round pairs the answer with them.
+    @Test
+    void publishesEachAnswerPairedWithTheTimetableTheLastRequestRead() {
+        var live = live(100);
+        var tram = new PlannedDeparture("o-late", "o", "O", 0, vienna("21:41:00"));
+        var subway = new PlannedDeparture("u1-oberlaa", "u1", "U1", 1, vienna("21:49:00"));
+        live.open("at:49:1040", clock.instant());
+        assertThat(live.await("at:49:1040", clock.instant(), List.of(tram, subway)))
+                .isEqualTo(Live.pending(15));
+
+        clock.set(MonitorServer.ANSWERED_AT);
+        live.round();
+
+        var praterstern = 60_201_040;
+        var answer = PRATERSTERN_LIVE.departures();
+        assertThat(events)
+                .containsExactly(new RoundAnswered(
+                        Instant.parse(MonitorServer.ANSWERED_AT),
+                        List.of(
+                                new RoundAnswered.Seen(praterstern, answer.get(0), null),
+                                new RoundAnswered.Seen(praterstern, answer.get(1), null),
+                                new RoundAnswered.Seen(praterstern, answer.get(2), tram),
+                                new RoundAnswered.Seen(praterstern, answer.get(3), null),
+                                new RoundAnswered.Seen(praterstern, answer.get(4), subway),
+                                new RoundAnswered.Seen(praterstern, answer.get(5), null))));
     }
 
     // Rounds come every 15 seconds, but a station may wait longer for its turn when many are open.
@@ -388,7 +421,7 @@ class LiveDeparturesTest {
 
         clock.set("2026-10-24T19:47:55.500Z");
         var started = System.nanoTime();
-        assertThat(live.await("at:49:1040", clock.instant())).isEqualTo(Live.UNAVAILABLE);
+        assertThat(live.await("at:49:1040", clock.instant(), List.of())).isEqualTo(Live.UNAVAILABLE);
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(250));
     }
 
@@ -407,18 +440,20 @@ class LiveDeparturesTest {
         var platforms = new Platforms(properties, RestClient.builder(), clock);
         platforms.load();
         return new LiveDepartures(
-                new MonitorClient(properties, RestClient.builder()), platforms, properties, clock, clock);
+                new MonitorClient(properties, RestClient.builder()), platforms, properties, clock, clock, events::add);
     }
 
-    // What a departures request for the stop gets now, when the timetable takes no time to read.
+    // What a departures request for the stop gets now, when the timetable has no departures and takes
+    // no time to read.
     private Live request(LiveDepartures live, String stopId) {
         live.open(stopId, clock.instant());
-        return live.await(stopId, clock.instant());
+        return live.await(stopId, clock.instant(), List.of());
     }
 
     // A departure on 2026-10-24, with its times in Vienna.
-    private static LiveDeparture departure(int platform, String line, String direction, String planned, String real) {
-        return new LiveDeparture(platform, line, direction, vienna(planned), vienna(real));
+    private static LiveDeparture departure(
+            int platform, String line, String direction, String planned, String real, int countdown) {
+        return new LiveDeparture(platform, line, direction, vienna(planned), vienna(real), countdown);
     }
 
     private static Instant vienna(String time) {
