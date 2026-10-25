@@ -26,9 +26,11 @@ going. Everything else follows `AGENTS.md`, which wins over this skill when the 
      Preview. Mock the API only for a state real data cannot show, and say which state is mocked.
    - Use Playwright's headless Chromium from the frontend's `@playwright/test`, launched with
      `--use-angle=swiftshader --enable-unsafe-swiftshader` so the map paints. Take pictures with
-     `page.screenshot` and clips with the browser context's `recordVideo`. Run the script from a
-     `mktemp -d` folder, because relative paths land in the working directory. T3 Code's preview
-     tab cannot show the map, because it never runs `requestAnimationFrame`.
+     `page.screenshot` and clips with the browser context's `recordVideo`. Close the context
+     before the script ends, because Playwright finishes the video then and leaves an empty file
+     when the script exits first. Run the script from a `mktemp -d` folder, because relative paths
+     land in the working directory. T3 Code's preview tab cannot show the map, because it never
+     runs `requestAnimationFrame`.
    - Look at every capture yourself before showing it. Read the screenshots, and pull frames out
      of a clip with `ffmpeg -ss <seconds> -i <clip> -frames:v 1 <frame>.png`. Fix what looks
      wrong, such as wrapped or clipped text, overlap or the wrong state, and capture again. A
