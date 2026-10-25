@@ -1,4 +1,4 @@
-import type { Feature, Point, Position } from 'geojson';
+import type { Feature, Point } from 'geojson';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { VehicleProperties, Vehicles } from '../timetable/running-vehicles';
 
@@ -7,6 +7,8 @@ export type DrawnProperties = Omit<VehicleProperties, 'path'>;
 
 /** Where a vehicle is at a time of the page's clock, `performance.now()`. */
 type Waypoint = [time: number, longitude: number, latitude: number];
+
+type Place = [longitude: number, latitude: number];
 
 interface Moving {
   vehicle: Feature<Point, DrawnProperties>;
@@ -47,14 +49,22 @@ export class VehicleAnimation {
     this.shift = keep ? shift : now - time;
     const start = time + this.shift;
     const earlier = new Map(keep ? this.moving.map(({ vehicle, waypoints }) => [vehicle.id, waypoints]) : []);
-    this.moving = vehicles.features.map(({ properties: { path, ...properties }, ...vehicle }) => ({
-      vehicle: { ...vehicle, properties },
-      // An answer can start a few seconds after now, and the earlier path covers those.
-      waypoints: [
-        ...ahead(earlier.get(vehicle.id) ?? [], now).filter(([waypoint]) => waypoint < start),
-        ...path.map(([longitude, latitude, seconds]): Waypoint => [start + seconds * 1000, longitude, latitude]),
-      ],
-    }));
+    this.moving = vehicles.features.map(({ properties: { path, ...properties }, ...vehicle }) => {
+      // An answer can start a few seconds after now. Until then the vehicle goes on from where it is
+      // drawn along the earlier path, which meets the answer's path unless the timetable changed.
+      const before = ahead(earlier.get(vehicle.id) ?? [], now);
+      const here = now < start ? position(before, now) : undefined;
+      const bridge: Waypoint[] = here
+        ? [[now, ...here], ...before.filter(([waypoint]) => waypoint > now && waypoint < start)]
+        : [];
+      return {
+        vehicle: { ...vehicle, properties },
+        waypoints: [
+          ...bridge,
+          ...path.map(([longitude, latitude, seconds]): Waypoint => [start + seconds * 1000, longitude, latitude]),
+        ],
+      };
+    });
     this.end = Math.max(start, ...this.moving.map(({ waypoints }) => waypoints.at(-1)?.[0] ?? start));
     this.animate = animate;
     this.revision++;
@@ -108,7 +118,7 @@ function ahead(waypoints: Waypoint[], now: number): Waypoint[] {
 
 // Where a vehicle is at `now`, on the straight line between the waypoints around it. Of two
 // waypoints at the same time, the later one counts.
-function position(waypoints: Waypoint[], now: number): Position | undefined {
+function position(waypoints: Waypoint[], now: number): Place | undefined {
   const [last, next] = ahead(waypoints, now);
   if (!last) {
     return undefined;

@@ -81,7 +81,7 @@ describe('VehicleAnimation', () => {
     expect(setData).toHaveBeenCalledTimes(frames);
   });
 
-  it('continues along the earlier path until a newer answer starts, without a jump', async () => {
+  it('goes on from where a vehicle is drawn until a newer answer starts, without a jump', async () => {
     animation.show(
       vehicles(0, {
         a: [
@@ -92,14 +92,16 @@ describe('VehicleAnimation', () => {
       true,
     );
     await vi.advanceTimersByTimeAsync(10_000);
+    expect(drawn()).toEqual({ a: [16.4, 48.2] });
 
-    // The answer for 08:00:15 arrives at 08:00:10 on the page's clock. The vehicle left out
-    // disappears, and the new one waits where its path starts.
+    // The answer for 08:00:15 arrives at 08:00:10 on the page's clock and puts the vehicle further
+    // on than the earlier path, as after a new timetable. The vehicle goes there from where it is,
+    // the vehicle left out disappears, and the new one waits where its path starts.
     animation.show(
       vehicles(15, {
         a: [
-          [16.45, 48.2, 0],
-          [16.75, 48.2, 30],
+          [16.5, 48.2, 0],
+          [16.8, 48.2, 30],
         ],
         b: [
           [16.5, 48.3, 0],
@@ -108,10 +110,10 @@ describe('VehicleAnimation', () => {
       }),
       true,
     );
-    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(1_000);
     expect(drawn()).toEqual({ a: [16.42, 48.2], b: [16.5, 48.3] });
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(drawn()).toEqual({ a: [16.47, 48.2], b: [16.5, 48.32] });
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(drawn()).toEqual({ a: [16.52, 48.2], b: [16.5, 48.32] });
   });
 
   it('jumps to the newest positions when the paths ran out instead of racing there', async () => {
