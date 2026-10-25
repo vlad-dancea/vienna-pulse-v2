@@ -29,5 +29,8 @@ EXPOSE 8080
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60", "-XX:+ExitOnOutOfMemoryError", "-jar", "vienna-pulse.jar"]
 
 # Ready means the database answers too. The image has bash but no curl, so bash speaks HTTP.
-HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --start-interval=2s --retries=3 \
+# A start can include a migration that builds an index over the whole timetable, which took 35
+# seconds on production for V7. Failed checks count only after 150 seconds, so the container turns
+# unhealthy about when the deploy script stops waiting for it, after 180 seconds.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=150s --start-interval=2s --retries=3 \
     CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"UP\"' <&3"]
