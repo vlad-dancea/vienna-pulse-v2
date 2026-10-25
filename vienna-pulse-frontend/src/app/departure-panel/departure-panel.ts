@@ -45,7 +45,8 @@ export class DeparturePanel {
   /** Emits when the close button or Escape asks to close the panel. */
   readonly closed = output();
 
-  protected readonly departures = stopDepartures(this.stop);
+  // The loaders and the faster refresh follow the same answer, which stays while a reload fails.
+  protected readonly departures = stopDepartures(this.stop, () => this.pending());
   private readonly latest = latestValue(this.departures);
   /** The last departures that loaded for this stop, kept while they reload and after a reload fails. */
   private readonly loaded = computed(() => {
@@ -61,6 +62,8 @@ export class DeparturePanel {
       this.now(),
     );
   });
+  /** Whether the backend has yet to fetch the stop's live times, which it does within 15 seconds. */
+  protected readonly pending = computed(() => this.loaded()?.liveStatus === 'pending');
   protected readonly nothingLeaves = computed(() => {
     const name = modeNames[this.mode()];
     return name ? `No ${name} departures in the next hour.` : 'No departures in the next hour.';

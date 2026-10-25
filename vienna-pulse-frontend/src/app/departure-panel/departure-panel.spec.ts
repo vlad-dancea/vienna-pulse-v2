@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import type { Departure, DepartureLine } from '../timetable/stop-departures';
+import type { Departure, DepartureLine, StopDepartures } from '../timetable/stop-departures';
 import { DeparturePanel } from './departure-panel';
 
 const u3: DepartureLine = {
@@ -17,15 +17,27 @@ const tram1: DepartureLine = { ...u3, id: 'tram-1', name: '1', type: 'tram', col
 const bus4a: DepartureLine = { ...u3, id: 'bus-4a', name: '4A', type: 'bus', color: '#0A295D' };
 const bus13a: DepartureLine = { ...bus4a, id: 'bus-13a', name: '13A' };
 
-/** A departure at `minute` past 18:00 in Vienna on 2026-10-24. */
-function departure(line: DepartureLine, headsign: string | null, minute: number): Departure {
+/** The time `minutes` after 18:00 in Vienna on 2026-10-24, as the API writes it. */
+function at(minutes: number): string {
+  const seconds = 18 * 3600 + Math.round(minutes * 60);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `2026-10-24T${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}+02:00`;
+}
+
+/** A departure planned `minute` minutes after 18:00 in Vienna, and expected `live` minutes after it if given. */
+function departure(line: DepartureLine, headsign: string | null, minute: number, live?: number): Departure {
   return {
-    plannedTime: `2026-10-24T18:${String(minute).padStart(2, '0')}:00+02:00`,
-    liveTime: null,
+    plannedTime: at(minute),
+    liveTime: live === undefined ? null : at(live),
     line,
     headsign,
     platform: 'at:49:657:0:1',
   };
+}
+
+/** Karlsplatz's departures as the API answers them, by default for a stop without live data. */
+function answer(departures: Departure[], liveStatus: StopDepartures['liveStatus'] = 'unavailable'): StopDepartures {
+  return { stop: { id: 'at:49:657', name: 'Karlsplatz' }, liveStatus, departures };
 }
 
 const karlsplatz = '/api/stops/at%3A49%3A657/departures';
@@ -71,19 +83,20 @@ describe('DeparturePanel', () => {
     expect(text('[role="status"]')).toBe('Loading departures...');
     expect(document.activeElement?.textContent).toBe('Karlsplatz');
 
-    http.expectOne(karlsplatz).flush({
-      stop: { id: 'at:49:657', name: 'Karlsplatz' },
-      departures: [
-        departure(u3, 'Wien Ottakring', 0),
-        departure(bus13a, 'Wien Skodagasse', 2),
-        departure(u3, 'Wien Simmering', 3),
-        departure(u3, 'Wien Ottakring', 4),
-        departure(tram1, 'Wien Prater, Hauptallee', 5),
-        departure(bus4a, 'Wien Karlsplatz', 7),
-        departure(u3, 'Wien Ottakring', 8),
-        departure(u3, 'Wiener Neudorf', 12),
-      ],
-    });
+    http
+      .expectOne(karlsplatz)
+      .flush(
+        answer([
+          departure(u3, 'Wien Ottakring', 0),
+          departure(bus13a, 'Wien Skodagasse', 2),
+          departure(u3, 'Wien Simmering', 3),
+          departure(u3, 'Wien Ottakring', 4),
+          departure(tram1, 'Wien Prater, Hauptallee', 5),
+          departure(bus4a, 'Wien Karlsplatz', 7),
+          departure(u3, 'Wien Ottakring', 8),
+          departure(u3, 'Wiener Neudorf', 12),
+        ]),
+      );
     await fixture.whenStable();
 
     expect(text('[role="status"]')).toBe('');
@@ -100,12 +113,86 @@ describe('DeparturePanel', () => {
     expect(element.querySelector('time')?.getAttribute('datetime')).toBe('2026-10-24T18:00:00+02:00');
   });
 
+  it('counts from the live times, strikes through planned times a minute or more away and marks late departures', async () => {
+    TestBed.tick();
+    http
+      .expectOne(karlsplatz)
+      .flush(
+        answer(
+          [
+            departure(u3, 'Wien Simmering', -5, 2),
+            departure(u3, 'Wien Ottakring', 4, 4.5),
+            departure(tram1, 'Wien Prater, Hauptallee', 5),
+            departure(bus13a, 'Wien Skodagasse', 10, 8),
+            departure(u3, 'Wien Ottakring', 9, 11),
+            departure(tram1, 'Wien Prater, Hauptallee', 12, 13),
+          ],
+          'live',
+        ),
+      );
+    await fixture.whenStable();
+
+    expect(Array.from(element.querySelectorAll('li'), words)).toEqual([
+      'U3 Ottakring live 4 min 18:04 live 11 min planned 18:09 expected 18:11',
+      // Planned before now, but still to leave.
+      'U3 Simmering live 2 min planned 17:55 expected 18:02',
+      // No live data for the first one.
+      '1 Prater, Hauptallee 5 min 18:05 live 13 min planned 18:12 expected 18:13',
+      '13A Skodagasse live 8 min planned 18:10 expected 18:08',
+    ]);
+    // The 30 seconds of the first U3 to Ottakring leave its planned time out.
+    expect(Array.from(element.querySelectorAll('s'), words)).toEqual([
+      'planned 18:09',
+      'planned 17:55',
+      'planned 18:12',
+      'planned 18:10',
+    ]);
+    const late = element.querySelectorAll('time.text-red-700');
+    expect(Array.from(late, (time) => [time.textContent, time.getAttribute('datetime')])).toEqual([
+      ['18:02', '2026-10-24T18:02:00+02:00'],
+    ]);
+  });
+
+  it('shows loaders and asks again every 15 seconds until the live times arrive, also after a failed refresh', async () => {
+    const loaders = () => element.querySelectorAll('li span[aria-hidden="true"]').length;
+    TestBed.tick();
+    http
+      .expectOne(karlsplatz)
+      .flush(answer([departure(u3, 'Wien Ottakring', 4), departure(u3, 'Wien Ottakring', 9)], 'pending'));
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring 4 min 18:04 9 min 18:09');
+    expect(loaders()).toBe(2);
+    expect(text('[role="status"]')).toBe('Loading live times...');
+
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectOne(karlsplatz).flush({}, { status: 503, statusText: 'Unavailable' });
+    await fixture.whenStable();
+    expect(loaders()).toBe(2);
+    expect(text('[role="status"]')).toBe('Loading live times...');
+
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http
+      .expectOne(karlsplatz)
+      .flush(answer([departure(u3, 'Wien Ottakring', 4, 4.5), departure(u3, 'Wien Ottakring', 9, 12)], 'live'));
+    await fixture.whenStable();
+    expect(text('ul')).toBe('U3 Ottakring live 4 min 18:04 live 11 min planned 18:09 expected 18:12');
+    expect(loaders()).toBe(0);
+    expect(text('[role="status"]')).toBe('');
+
+    // With the live times there, the next refresh is 30 seconds later.
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectNone(karlsplatz);
+    vi.advanceTimersByTime(15_000);
+    TestBed.tick();
+    http.expectOne(karlsplatz);
+  });
+
   it('counts down, drops departures that left and refreshes every 30 seconds, keeping them when a refresh fails', async () => {
     TestBed.tick();
-    http.expectOne(karlsplatz).flush({
-      stop: { id: 'at:49:657', name: 'Karlsplatz' },
-      departures: [departure(u3, 'Wien Ottakring', 0), departure(u3, 'Wien Ottakring', 1)],
-    });
+    http.expectOne(karlsplatz).flush(answer([departure(u3, 'Wien Ottakring', 0), departure(u3, 'Wien Ottakring', 1)]));
     await fixture.whenStable();
     expect(text('h2')).toBe('Karlsplatz');
 
@@ -122,7 +209,7 @@ describe('DeparturePanel', () => {
 
     vi.advanceTimersByTime(30_000);
     TestBed.tick();
-    http.expectOne(karlsplatz).flush({ stop: { id: 'at:49:657', name: 'Karlsplatz' }, departures: [] });
+    http.expectOne(karlsplatz).flush(answer([]));
     await fixture.whenStable();
     expect(text('ul')).toBe('');
     expect(text('[role="status"]')).toBe('No departures in the next hour.');
@@ -143,10 +230,7 @@ describe('DeparturePanel', () => {
     retry?.focus();
     retry?.click();
     TestBed.tick();
-    http.expectOne(karlsplatz).flush({
-      stop: { id: 'at:49:657', name: 'Karlsplatz' },
-      departures: [departure(tram1, 'Wien Prater, Hauptallee', 5)],
-    });
+    http.expectOne(karlsplatz).flush(answer([departure(tram1, 'Wien Prater, Hauptallee', 5)]));
     await fixture.whenStable();
     expect(document.activeElement?.textContent).toBe('Karlsplatz');
     // The same live region stays, so screen readers announce its next message.
@@ -164,10 +248,9 @@ describe('DeparturePanel', () => {
   it('shows only the departures of the mode the map shows, and says when that mode has none', async () => {
     fixture.componentRef.setInput('mode', 'subway');
     TestBed.tick();
-    http.expectOne(karlsplatz).flush({
-      stop: { id: 'at:49:657', name: 'Karlsplatz' },
-      departures: [departure(u3, 'Wien Ottakring', 2), departure(tram1, 'Wien Prater, Hauptallee', 5)],
-    });
+    http
+      .expectOne(karlsplatz)
+      .flush(answer([departure(u3, 'Wien Ottakring', 2), departure(tram1, 'Wien Prater, Hauptallee', 5)]));
     await fixture.whenStable();
     expect(text('ul')).toBe('U3 Ottakring 2 min 18:02');
 
@@ -183,10 +266,7 @@ describe('DeparturePanel', () => {
 
   it("loads another stop's departures without showing the last stop's", async () => {
     TestBed.tick();
-    http.expectOne(karlsplatz).flush({
-      stop: { id: 'at:49:657', name: 'Karlsplatz' },
-      departures: [departure(u3, 'Wien Ottakring', 0)],
-    });
+    http.expectOne(karlsplatz).flush(answer([departure(u3, 'Wien Ottakring', 0)]));
     await fixture.whenStable();
 
     fixture.componentRef.setInput('stop', 'at:49:1468');
