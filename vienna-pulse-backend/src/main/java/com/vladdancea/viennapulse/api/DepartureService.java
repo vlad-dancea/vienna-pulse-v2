@@ -73,11 +73,15 @@ public class DepartureService {
                             WHERE merged_id = :stop
                         ),
                         -- Each service day with the seconds of its times that fall in the hours before and after now.
+                        -- The times are whole seconds, so rounding the bounds up keeps the same calls, and integer
+                        -- bounds let the index on stop and departure time find them.
                         service_days AS (
                             SELECT day,
                                    origin,
-                                   extract(epoch FROM CAST(:since AS timestamptz) - origin) AS first_second,
-                                   extract(epoch FROM CAST(:until AS timestamptz) - origin) AS end_second
+                                   CAST(ceil(extract(epoch FROM CAST(:since AS timestamptz) - origin)) AS integer)
+                                       AS first_second,
+                                   CAST(ceil(extract(epoch FROM CAST(:until AS timestamptz) - origin)) AS integer)
+                                       AS end_second
                             FROM (SELECT CAST(:today AS date) + shift AS day,
                                          pulse.service_day_origin(CAST(:today AS date) + shift) AS origin
                                   FROM generate_series(-1, 1) AS shift) AS days
@@ -86,17 +90,22 @@ public class DepartureService {
                             SELECT d.day, r.service_id
                             FROM service_days d CROSS JOIN LATERAL pulse.running_services(d.day) AS r
                         ),
-                        -- The stop's calls come from the stop_id index first. Left to itself, the planner, which
-                        -- expects about one running service where there are hundreds, reads every call of every
-                        -- running trip instead, about 700,000 rows.
+                        -- The stop's calls in those hours, one range of the index per platform and service day,
+                        -- rather than all of them, which lie on a third of the table's pages since it is stored trip
+                        -- by trip. Materialized, they are read before any trip. The planner expects about one
+                        -- running service where there are hundreds, and could start from every running trip's calls.
                         calls AS MATERIALIZED (
-                            SELECT trip_id, sequence, stop_id, departure_time
-                            FROM timetable.stop_times
-                            WHERE stop_id IN (SELECT id FROM platforms) AND pickup_type <> 'NONE'
+                            SELECT d.day, s.trip_id, s.sequence, s.stop_id, s.departure_time
+                            FROM service_days d
+                            CROSS JOIN platforms p
+                            JOIN timetable.stop_times s
+                              ON s.stop_id = p.id
+                             AND s.departure_time >= d.first_second AND s.departure_time < d.end_second
+                            WHERE s.pickup_type <> 'NONE'
                         ),
-                        -- The calls in those hours look up their trips one at a time, day by day. Joined for all
-                        -- days at once, the planner, expecting a few running services, pairs every call of the
-                        -- stop with every running service, millions of rows.
+                        -- The calls look up their trips one at a time, day by day. Joined for all days at once, the
+                        -- planner, expecting a few running services, pairs every call of the stop with every
+                        -- running service, millions of rows.
                         departures AS (
                             SELECT next.*
                             FROM service_days d
@@ -110,13 +119,16 @@ public class DepartureService {
                                        t.direction_id
                                 FROM calls c
                                 JOIN timetable.trips t ON t.id = c.trip_id
-                                WHERE c.departure_time >= d.first_second AND c.departure_time < d.end_second
+                                WHERE c.day = d.day
                                   AND t.service_id IN (SELECT service_id FROM running r WHERE r.day = d.day)
-                                  -- The last call of a trip only arrives, though the feed lets passengers board.
-                                  AND EXISTS (SELECT
-                                              FROM timetable.stop_times later
-                                              WHERE later.trip_id = c.trip_id AND later.sequence > c.sequence)
+                                -- Most trips at a stop do not run on a given day. The fence drops them before the
+                                -- check below, which reads the large primary key of the stop times once per call.
+                                OFFSET 0
                             ) AS next
+                            -- The last call of a trip only arrives, though the feed lets passengers board.
+                            WHERE EXISTS (SELECT
+                                          FROM timetable.stop_times later
+                                          WHERE later.trip_id = next.trip_id AND later.sequence > next.sequence)
                         )
                         SELECT stop.name AS stop_name,
                                next.time,

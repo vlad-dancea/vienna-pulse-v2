@@ -170,6 +170,25 @@ class DepartureControllerTest {
                 .isEqualTo(List.of("2026-10-21T00:10:00+02:00", "2026-10-21T00:20:00+02:00"));
     }
 
+    // The clock has fractions of a second, and the timetable whole seconds.
+    @Test
+    void servesADepartureInTheLastFractionOfASecondOfTheHour() {
+        // 00:30:00.4 on DAY in Vienna.
+        clock.set("2026-10-19T22:30:00.400Z");
+        timetable.addWeeklyService("tuesdays", DAY);
+        addDeparture("in-an-hour", "u1", "tuesdays", STOP + ":0:1", "01:30:00");
+        addDeparture("a-second-later", "u1", "tuesdays", STOP + ":0:1", "01:30:01");
+
+        client.get()
+                .uri("/api/stops/at:49:1320/departures")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.departures[*].plannedTime")
+                .isEqualTo(List.of("2026-10-20T01:30:00+02:00"));
+    }
+
     @Test
     void countsTheTimesFromNoonMinusTwelveHoursWhenTheClocksGoBack() {
         // 07:30 on Sunday 2026-10-25, after the clocks went back at 03:00 summer time.
