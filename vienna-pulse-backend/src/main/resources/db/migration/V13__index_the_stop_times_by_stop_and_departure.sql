@@ -7,7 +7,8 @@
 -- The backend runs this before it serves, while the deploy waits for it to get healthy. A session
 -- still reading the table makes the migration fail after 10 seconds. Waiting instead, it would hold
 -- Flyway's lock past the end of the deploy, and the previous backend, which the deploy then starts,
--- would wait for that lock and fail. Dropping first takes the strongest lock before the long build.
+-- would wait for that lock and fail. Building first leaves the table readable during the long build,
+-- and only the drop at the end takes the lock that stops readers.
 SET LOCAL lock_timeout = '10s';
-DROP INDEX timetable.stop_times_stop_id_idx;
 CREATE INDEX ON timetable.stop_times (stop_id, departure_time) WHERE pickup_type <> 'NONE';
+DROP INDEX timetable.stop_times_stop_id_idx;
