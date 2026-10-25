@@ -90,27 +90,45 @@ const stops: components['schemas']['FeatureCollectionPointStopProperties'] = {
   ],
 };
 
+const tram62 = {
+  line: 'tram-62',
+  name: '62',
+  longName: null,
+  type: 'tram',
+  color: null,
+  textColor: null,
+  headsign: 'Oper',
+};
+
+// A tram waiting at a stop for the whole path, so it is drawn at the same place whenever a frame comes.
 const vehicles = {
   type: 'FeatureCollection',
+  time: '2026-10-20T06:00:00Z',
   features: [
     {
       type: 'Feature',
       id: 'trip-1',
       geometry: { type: 'Point', coordinates: [16.35, 48.2] },
       properties: {
-        line: 'tram-62',
-        name: '62',
-        longName: null,
-        type: 'tram',
-        color: null,
-        textColor: null,
-        headsign: 'Oper',
+        ...tram62,
+        path: [
+          [16.35, 48.2, 0],
+          [16.35, 48.2, 30],
+        ],
       },
     },
   ],
 };
 
-const noVehicles = { type: 'FeatureCollection', features: [] };
+// What the map draws for the vehicles: everything but the time and the path.
+const drawnVehicles = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', id: 'trip-1', geometry: { type: 'Point', coordinates: [16.35, 48.2] }, properties: tram62 },
+  ],
+};
+
+const noVehicles = { type: 'FeatureCollection', time: '2026-10-20T06:00:00Z', features: [] };
 
 const busFilter: FilterSpecification = ['!', ['in', ['get', 'type'], ['literal', ['tram', 'subway']]]];
 const expectedLayers: [string, FilterSpecification][] = [
@@ -271,13 +289,13 @@ describe('MapView', () => {
       http.expectOne('/api/stops').flush(stops);
       http.expectOne('/api/vehicles').flush(vehicles);
       await fixture.whenStable();
-      expect(setVehicles).toHaveBeenLastCalledWith(vehicles);
+      expect(setVehicles).toHaveBeenLastCalledWith(drawnVehicles);
 
       vi.advanceTimersByTime(15_000);
       TestBed.tick();
       http.expectOne('/api/vehicles').flush({}, { status: 503, statusText: 'Unavailable' });
       await fixture.whenStable();
-      expect(setVehicles).toHaveBeenLastCalledWith(vehicles);
+      expect(setVehicles).toHaveBeenLastCalledWith(drawnVehicles);
     } finally {
       fixture.destroy();
       TestBed.resetTestingModule();

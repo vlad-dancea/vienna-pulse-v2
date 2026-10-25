@@ -114,10 +114,10 @@ export class MapView {
     effect(() => {
       const animation = this.vehicleAnimation();
       const vehicles = this.vehicles.latest();
-      if (animation) {
-        // Gliding for the whole time between two refreshes keeps the vehicles moving.
+      if (animation && vehicles) {
+        // With reduced motion, the vehicles jump to where they are with each refresh instead.
         const reduceMotion = document.defaultView?.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        animation.show(vehicles ?? noFeatures, reduceMotion ? 0 : this.vehicles.interval);
+        animation.show(vehicles, !reduceMotion);
       }
     });
 

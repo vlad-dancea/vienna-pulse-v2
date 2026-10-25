@@ -53,8 +53,10 @@ const api = {
       geometry: { type: 'MultiLineString', coordinates: [[at([0, mode.lineY]), at([350, mode.lineY])]] },
     })),
   },
+  // Each vehicle waits where it is for its whole path.
   '/api/vehicles': {
     type: 'FeatureCollection',
+    time: new Date().toISOString(),
     features: modes.map((mode, index) => ({
       type: 'Feature',
       id: index + 1,
@@ -66,6 +68,7 @@ const api = {
         color: mode.color,
         textColor: null,
         headsign: null,
+        path: [0, 30].map((seconds) => [...at([mode.x, 250]), seconds]),
       },
       geometry: { type: 'Point', coordinates: at([mode.x, 250]) },
     })),
