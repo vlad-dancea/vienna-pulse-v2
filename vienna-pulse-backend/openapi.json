@@ -213,12 +213,12 @@
             "content" : {
               "application/geo+json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
+                  "$ref" : "#/components/schemas/Vehicles"
                 }
               },
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/FeatureCollectionPointVehicleProperties"
+                  "$ref" : "#/components/schemas/Vehicles"
                 }
               }
             },
@@ -325,22 +325,6 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/FeaturePointStopProperties"
-            }
-          },
-          "type" : {
-            "type" : "string",
-            "const" : "FeatureCollection"
-          }
-        },
-        "required" : [ "features", "type" ]
-      },
-      "FeatureCollectionPointVehicleProperties" : {
-        "type" : "object",
-        "properties" : {
-          "features" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/FeaturePointVehicleProperties"
             }
           },
           "type" : {
@@ -562,6 +546,24 @@
           "name" : {
             "type" : "string"
           },
+          "path" : {
+            "type" : "array",
+            "items" : {
+              "type" : "array",
+              "maxItems" : 3,
+              "minItems" : 3,
+              "prefixItems" : [ {
+                "type" : "number",
+                "format" : "double"
+              }, {
+                "type" : "number",
+                "format" : "double"
+              }, {
+                "type" : "number",
+                "format" : "double"
+              } ]
+            }
+          },
           "textColor" : {
             "type" : [ "string", "null" ]
           },
@@ -569,7 +571,27 @@
             "type" : "string"
           }
         },
-        "required" : [ "color", "headsign", "line", "longName", "name", "textColor", "type" ]
+        "required" : [ "color", "headsign", "line", "longName", "name", "path", "textColor", "type" ]
+      },
+      "Vehicles" : {
+        "type" : "object",
+        "properties" : {
+          "features" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeaturePointVehicleProperties"
+            }
+          },
+          "time" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "type" : {
+            "type" : "string",
+            "const" : "FeatureCollection"
+          }
+        },
+        "required" : [ "features", "time", "type" ]
       }
     }
   }

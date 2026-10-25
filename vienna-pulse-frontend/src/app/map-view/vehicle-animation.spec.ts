@@ -16,6 +16,7 @@ function vehicle(id: string, longitude: number): Feature<Point, VehiclePropertie
       color: null,
       textColor: null,
       headsign: 'Zentrum',
+      path: [[longitude, 48.2, 0]],
     },
   };
 }

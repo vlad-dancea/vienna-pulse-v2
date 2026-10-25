@@ -24,8 +24,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration(proxyBeanMethods = false)
 @EnableCaching
 class ApiConfiguration implements WebMvcConfigurer {
-    // Every map asks every 15 seconds and glides its vehicles over that time, so positions up to one
-    // step old do not show, and the database works out the vehicles at most once per step.
+    // A map moves its vehicles along their paths from the start of the step, so it shows them up to
+    // one step behind their timetable, which nobody notices, and the database works out the
+    // vehicles at most once per step.
     static final Duration VEHICLE_STEP = Duration.ofSeconds(5);
     // The API's queries take about a second in production. One that takes five holds a connection
     // of the small pool that other requests wait for, so it is cancelled instead of waited for.

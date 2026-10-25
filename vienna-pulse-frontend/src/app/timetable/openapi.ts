@@ -97,11 +97,6 @@ export interface components {
             /** @constant */
             type: "FeatureCollection";
         };
-        FeatureCollectionPointVehicleProperties: {
-            features: components["schemas"]["FeaturePointVehicleProperties"][];
-            /** @constant */
-            type: "FeatureCollection";
-        };
         FeatureMultiLineStringLineProperties: {
             geometry: components["schemas"]["MultiLineString"];
             id: string;
@@ -173,8 +168,20 @@ export interface components {
             line: string;
             longName: string | null;
             name: string;
+            path: [
+                number,
+                number,
+                number
+            ][];
             textColor: string | null;
             type: string;
+        };
+        Vehicles: {
+            features: components["schemas"]["FeaturePointVehicleProperties"][];
+            /** Format: date-time */
+            time: string;
+            /** @constant */
+            type: "FeatureCollection";
         };
     };
     responses: never;
@@ -353,8 +360,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/geo+json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
-                    "application/json": components["schemas"]["FeatureCollectionPointVehicleProperties"];
+                    "application/geo+json": components["schemas"]["Vehicles"];
+                    "application/json": components["schemas"]["Vehicles"];
                 };
             };
             /** @description Reading the timetable failed in a way no retry fixes. */

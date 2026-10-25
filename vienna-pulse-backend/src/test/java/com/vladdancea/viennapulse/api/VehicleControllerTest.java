@@ -112,28 +112,62 @@ class VehicleControllerTest {
                 .cacheControl(CacheControl.noCache())
                 .expectBody()
                 .json("""
-                        {"type": "FeatureCollection", "features": [
+                        {"type": "FeatureCollection", "time": "2026-10-19T22:05:00Z", "features": [
                           {"type": "Feature", "id": "gap",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.2]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "gap"}},
+                                          "headsign": "gap", "path": [[16.1, 48.2, 0.0], [16.11, 48.2, 30.0]]}},
                           {"type": "Feature", "id": "moving",
                            "geometry": {"type": "Point", "coordinates": [16.075, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "moving"}},
+                                          "headsign": "moving",
+                                          "path": [[16.075, 48.0, 0.0], [16.0825, 48.0, 30.0]]}},
                           {"type": "Feature", "id": "untimed",
                            "geometry": {"type": "Point", "coordinates": [16.05, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "untimed"}},
+                                          "headsign": "untimed",
+                                          "path": [[16.05, 48.0, 0.0], [16.055, 48.0, 30.0]]}},
                           {"type": "Feature", "id": "waiting",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
                            "properties": {"line": "n25", "name": "N25", "longName": null, "type": "bus",
-                                          "color": null, "textColor": null, "headsign": "waiting"}}
+                                          "color": null, "textColor": null, "headsign": "waiting",
+                                          "path": [[16.1, 48.05, 0.0], [16.1, 48.05, 30.0]]}}
                         ]}
                         """, JsonCompareMode.STRICT);
+    }
+
+    @Test
+    void followsTheShapeAndWaitsAtStopsForThirtySeconds() {
+        timetable.addWeeklyService("tuesdays", DAY);
+        // 10 m a second, 50 m before the corner, until it waits at a stop 100 m past it.
+        timetable.addTrip(
+                "corner",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:03:25", 0),
+                call(2, "00:05:15", "00:05:25", 1100),
+                call(3, "00:06:55", null, 2000));
+        // Reaches the end of the shape and of its trip 20 seconds from now.
+        timetable.addTrip(
+                "ending", "u1", "tuesdays", SHAPE, call(1, null, "00:04:20", 1600), call(2, "00:05:20", null, 2000));
+
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(
+                        List.of(
+                                List.of(16.095, 48.0, 0.0),
+                                List.of(16.1, 48.0, 5.0),
+                                List.of(16.1, 48.01, 15.0),
+                                List.of(16.1, 48.01, 25.0),
+                                List.of(16.1, 48.015, 30.0)),
+                        List.of(List.of(16.1, 48.086667, 0.0), List.of(16.1, 48.1, 20.0))));
     }
 
     @Test
@@ -206,7 +240,7 @@ class VehicleControllerTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"type": "FeatureCollection", "features": []}
+                        {"type": "FeatureCollection", "time": "2026-10-19T22:05:00Z", "features": []}
                         """, JsonCompareMode.STRICT);
     }
 
