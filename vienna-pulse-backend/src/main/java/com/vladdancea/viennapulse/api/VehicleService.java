@@ -33,8 +33,9 @@ public class VehicleService {
     ///
     /// Between leaving one stop and reaching the next, a vehicle covers the distance between them
     /// along its shape at an even speed. It waits at a stop from its arrival until its departure.
-    /// A call without times, which the feed allows between two timed ones, is passed like any other
-    /// point of the shape, and points of the shape without a distance are passed over. When two calls
+    /// A call without times, which the feed allows between two timed ones, or without a distance is
+    /// passed like any other point of the shape, and points of the shape without a distance are
+    /// passed over. When two calls
     /// share a minute, the vehicle is halfway between them at that minute instead of jumping.
     ///
     /// Times count from noon minus 12 hours on their service day, as for the departures, and pass
@@ -66,9 +67,9 @@ public class VehicleService {
                               ON s.first_departure <= m.second AND s.last_arrival > m.second
                             WHERE s.service_id IN (SELECT service_id FROM running r WHERE r.day = m.day)
                         ),
-                        -- The calls with times from the last stop each trip left to the first it reaches after
-                        -- the path ends, or its last, and the calls before and after them that share their
-                        -- minutes. The first call has only a departure and the last only an arrival, so each
+                        -- The calls with times and distances from the last stop each trip left to the first it
+                        -- reaches after the path ends, or its last, and the calls before and after them that
+                        -- share their minutes. The first call has only a departure and the last only an arrival, so each
                         -- time stands in for the other.
                         calls AS (
                             SELECT a.trip_id, a.second, t.route_id, t.headsign, t.shape_id, c.*
@@ -78,6 +79,7 @@ public class VehicleService {
                                 SELECT sequence, departure_time
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND departure_time <= a.second
+                                  AND distance_traveled IS NOT NULL
                                 ORDER BY sequence DESC
                                 LIMIT 1
                             ) AS left_stop
@@ -86,6 +88,7 @@ public class VehicleService {
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND sequence < left_stop.sequence
                                   AND departure_time < left_stop.departure_time
+                                  AND distance_traveled IS NOT NULL
                                 ORDER BY sequence DESC
                                 LIMIT 1
                             ) AS earlier_stop ON true
@@ -94,6 +97,7 @@ public class VehicleService {
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND sequence > left_stop.sequence
                                   AND arrival_time >= a.second + :path
+                                  AND distance_traveled IS NOT NULL
                                 ORDER BY sequence
                                 LIMIT 1
                             ) AS last_stop ON true
@@ -102,6 +106,7 @@ public class VehicleService {
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND sequence > last_stop.sequence
                                   AND arrival_time > last_stop.arrival_time
+                                  AND distance_traveled IS NOT NULL
                                 ORDER BY sequence
                                 LIMIT 1
                             ) AS later_stop ON true

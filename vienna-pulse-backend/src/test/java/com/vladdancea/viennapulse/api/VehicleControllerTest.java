@@ -86,6 +86,18 @@ class VehicleControllerTest {
                 call(1, null, "00:00:00", 0),
                 call(2, null, null, 1500),
                 call(3, "00:20:00", null, 2000));
+        // Halfway from the first stop to the one at 1,800 m, past two without distances, which it
+        // passes like those without times.
+        timetable.addTrip(
+                "unmeasured",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:00:00", 0),
+                new Call(2, "stop", "00:04:00", "00:04:00", PickupDropOffType.REGULAR, null),
+                new Call(3, "stop", "00:05:00", "00:05:00", PickupDropOffType.REGULAR, null),
+                call(4, "00:06:00", "00:06:00", 1800),
+                call(5, "00:07:00", null, 2000));
         // Halfway along a shape whose middle point has no distance, which is passed over.
         timetable.addShapePoint("gap", 1, 16.0, 48.2, 0.0);
         timetable.addShapePoint("gap", 2, 16.0, 48.3, null);
@@ -124,6 +136,12 @@ class VehicleControllerTest {
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
                                           "headsign": "moving",
                                           "path": [[16.075, 48.0, 0.0], [16.0825, 48.0, 30.0]]}},
+                          {"type": "Feature", "id": "unmeasured",
+                           "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
+                           "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
+                                          "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
+                                          "headsign": "unmeasured",
+                                          "path": [[16.1, 48.05, 0.0], [16.1, 48.065, 30.0]]}},
                           {"type": "Feature", "id": "untimed",
                            "geometry": {"type": "Point", "coordinates": [16.05, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
