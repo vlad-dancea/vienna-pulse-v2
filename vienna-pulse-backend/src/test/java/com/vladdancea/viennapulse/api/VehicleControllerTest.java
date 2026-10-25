@@ -86,6 +86,18 @@ class VehicleControllerTest {
                 call(1, null, "00:00:00", 0),
                 call(2, null, null, 1500),
                 call(3, "00:20:00", null, 2000));
+        // Halfway from the first stop to the one at 1,800 m, past two without distances, which it
+        // passes like those without times.
+        timetable.addTrip(
+                "unmeasured",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:00:00", 0),
+                new Call(2, "stop", "00:04:00", "00:04:00", PickupDropOffType.REGULAR, null),
+                new Call(3, "stop", "00:05:00", "00:05:00", PickupDropOffType.REGULAR, null),
+                call(4, "00:06:00", "00:06:00", 1800),
+                call(5, "00:07:00", null, 2000));
         // Halfway along a shape whose middle point has no distance, which is passed over.
         timetable.addShapePoint("gap", 1, 16.0, 48.2, 0.0);
         timetable.addShapePoint("gap", 2, 16.0, 48.3, null);
@@ -112,28 +124,146 @@ class VehicleControllerTest {
                 .cacheControl(CacheControl.noCache())
                 .expectBody()
                 .json("""
-                        {"type": "FeatureCollection", "features": [
+                        {"type": "FeatureCollection", "time": "2026-10-19T22:05:00Z", "features": [
                           {"type": "Feature", "id": "gap",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.2]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "gap"}},
+                                          "headsign": "gap", "path": [[16.1, 48.2, 0.0], [16.11, 48.2, 30.0]]}},
                           {"type": "Feature", "id": "moving",
                            "geometry": {"type": "Point", "coordinates": [16.075, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "moving"}},
+                                          "headsign": "moving",
+                                          "path": [[16.075, 48.0, 0.0], [16.0825, 48.0, 30.0]]}},
+                          {"type": "Feature", "id": "unmeasured",
+                           "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
+                           "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
+                                          "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
+                                          "headsign": "unmeasured",
+                                          "path": [[16.1, 48.05, 0.0], [16.1, 48.065, 30.0]]}},
                           {"type": "Feature", "id": "untimed",
                            "geometry": {"type": "Point", "coordinates": [16.05, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "untimed"}},
+                                          "headsign": "untimed",
+                                          "path": [[16.05, 48.0, 0.0], [16.055, 48.0, 30.0]]}},
                           {"type": "Feature", "id": "waiting",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
                            "properties": {"line": "n25", "name": "N25", "longName": null, "type": "bus",
-                                          "color": null, "textColor": null, "headsign": "waiting"}}
+                                          "color": null, "textColor": null, "headsign": "waiting",
+                                          "path": [[16.1, 48.05, 0.0], [16.1, 48.05, 30.0]]}}
                         ]}
                         """, JsonCompareMode.STRICT);
+    }
+
+    @Test
+    void followsTheShapeAndWaitsAtStopsForThirtySeconds() {
+        timetable.addWeeklyService("tuesdays", DAY);
+        // The L, with a point just before the corner at the corner's distance, as the feed has now and
+        // then, and a point halfway between the corner and a stop, which the path passes anyway.
+        timetable.addShapePoint("corner", 1, 16.0, 48.0, 0.0);
+        timetable.addShapePoint("corner", 2, 16.099, 48.0, 1000.0);
+        timetable.addShapePoint("corner", 3, 16.1, 48.0, 1000.0);
+        timetable.addShapePoint("corner", 4, 16.1, 48.005, 1050.0);
+        timetable.addShapePoint("corner", 5, 16.1, 48.1, 2000.0);
+        // 10 m a second, 50 m before the corner, until it waits at a stop 100 m past it.
+        timetable.addTrip(
+                "corner",
+                "u1",
+                "tuesdays",
+                "corner",
+                call(1, null, "00:03:25", 0),
+                call(2, "00:05:15", "00:05:25", 1100),
+                call(3, "00:06:55", null, 2000));
+        // Reaches the end of the shape and of its trip 20 seconds from now.
+        timetable.addTrip(
+                "ending", "u1", "tuesdays", SHAPE, call(1, null, "00:04:20", 1600), call(2, "00:05:20", null, 2000));
+
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(
+                        List.of(
+                                List.of(16.095, 48.0, 0.0),
+                                List.of(16.1, 48.0, 5.0),
+                                List.of(16.1, 48.01, 15.0),
+                                List.of(16.1, 48.01, 25.0),
+                                List.of(16.1, 48.015, 30.0)),
+                        List.of(List.of(16.1, 48.086667, 0.0), List.of(16.1, 48.1, 20.0))));
+    }
+
+    @Test
+    void placesAVehicleTheSameWayInAnswersFifteenSecondsApart() {
+        timetable.addWeeklyService("tuesdays", DAY);
+        // Two points share a distance just past the stop at 900 m, the end of the first answer's calls.
+        timetable.addShapePoint("repeat", 1, 16.0, 48.2, 0.0);
+        timetable.addShapePoint("repeat", 2, 16.01, 48.2, 1000.0);
+        timetable.addShapePoint("repeat", 3, 16.0115, 48.2, 1000.0);
+        timetable.addShapePoint("repeat", 4, 16.02, 48.2, 2000.0);
+        timetable.addTrip(
+                "repeat",
+                "u1",
+                "tuesdays",
+                "repeat",
+                call(1, null, "00:05:00", 0),
+                call(2, "00:06:00", "00:06:00", 500),
+                call(3, "00:07:00", "00:07:00", 900),
+                call(4, "00:08:00", null, 2000));
+
+        // The second answer starts where the first one is halfway, towards the last of the two points.
+        clock.set("2026-10-19T22:05:20Z");
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(List.of(List.of(16.001917, 48.2, 0.0), List.of(16.004792, 48.2, 30.0))));
+        clock.set("2026-10-19T22:05:35Z");
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(List.of(
+                        List.of(16.003354, 48.2, 0.0), List.of(16.00575, 48.2, 25.0), List.of(16.006133, 48.2, 30.0))));
+    }
+
+    @Test
+    void sharesALegWithoutTimeWithTheLegsAroundIt() {
+        // Ten seconds after the first trip reached the stops at 600 m and 1,000 m, both at 00:05.
+        clock.set("2026-10-19T22:05:10Z");
+        timetable.addWeeklyService("tuesdays", DAY);
+        timetable.addTrip(
+                "rounded",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:04:00", 0),
+                call(2, "00:05:00", "00:05:00", 600),
+                call(3, "00:05:00", "00:05:00", 1000),
+                call(4, "00:06:00", null, 1400));
+        // Reaches its last two stops at 00:06, after the path ends.
+        timetable.addTrip(
+                "ending",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:04:00", 0),
+                call(2, "00:06:00", "00:06:00", 600),
+                call(3, "00:06:00", null, 1000));
+
+        // Each is halfway between the two stops at their minute.
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(
+                        List.of(List.of(16.046667, 48.0, 0.0), List.of(16.066667, 48.0, 30.0)),
+                        List.of(List.of(16.09, 48.0, 0.0), List.of(16.1, 48.0, 10.0), List.of(16.1, 48.02, 30.0))));
     }
 
     @Test
@@ -206,7 +336,7 @@ class VehicleControllerTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"type": "FeatureCollection", "features": []}
+                        {"type": "FeatureCollection", "time": "2026-10-19T22:05:00Z", "features": []}
                         """, JsonCompareMode.STRICT);
     }
 

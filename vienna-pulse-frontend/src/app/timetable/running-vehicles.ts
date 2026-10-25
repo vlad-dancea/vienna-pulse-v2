@@ -12,9 +12,7 @@ export type VehicleProperties = components['schemas']['VehicleProperties'];
 export class RunningVehicles {
   /** How often the vehicles are refreshed, and so how long they take to move to the next positions. */
   readonly interval = 15_000;
-  readonly vehicles = httpResource<components['schemas']['FeatureCollectionPointVehicleProperties']>(
-    () => '/api/vehicles',
-  );
+  readonly vehicles = httpResource<components['schemas']['Vehicles']>(() => '/api/vehicles');
   /** The last vehicles that loaded, kept on the map when a refresh fails. */
   readonly latest = latestValue(this.vehicles);
 

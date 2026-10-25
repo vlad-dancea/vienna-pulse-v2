@@ -1,11 +1,13 @@
 package com.vladdancea.viennapulse.api;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /// What the map knows about a vehicle besides where it is: the id of its line, the properties the
-/// map draws that line with, and where the trip is headed.
+/// map draws that line with, where the trip is headed and the path it follows next.
 public record VehicleProperties(
         String line,
         @JsonUnwrapped LineProperties properties,
-        @Nullable String headsign) {}
+        @Nullable String headsign,
+        List<Waypoint> path) {}

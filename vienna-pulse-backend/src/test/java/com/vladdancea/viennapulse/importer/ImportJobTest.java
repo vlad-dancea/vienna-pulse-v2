@@ -133,7 +133,8 @@ class ImportJobTest {
                 .expectBody()
                 .jsonPath("$.features[*].id")
                 .isEqualTo(List.of("21-U1-j26-1"));
-        // The U1 is halfway from Stephansplatz to Karlsplatz, and the tram waits at Schwedenplatz.
+        // The U1 is halfway from Stephansplatz to Karlsplatz and three quarters of the way 30 seconds
+        // later, and the tram waits at Schwedenplatz all that time.
         client.get()
                 .uri("/api/vehicles")
                 .exchange()
@@ -141,13 +142,15 @@ class ImportJobTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                {"type": "FeatureCollection", "features": [
+                {"type": "FeatureCollection", "time": "2026-10-20T06:03:00Z", "features": [
                   {"type": "Feature", "id": "1.T2.21-U1-j26-1.6.R",
                    "geometry": {"type": "Point", "coordinates": [16.370368, 48.204873]},
-                   "properties": {"line": "21-U1-j26-1", "headsign": "Wien Oberlaa", %s}},
+                   "properties": {"line": "21-U1-j26-1", "headsign": "Wien Oberlaa", %s,
+                                  "path": [[16.370368, 48.204873, 0.0], [16.369597, 48.203067, 30.0]]}},
                   {"type": "Feature", "id": "1.T2.22-2-j26-1.1.H",
                    "geometry": {"type": "Point", "coordinates": [16.377715, 48.211771]},
-                   "properties": {"line": "22-2-j26-1", "headsign": "Wien Friedrich-Engels-Platz", %s}}
+                   "properties": {"line": "22-2-j26-1", "headsign": "Wien Friedrich-Engels-Platz", %s,
+                                  "path": [[16.377715, 48.211771, 0.0], [16.377715, 48.211771, 30.0]]}}
                 ]}
                 """.formatted(unwrapped(U1), unwrapped(TRAM_2)), JsonCompareMode.STRICT);
         // The U1 left Schwedenplatz at 08:01, and the next day's trips leave more than an hour later.
