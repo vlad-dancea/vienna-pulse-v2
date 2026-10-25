@@ -171,7 +171,7 @@ public class DepartureService {
                 board.add(departure);
             }
         }
-        return new Departures(new Departures.Stop(stopId, name), live.status(), board);
+        return new Departures(new Departures.Stop(stopId, name), live.status(), live.liveIn(), board);
     }
 
     private static OffsetDateTime leaves(Departure departure) {

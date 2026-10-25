@@ -37,7 +37,8 @@ function departure(line: DepartureLine, headsign: string | null, minute: number,
 
 /** Karlsplatz's departures as the API answers them, by default for a stop without live data. */
 function answer(departures: Departure[], liveStatus: StopDepartures['liveStatus'] = 'unavailable'): StopDepartures {
-  return { stop: { id: 'at:49:657', name: 'Karlsplatz' }, liveStatus, departures };
+  const liveIn = liveStatus === 'pending' ? 15 : null;
+  return { stop: { id: 'at:49:657', name: 'Karlsplatz' }, liveStatus, liveIn, departures };
 }
 
 const karlsplatz = '/api/stops/at%3A49%3A657/departures';

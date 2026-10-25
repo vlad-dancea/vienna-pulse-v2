@@ -119,7 +119,7 @@ which days the timetable covers and where a service day's times start, are SQL f
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
 | `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors, the headsign and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
-| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop. Times are in Vienna. An unknown stop gets a 404. |
+| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop, with `liveIn`, the seconds until the next round, while it is `pending`. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
 its arrival and departure. The timetable gives whole minutes, so two stops can share one, and the
@@ -191,7 +191,8 @@ opened within 15 seconds of the last request waits for the next round, because t
 nothing sooner, and its first answer has the planned times only. The `liveStatus` says whether a
 later answer will have more:
 
-- `pending`: no round has fetched the station yet.
+- `pending`: no round has fetched the station yet. `liveIn` says in how many whole seconds,
+  rounded up, the next round may start, and is null for the other two.
 - `live`: a round fetched it in the last minute, so a departure without a live time has no live
   data.
 - `unavailable`: there is no live data, because the stop has no station or Wiener Linien failed

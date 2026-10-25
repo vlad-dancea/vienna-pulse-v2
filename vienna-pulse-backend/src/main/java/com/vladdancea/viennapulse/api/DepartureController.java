@@ -17,8 +17,9 @@ public class DepartureController {
 
     /// The next departures from the stop with the merged id the map shows, like `at:49:1320`, with
     /// Wiener Linien's live times, and a 404 for any other id. The request opens the stop for live
-    /// times, which the first answer has when the fair-use rules let the backend ask at once. Browsers
-    /// must check before reusing the response, which goes stale as soon as the first departure leaves.
+    /// times, which the first answer has when the fair-use rules let the backend ask at once, and
+    /// otherwise says in how many seconds the next request goes out. Browsers must check before
+    /// reusing the response, which goes stale as soon as the first departure leaves.
     @GetMapping("/api/stops/{id}/departures")
     public ResponseEntity<Departures> departures(@PathVariable String id) {
         return ResponseEntity.ok()

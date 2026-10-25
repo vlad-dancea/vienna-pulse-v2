@@ -65,7 +65,7 @@ class LiveDeparturesTest {
     void asksOnceForTheOpenStationsAndNotAtAllOnceTheyClose() {
         var live = live(100);
         // The process before this one may have asked just before it stopped.
-        assertThat(request(live, "at:49:1040")).isEqualTo(Live.PENDING);
+        assertThat(request(live, "at:49:1040")).isEqualTo(Live.pending(15));
         live.open("at:49:657", clock.instant());
 
         clock.set(MonitorServer.ANSWERED_AT);
@@ -109,7 +109,7 @@ class LiveDeparturesTest {
     }
 
     // The production check after a deploy: a second station opened soon after the first waits for
-    // the next round.
+    // the next round, as long as the answer says.
     @Test
     void asksForAStationOpenedWithinTheIntervalInTheNextRound() {
         var live = live(100);
@@ -117,7 +117,7 @@ class LiveDeparturesTest {
         assertThat(request(live, "at:49:1040")).isEqualTo(PRATERSTERN_LIVE);
 
         clock.set("2026-10-24T19:48:00.300Z");
-        assertThat(request(live, "at:49:657")).isEqualTo(Live.PENDING);
+        assertThat(request(live, "at:49:657")).isEqualTo(Live.pending(10));
 
         clock.set("2026-10-24T19:48:10Z");
         assertThat(request(live, "at:49:657")).isEqualTo(KARLSPLATZ_LIVE);
@@ -153,7 +153,7 @@ class LiveDeparturesTest {
         server.reset();
 
         clock.set("2026-10-24T19:48:10.999Z");
-        assertThat(request(live, "at:49:657")).isEqualTo(Live.PENDING);
+        assertThat(request(live, "at:49:657")).isEqualTo(Live.pending(1));
         clock.set("2026-10-24T19:48:11Z");
         assertThat(request(live, "at:49:657")).isEqualTo(KARLSPLATZ_LIVE);
         assertThat(server.requests()).containsExactly(concat(KARLSPLATZ, PRATERSTERN));
@@ -168,7 +168,7 @@ class LiveDeparturesTest {
         var loop = CompletableFuture.runAsync(live::round);
         assertThat(server.requests(1)).containsExactly(PRATERSTERN);
 
-        assertThat(request(live, "at:49:657")).isEqualTo(Live.PENDING);
+        assertThat(request(live, "at:49:657")).isEqualTo(Live.pending(15));
         assertThat(request(live, "at:49:1040")).isEqualTo(PRATERSTERN_LIVE);
         loop.join();
         assertThat(server.requests()).containsExactly(PRATERSTERN);
@@ -219,7 +219,7 @@ class LiveDeparturesTest {
                     if (asked.containsAll(platforms.get(stops.get(i % stops.size())))) {
                         assertThat(answer.status()).isEqualTo(LiveStatus.LIVE);
                     } else {
-                        assertThat(answer).isEqualTo(Live.PENDING);
+                        assertThat(answer).isEqualTo(Live.pending(15));
                     }
                 }
                 assertThat(server.requests()).hasSize(1);

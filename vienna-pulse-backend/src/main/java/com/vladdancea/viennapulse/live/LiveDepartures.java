@@ -121,7 +121,7 @@ public class LiveDepartures {
                 return Live.UNAVAILABLE;
             }
             if (answer == null) {
-                return Live.PENDING;
+                return Live.pending(secondsToNextRound(steadyNow));
             }
         }
         var departures = answer.departures();
@@ -256,6 +256,15 @@ public class LiveDepartures {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    // Whole seconds, rounded up, until the next round may start, and at least one, which the loop may
+    // take to see the gate open. While a round runs, the next starts an interval after it ends, and
+    // Wiener Linien usually answer within a fifth of a second.
+    private int secondsToNextRound(Instant steadyNow) {
+        var next = running != null ? steadyNow.plus(properties.roundInterval()) : nextRequest;
+        var nanos = Duration.between(steadyNow, next).toNanos();
+        return (int) Math.max(1, Math.ceilDiv(nanos, Duration.ofSeconds(1).toNanos()));
     }
 
     // Counts from an arbitrary instant and only moves on, unlike the system clock.

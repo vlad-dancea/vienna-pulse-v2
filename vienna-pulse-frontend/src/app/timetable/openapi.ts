@@ -83,6 +83,8 @@ export interface components {
         };
         Departures: {
             departures: components["schemas"]["Departure"][];
+            /** Format: int32 */
+            liveIn: number | null;
             /** @enum {string} */
             liveStatus: "pending" | "live" | "unavailable";
             stop: components["schemas"]["Stop"];

@@ -6,9 +6,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/// The next departures from a stop, soonest first, and whether Wiener Linien's live times for them
-/// have been fetched.
-public record Departures(Stop stop, LiveStatus liveStatus, List<Departure> departures) {
+/// The next departures from a stop, soonest first, whether Wiener Linien's live times for them have
+/// been fetched, and while they are `pending`, the whole seconds until the round that should fetch
+/// them, or `null` otherwise.
+public record Departures(
+        Stop stop, LiveStatus liveStatus, @Nullable Integer liveIn, List<Departure> departures) {
     /// The stop, with the merged id and name the map shows.
     public record Stop(String id, String name) {}
 

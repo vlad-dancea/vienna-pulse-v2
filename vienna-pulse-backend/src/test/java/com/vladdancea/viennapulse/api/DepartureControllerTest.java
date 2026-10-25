@@ -128,7 +128,7 @@ class DepartureControllerTest {
                 .cacheControl(CacheControl.noCache())
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live",
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live", "liveIn": null,
                          "departures": [
                            {"plannedTime": "2026-10-20T00:30:00+02:00", "liveTime": null, "headsign": "now",
                             "platform": "at:49:1320:0:2",
@@ -267,7 +267,7 @@ class DepartureControllerTest {
                 .expectBody()
                 .json(
                         """
-                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live",
+                        {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live", "liveIn": null,
                          "departures": [%s, %s, %s, %s, %s, %s]}
                         """.formatted(
                                         praterstern("21:49:00", "21:49:00", "Wien Heiligenstadt", ":0:3", BUS_5B),
@@ -292,7 +292,7 @@ class DepartureControllerTest {
                 .expectBody()
                 .json("""
                         {"stop": {"id": "at:43:3121", "name": "Baden Josefsplatz"}, "liveStatus": "unavailable",
-                         "departures": []}
+                         "liveIn": null, "departures": []}
                         """, JsonCompareMode.STRICT);
     }
 
@@ -305,7 +305,7 @@ class DepartureControllerTest {
                 .isOk()
                 .expectBody()
                 .json("""
-                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live",
+                        {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live", "liveIn": null,
                          "departures": []}
                         """, JsonCompareMode.STRICT);
     }
