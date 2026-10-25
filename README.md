@@ -122,7 +122,8 @@ which days the timetable covers and where a service day's times start, are SQL f
 | `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
-its arrival and departure. Trips without a shape, or without distances along it, are left out. The trip spans
+its arrival and departure. The timetable gives whole minutes, so two stops can share one, and the
+vehicle is then halfway between them at that minute instead of jumping. Trips without a shape, or without distances along it, are left out. The trip spans
 the importer records find the running trips without reading every stop time. A path has a waypoint
 wherever the vehicle reaches or leaves a stop or passes a point of its shape, except where the path
 passes within a metre anyway. Thirty seconds is two requests of a map, so its vehicles keep moving

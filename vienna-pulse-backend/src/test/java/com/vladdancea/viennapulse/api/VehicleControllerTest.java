@@ -176,6 +176,41 @@ class VehicleControllerTest {
     }
 
     @Test
+    void sharesALegWithoutTimeWithTheLegsAroundIt() {
+        // Ten seconds after the first trip reached the stops at 600 m and 1,000 m, both at 00:05.
+        clock.set("2026-10-19T22:05:10Z");
+        timetable.addWeeklyService("tuesdays", DAY);
+        timetable.addTrip(
+                "rounded",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:04:00", 0),
+                call(2, "00:05:00", "00:05:00", 600),
+                call(3, "00:05:00", "00:05:00", 1000),
+                call(4, "00:06:00", null, 1400));
+        // Reaches its last two stops at 00:06, after the path ends.
+        timetable.addTrip(
+                "ending",
+                "u1",
+                "tuesdays",
+                SHAPE,
+                call(1, null, "00:04:00", 0),
+                call(2, "00:06:00", "00:06:00", 600),
+                call(3, "00:06:00", null, 1000));
+
+        // Each is halfway between the two stops at their minute.
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(
+                        List.of(List.of(16.046667, 48.0, 0.0), List.of(16.066667, 48.0, 30.0)),
+                        List.of(List.of(16.09, 48.0, 0.0), List.of(16.1, 48.0, 10.0), List.of(16.1, 48.02, 30.0))));
+    }
+
+    @Test
     void placesTomorrowsTripsOnTheEveningBeforeTheClocksGoForward() {
         // 23:30 on Saturday 2026-03-28, already 00:30 on Sunday's service day.
         clock.set("2026-03-28T22:30:00Z");

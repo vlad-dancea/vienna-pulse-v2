@@ -6,9 +6,29 @@ import java.util.List;
 /// The part of a trip that a vehicle's path is worked out from: the moments it leaves and reaches
 /// stops in `knots`, in order, and the points of its shape around them in `shape`, in order. Between
 /// two knots the vehicle covers the distance at an even speed, so it waits at a stop from its arrival
-/// until its departure, and it passes a leg the timetable gives no time at once.
+/// until its departure. The knots must include every call at the times of the first and the last.
 record Itinerary(List<Knot> knots, List<ShapePoint> shape) {
     private static final double EARTH_RADIUS_METRES = 6_371_000;
+
+    // The timetable gives whole minutes, so two stops a few hundred metres apart can share one, and
+    // the vehicle would jump from one to the other. Instead it is halfway between them at that minute
+    // and covers the rest of the way in the legs before and after. Every call at that minute has to be
+    // among the knots, or two answers would put the vehicle in different places.
+    Itinerary {
+        var shared = new ArrayList<Knot>();
+        for (var first = 0; first < knots.size(); ) {
+            var last = first;
+            while (last + 1 < knots.size()
+                    && knots.get(last + 1).second() == knots.get(first).second()) {
+                last++;
+            }
+            var second = knots.get(first).second();
+            shared.add(new Knot(
+                    second, (knots.get(first).distance() + knots.get(last).distance()) / 2));
+            first = last + 1;
+        }
+        knots = shared;
+    }
 
     /// How far along its shape the trip is at `second`, counted on its service day like the stop times.
     record Knot(double second, double distance) {}
@@ -103,7 +123,6 @@ record Itinerary(List<Knot> knots, List<ShapePoint> shape) {
         return Math.hypot(east, north);
     }
 
-    // At two knots with the same second, the later one counts, so the trip has passed the leg.
     private double distance(double second) {
         for (var index = 1; index < knots.size(); index++) {
             var next = knots.get(index);

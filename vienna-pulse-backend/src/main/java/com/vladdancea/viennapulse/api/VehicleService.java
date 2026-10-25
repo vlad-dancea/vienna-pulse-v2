@@ -34,7 +34,8 @@ public class VehicleService {
     /// Between leaving one stop and reaching the next, a vehicle covers the distance between them
     /// along its shape at an even speed. It waits at a stop from its arrival until its departure.
     /// A call without times, which the feed allows between two timed ones, is passed like any other
-    /// point of the shape, and points of the shape without a distance are passed over.
+    /// point of the shape, and points of the shape without a distance are passed over. When two calls
+    /// share a minute, the vehicle is halfway between them at that minute instead of jumping.
     ///
     /// Times count from noon minus 12 hours on their service day, as for the departures, and pass
     /// 24 hours for trips that run after midnight. The feed's times end before 30 hours, so trips of
@@ -66,14 +67,15 @@ public class VehicleService {
                             WHERE s.service_id IN (SELECT service_id FROM running r WHERE r.day = m.day)
                         ),
                         -- The calls with times from the last stop each trip left to the first it reaches after
-                        -- the path ends, or its last. The first call has only a departure and the last only an
-                        -- arrival, so each time stands in for the other.
+                        -- the path ends, or its last, and the calls before and after them that share their
+                        -- minutes. The first call has only a departure and the last only an arrival, so each
+                        -- time stands in for the other.
                         calls AS (
                             SELECT a.trip_id, a.second, t.route_id, t.headsign, t.shape_id, c.*
                             FROM active a
                             JOIN timetable.trips t ON t.id = a.trip_id
                             CROSS JOIN LATERAL (
-                                SELECT sequence
+                                SELECT sequence, departure_time
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND departure_time <= a.second
                                 ORDER BY sequence DESC
@@ -82,11 +84,27 @@ public class VehicleService {
                             LEFT JOIN LATERAL (
                                 SELECT sequence
                                 FROM timetable.stop_times
+                                WHERE trip_id = a.trip_id AND sequence < left_stop.sequence
+                                  AND departure_time < left_stop.departure_time
+                                ORDER BY sequence DESC
+                                LIMIT 1
+                            ) AS earlier_stop ON true
+                            LEFT JOIN LATERAL (
+                                SELECT sequence, arrival_time
+                                FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND sequence > left_stop.sequence
                                   AND arrival_time >= a.second + :path
                                 ORDER BY sequence
                                 LIMIT 1
                             ) AS last_stop ON true
+                            LEFT JOIN LATERAL (
+                                SELECT sequence
+                                FROM timetable.stop_times
+                                WHERE trip_id = a.trip_id AND sequence > last_stop.sequence
+                                  AND arrival_time > last_stop.arrival_time
+                                ORDER BY sequence
+                                LIMIT 1
+                            ) AS later_stop ON true
                             CROSS JOIN LATERAL (
                                 SELECT array_agg(coalesce(arrival_time, departure_time) ORDER BY sequence) AS arrivals,
                                        array_agg(coalesce(departure_time, arrival_time) ORDER BY sequence) AS departures,
@@ -95,8 +113,8 @@ public class VehicleService {
                                        max(distance_traveled) AS last_distance
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id
-                                  AND sequence >= left_stop.sequence
-                                  AND (last_stop.sequence IS NULL OR sequence <= last_stop.sequence)
+                                  AND sequence >= coalesce(earlier_stop.sequence, left_stop.sequence)
+                                  AND sequence <= coalesce(later_stop.sequence, 2147483647)
                                   AND (arrival_time IS NOT NULL OR departure_time IS NOT NULL)
                                   AND distance_traveled IS NOT NULL
                             ) AS c
