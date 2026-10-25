@@ -124,8 +124,10 @@ public class VehicleService {
                                   AND distance_traveled IS NOT NULL
                             ) AS c
                         ),
-                        -- The points of the shape from the last one at or before the first call to the first
-                        -- one at or after the last call, which the vehicle cannot leave until the path ends.
+                        -- The points of the shape from the last one at or before the first call to the next
+                        -- one past the last call, which the vehicle cannot leave until the path ends. Itinerary
+                        -- keeps the last of the points that share a distance, so every point at that next
+                        -- distance is read too.
                         shaped AS (
                             SELECT c.*, p.*
                             FROM calls c
@@ -139,10 +141,18 @@ public class VehicleService {
                                 LIMIT 1
                             ) AS first_point
                             LEFT JOIN LATERAL (
+                                SELECT distance_traveled
+                                FROM timetable.shape_points
+                                WHERE shape_id = c.shape_id AND sequence > first_point.sequence
+                                  AND distance_traveled > c.last_distance
+                                ORDER BY sequence
+                                LIMIT 1
+                            ) AS next_point ON true
+                            LEFT JOIN LATERAL (
                                 SELECT sequence
                                 FROM timetable.shape_points
                                 WHERE shape_id = c.shape_id AND sequence > first_point.sequence
-                                  AND distance_traveled >= c.last_distance
+                                  AND distance_traveled > next_point.distance_traveled
                                 ORDER BY sequence
                                 LIMIT 1
                             ) AS last_point ON true

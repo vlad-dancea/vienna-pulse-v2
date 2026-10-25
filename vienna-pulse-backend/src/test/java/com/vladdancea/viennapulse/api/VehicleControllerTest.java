@@ -196,6 +196,42 @@ class VehicleControllerTest {
     }
 
     @Test
+    void placesAVehicleTheSameWayInAnswersFifteenSecondsApart() {
+        timetable.addWeeklyService("tuesdays", DAY);
+        // Two points share a distance just past the stop at 900 m, the end of the first answer's calls.
+        timetable.addShapePoint("repeat", 1, 16.0, 48.2, 0.0);
+        timetable.addShapePoint("repeat", 2, 16.01, 48.2, 1000.0);
+        timetable.addShapePoint("repeat", 3, 16.0115, 48.2, 1000.0);
+        timetable.addShapePoint("repeat", 4, 16.02, 48.2, 2000.0);
+        timetable.addTrip(
+                "repeat",
+                "u1",
+                "tuesdays",
+                "repeat",
+                call(1, null, "00:05:00", 0),
+                call(2, "00:06:00", "00:06:00", 500),
+                call(3, "00:07:00", "00:07:00", 900),
+                call(4, "00:08:00", null, 2000));
+
+        // The second answer starts where the first one is halfway, towards the last of the two points.
+        clock.set("2026-10-19T22:05:20Z");
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(List.of(List.of(16.001917, 48.2, 0.0), List.of(16.004792, 48.2, 30.0))));
+        clock.set("2026-10-19T22:05:35Z");
+        client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .expectBody()
+                .jsonPath("$.features[*].properties.path")
+                .isEqualTo(List.of(List.of(
+                        List.of(16.003354, 48.2, 0.0), List.of(16.00575, 48.2, 25.0), List.of(16.006133, 48.2, 30.0))));
+    }
+
+    @Test
     void sharesALegWithoutTimeWithTheLegsAroundIt() {
         // Ten seconds after the first trip reached the stops at 600 m and 1,000 m, both at 00:05.
         clock.set("2026-10-19T22:05:10Z");
