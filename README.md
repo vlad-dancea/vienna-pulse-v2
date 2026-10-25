@@ -309,8 +309,8 @@ fetched recently has planned times only, so each time shows a loader. The panel 
 that answer's `liveIn` says the next round may start, because a request that arrives then starts
 the round or joins it and waits for its answer (see [Live departures](#live-departures)). While a
 round outlasts its 2 second timeout, `liveIn` can fall a little short, and the panel gets one more
-`pending` answer first. Without `liveIn`, and after a refresh that failed, it asks every 15 seconds
-instead of 30.
+`pending` answer first. Without `liveIn`, and after a refresh that failed while the live times were
+pending, it asks every 15 seconds instead of 30.
 The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
 license asks.
 
