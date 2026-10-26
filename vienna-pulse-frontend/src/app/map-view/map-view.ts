@@ -183,9 +183,9 @@ export class MapView {
           [16.1, 47.95],
           [16.65, 48.4],
         ],
-        // Wiener Linien publish the timetable behind the stops, lines and vehicles and the departure
-        // panel's live times under CC BY 4.0, which asks for credit. These options replace MapLibre's
-        // defaults, so they repeat its compact control and link.
+        // The stops, lines and vehicles come from Wiener Linien's timetable and the departure panel's live
+        // times from their realtime data, both published by Stadt Wien under CC BY 4.0, which asks for
+        // credit. These options replace MapLibre's defaults, so they repeat its compact control and link.
         attributionControl: {
           compact: true,
           customAttribution: [

@@ -86,7 +86,7 @@ internet access. Administrators and CI reach the server over Tailscale.
 At 07:00 Vienna time, [`ImportJob`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/ImportJob.java)
 downloads the ZIP file of Wiener Linien's
 [GTFS feed](https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de),
-which they publish under CC BY 4.0, and checks that it has every file the importer needs. It streams
+which Stadt Wien publishes under CC BY 4.0, and checks that it has every file the importer needs. It streams
 the routes, stops, shapes, trips, stop times, service calendars and their exceptions into a `staging` schema with
 PostgreSQL's `COPY`. Then it classifies every platform by the modes of the trips that let
 passengers board or alight there, and records when each trip leaves its first stop and reaches
@@ -151,7 +151,7 @@ seconds on a database that stops answering altogether. Other database errors get
 The [`live`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/live) package adds
 live times to the departures from the `monitor` endpoint of Wiener Linien's
 [realtime API](https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de),
-which they publish under CC BY 4.0. It answers without a key with every departure of the next 70
+whose data Stadt Wien publishes under CC BY 4.0. It answers without a key with every departure of the next 70
 minutes from the platforms it is asked about, with a planned time and usually a live one, but
 without a trip id or a vehicle position.
 

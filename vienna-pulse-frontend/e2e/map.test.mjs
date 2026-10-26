@@ -203,8 +203,8 @@ test('draws the stops, lines and vehicles from the API, filters them by mode and
   await page.getByRole('button', { name: 'All' }).click();
   await expectDrawn(page, all);
 
-  // Wiener Linien license their timetable and the realtime data the departure panel shows, and Stadt
-  // Wien the districts, under CC BY 4.0, which asks for credit with links to the data and the license.
+  // Stadt Wien publishes Wiener Linien's timetable, the realtime data the departure panel shows and the
+  // district boundaries under CC BY 4.0, which asks for credit with links to the data and the license.
   const credits = page.locator('.maplibregl-ctrl-attrib-inner');
   await expect(credits).toHaveText(
     'MapLibre | Datenquelle: Stadt Wien - data.wien.gv.at (CC BY 4.0, simplified) | ' +
