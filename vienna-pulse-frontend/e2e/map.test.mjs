@@ -295,3 +295,41 @@ test("opens a clicked stop's departures, closes them on Escape, opens them from 
   await expect(panel.getByRole('listitem')).toHaveText(row);
   expect(errors).toEqual([]);
 });
+
+test('opens a stop found by name with the keyboard alone and returns to the search when it closes', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.goto(origin);
+  const search = page.getByRole('combobox', { name: 'Find a stop' });
+  await expect(search).toBeVisible();
+
+  // The search is the first thing Tab reaches.
+  await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  await page.keyboard.type('stop');
+  await expect(page.getByRole('option')).toHaveText([/^\s*Bus stop\s*Bus\s*$/, /Tram stop/, /U-Bahn stop/]);
+  await expect(page.getByRole('search').getByRole('status')).toHaveText('3 stops match.');
+  await expect(page.getByRole('option', { selected: true })).toHaveText(/Bus stop/);
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('option', { selected: true })).toHaveText(/U-Bahn stop/);
+  await expect(search).toHaveAttribute('aria-activedescendant', 'stop-search-at:49:1');
+
+  await page.keyboard.press('Enter');
+  const panel = page.getByRole('region', { name: 'U-Bahn stop' });
+  await expect(panel.getByRole('heading', { name: 'U-Bahn stop' })).toBeFocused();
+  await expect(panel.getByRole('listitem')).toHaveCount(1);
+  await expect(page).toHaveURL(`${origin}/?stop=at:49:1`);
+  await expect(page.getByRole('listbox')).toBeHidden();
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(page).toHaveURL(`${origin}/`);
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('stop');
+  expect(errors).toEqual([]);
+});

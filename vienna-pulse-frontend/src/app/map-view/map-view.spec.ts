@@ -457,7 +457,7 @@ describe('MapView', () => {
     const retry = Array.from(element.querySelectorAll('button')).find(
       (button) => button.textContent.trim() === 'Retry lines',
     );
-    const status = element.querySelector('[role="status"]');
+    const status = element.querySelector('section [role="status"]');
     expect(status?.textContent.trim()).toBe('Lines could not be loaded.');
     retry?.focus();
     retry?.click();
@@ -466,7 +466,7 @@ describe('MapView', () => {
     await fixture.whenStable();
     expect(document.activeElement?.textContent).toBe('Filters');
     // The same live region stays, so screen readers announce its next message.
-    expect(element.querySelector('[role="status"]')).toBe(status);
+    expect(element.querySelector('section [role="status"]')).toBe(status);
     expect(status?.textContent.trim()).toBe('');
     expect(setData).toHaveBeenLastCalledWith(routes);
     fixture.destroy();
@@ -623,11 +623,60 @@ describe('MapView', () => {
     expect(document.activeElement).toBe(canvas);
   });
 
+  it('opens a stop found by name like a clicked one, at street level, and returns focus to the search', async () => {
+    // jsdom does not lay out pages, so it cannot scroll an option into view.
+    Element.prototype.scrollIntoView = vi.fn();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/', MapView);
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    await harness.fixture.whenStable();
+    const router = TestBed.inject(Router);
+    const element = harness.fixture.nativeElement as HTMLElement;
+    const search = document.getElementById('stop-search') as HTMLInputElement;
+    const find = async (name: string) => {
+      search.focus();
+      search.value = name;
+      search.dispatchEvent(new Event('input'));
+      await harness.fixture.whenStable();
+      search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    };
+
+    const navigation = firstValueFrom(router.events.pipe(filter((event) => event instanceof NavigationEnd)));
+    await find('tram');
+    await navigation;
+    TestBed.tick();
+    expect(router.url).toBe('/?stop=tram');
+    expect(map.setFilter).toHaveBeenLastCalledWith('selected-stop', ['==', ['get', 'id'], 'tram']);
+    expect(document.activeElement?.id).toBe('departures-heading');
+    // jsdom lays nothing out, so the stop lands in the middle of a map without a size.
+    expect(map.easeTo).toHaveBeenCalledExactlyOnceWith({ center: [16.38, 48.2], offset: [0, 0], zoom: 15 });
+    http
+      .expectOne('/api/stops/tram/departures')
+      .flush({ stop: { id: 'tram', name: 'Tram' }, liveStatus: 'unavailable', departures: [] });
+    await harness.fixture.whenStable();
+
+    // Finding the open stop again moves the map back to it and focus back to its name.
+    await find('tram');
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/?stop=tram');
+    expect(map.easeTo).toHaveBeenCalledTimes(2);
+    expect(document.activeElement?.id).toBe('departures-heading');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/');
+    expect(element.querySelector('app-departure-panel')).toBeNull();
+    expect(document.activeElement).toBe(search);
+  });
+
   it('opens the map on the stop a link names once the map and the stops have loaded', async () => {
-    // A phone, where the sheet covers the map's bottom half and the Filters card its top.
+    // A phone, where the sheet covers the map's bottom half and the card with the search and the filters its top.
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       const top = this.tagName === 'APP-DEPARTURE-PANEL' ? 422 : 0;
-      const bottom = this.getAttribute('aria-labelledby') === 'network-heading' ? 140 : 844;
+      const bottom = this.firstElementChild?.tagName === 'APP-STOP-SEARCH' ? 140 : 844;
       return DOMRect.fromRect({ x: 0, y: top, width: 390, height: bottom - top });
     });
     const harness = await RouterTestingHarness.create();
@@ -645,7 +694,7 @@ describe('MapView', () => {
 
     http.expectOne('/api/stops').flush(stops);
     await harness.fixture.whenStable();
-    // The stop lands halfway between the Filters card and the sheet.
+    // The stop lands halfway between the card and the sheet.
     expect(map.easeTo).toHaveBeenCalledExactlyOnceWith({
       center: [16.39, 48.2],
       offset: [0, (140 + 422) / 2 - 844 / 2],

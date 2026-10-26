@@ -13,13 +13,11 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { modeNames } from '../mode-names';
 import { latestValue } from '../timetable/latest-value';
 import { refreshEvery } from '../timetable/refresh-every';
 import { stopDepartures } from '../timetable/stop-departures';
 import { boardRows } from './departure-board';
-
-// How the empty board names the modes the map's filter can show.
-const modeNames: Record<string, string> = { subway: 'U-Bahn', tram: 'tram', bus: 'bus' };
 
 /** Shows a stop's next departures grouped by line and headsign, beside the map or as a sheet below it on phones. */
 @Component({
@@ -77,6 +75,11 @@ export class DeparturePanel {
   protected readonly retryShown = computed(() => !!this.departures.error() && !this.unknown() && !this.rows().length);
 
   private readonly headingElement = viewChild.required<ElementRef<HTMLElement>>('heading');
+
+  /** Moves focus to the stop's name, as when the panel opens. */
+  focus() {
+    this.headingElement().nativeElement.focus();
+  }
 
   protected retry() {
     // The error and retry button disappear after success, so focus the panel's persistent heading.

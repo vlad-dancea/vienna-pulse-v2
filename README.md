@@ -354,6 +354,19 @@ the round or joins it and waits for its answer (see [Live departures](#live-depa
 round outlasts its 2 second timeout, `liveIn` can fall a little short, and the panel gets one more
 `pending` answer first. Without `liveIn`, and after a refresh that failed while the live times were
 pending, it asks every 15 seconds instead of 30.
+
+The "Find a stop" field at the top of the map panel opens a stop by its name, for keyboard and
+screen reader users and for riders who know a stop's name but not where it is. It finds the stops
+with a word in their name that starts with each typed word, without regard to case or accents, and
+reads ae, oe, ue and ss as ä, ö, ü and ß, so "doebling" finds Döblinger Hauptstraße and "platz"
+finds Stockholmer Platz but not Karlsplatz. It lists the first eight matches with the modes that
+stop there, only for the mode the filter shows, and screen readers hear how many stops match. The
+field follows the WAI-ARIA combobox pattern: typing selects the best match, Down and Up move
+through the list, Enter opens the selected stop, and Escape closes the list and then clears the
+field. A found stop opens like a clicked one, and the map moves to it at street level. Focus moves
+to the stop's name and back to the field when the panel closes. On phones the list ends above the
+on-screen keyboard and the map's attribution.
+
 The map's attribution credits the timetable as "Fahrplandaten: Wiener Linien" and the live times as
 "Echtzeitdaten: Wiener Linien", as their CC BY 4.0 licenses ask. Stadt Wien publishes both, and its
 [open data terms](https://digitales.wien.gv.at/ogd-nutzungsbedingungen/) ask for the credit
