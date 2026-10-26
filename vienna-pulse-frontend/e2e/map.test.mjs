@@ -366,3 +366,17 @@ test('keeps the list and the focused filter above the departure sheet on a short
   await expect(all).toBeFocused();
   expect(await onTop(all)).toBe(true);
 });
+
+test('marks the selected stop with an outline that forced colors keep', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await page.goto(origin);
+  await page.getByRole('combobox', { name: 'Find a stop' }).fill('stop');
+  const outline = (option) =>
+    option.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return style.outlineStyle === 'none' ? 'none' : `${style.outlineWidth} ${style.outlineColor}`;
+    });
+  // Forced colors replace the selected option's dark background with the page's own.
+  expect(await outline(page.getByRole('option', { selected: true }))).toBe('2px rgb(0, 0, 0)');
+  expect(await outline(page.getByRole('option', { selected: false }).first())).toBe('none');
+});
