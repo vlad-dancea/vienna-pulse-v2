@@ -80,18 +80,21 @@ export function boardRows(departures: readonly Departure[], now: number): BoardR
 }
 
 /**
- * Names the platforms that a row's departures leave from by the codes signs show. Wiener Linien name
- * the platform only of a departure with a live time, so one without takes the code of the row's other
- * departure when the timetable has both at the same platform. A departure with a live time and no
- * code leaves from a platform without one. Departures from different platforms are named in turn,
- * like the times beside them.
+ * Names the platforms that a row's departures leave from by the codes signs show. A departure has a
+ * code only when the backend paired it with one of Wiener Linien's, which usually has a live time. One
+ * with neither most likely was not paired, so it takes the code of the row's other departure when the
+ * timetable has both at the same platform. A departure with a live time and no code leaves from a
+ * platform without one. Departures from different platforms are named in turn, like the times beside
+ * them.
  */
 function platformLabel(departures: readonly Departure[]): LabelPart[] {
-  const codes = departures.map((departure) =>
-    departure.liveTime === null
-      ? (departures.find((other) => other.platform === departure.platform && other.platformCode !== null)
-          ?.platformCode ?? null)
-      : departure.platformCode,
+  const codes = departures.map(
+    (departure) =>
+      departure.platformCode ??
+      (departure.liveTime === null
+        ? (departures.find((other) => other.platform === departure.platform && other.platformCode !== null)
+            ?.platformCode ?? null)
+        : null),
   );
   const [first = null, second = first] = codes;
   if (first !== null && second !== null) {

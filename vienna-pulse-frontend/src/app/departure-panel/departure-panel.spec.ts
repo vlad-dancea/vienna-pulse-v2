@@ -180,6 +180,9 @@ describe('DeparturePanel', () => {
           from(5, 'D', departure(tram1, 'Wien Stefan-Fadinger-Platz', 12, 12)),
           from(10, 'G', departure(bus4a, 'Wien Karlsplatz', 1, 1)),
           from(17, 'B', departure(bus4a, 'Wien Karlsplatz', 5, 5)),
+          // Paired with a live departure that has no live time, so its code is its own.
+          from(6, 'I', departure(bus4a, 'Wien Wittelsbachstraße', 2, 2)),
+          from(6, 'J', departure(bus4a, 'Wien Wittelsbachstraße', 10)),
           // Platform 12 has no code.
           from(18, 'E', departure(bus13a, 'Wien Alser Straße', 4, 4)),
           from(12, null, departure(bus13a, 'Wien Alser Straße', 8, 8)),
@@ -199,10 +202,11 @@ describe('DeparturePanel', () => {
       ['1', 'Platform H'],
       ['1', 'Then from platform D'],
       ['4A', 'Platform G, then B'],
+      ['4A', 'Platform I, then J'],
       ['13A', 'Next from platform E'],
       ['13A', 'Then from platform E'],
     ]);
-    expect(Array.from(element.querySelectorAll('li b'), words)).toEqual(['2', 'H', 'D', 'G', 'B', 'E', 'E']);
+    expect(Array.from(element.querySelectorAll('li b'), words)).toEqual(['2', 'H', 'D', 'G', 'B', 'I', 'J', 'E', 'E']);
   });
 
   it('shows loaders and asks again when liveIn says, every 15 seconds after a failed refresh and every 30 with the live times', async () => {

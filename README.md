@@ -347,13 +347,13 @@ and from the timetable otherwise. A green signal marks the live times. When the 
 minute or more away from the planned one, the planned time appears struck through beside it, and
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
 Under the headsign, a row names the platform it leaves from by the code that signs show, in bold,
-such as "Platform C". Only departures with a live time have a code, so one without takes the code
-of the row's other departure when the timetable has both at the same platform. When the two leave
-from different platforms, the row names them in turn, such as "Platform G, then B" at Floridsdorf,
-or names the one with a code as "Next from platform E" or "Then from platform E". Rows have no
-label while the live times are pending or at stops without codes. The label takes the line beside
-the clock times, so a row keeps its height when the codes arrive if its headsign and label each fit
-on one line.
+such as "Platform C". Only departures paired with a live one have a code, and nearly all of those
+have a live time, so a departure with neither takes the code of the row's other departure when the
+timetable has both at the same platform. When the two leave from different platforms, the row
+names them in turn, such as "Platform G, then B" at Floridsdorf, or names the one with a code as
+"Next from platform E" or "Then from platform E". Rows have no label while the live times are
+pending or at stops without codes. The label takes the line beside the clock times, so a row keeps
+its height when the codes arrive if its headsign and label each fit on one line.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
 When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
 fetched recently has planned times only, so each time shows a loader. The panel asks again when
