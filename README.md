@@ -409,12 +409,13 @@ and realtime data, which the backend serves and whose excerpts are the test data
 `vienna-pulse-backend/src/test/resources/`, and the district boundaries in
 `vienna-pulse-frontend/public/data/`.
 
-The skills in `.agents/skills/` are unchanged copies from their upstream repositories. The
-project's own skills there (`full-stop`, `full-send` and `sol-loop`) are under the MIT License above.
+The project's own skills in `.agents/skills/` (`full-stop`, `full-send` and `sol-loop`) are under
+the MIT License above. The others are unchanged copies from their upstream repositories, and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) holds their copyright notices and license texts.
 
 | Skill | License | Upstream |
 | --- | --- | --- |
-| `angular-developer` | [MIT](https://github.com/angular/skills/blob/main/angular-developer/SKILL.md), Copyright 2026 Google LLC | [angular/skills](https://github.com/angular/skills) |
-| `maplibre-cartography`, `maplibre-source-wiring`, `maplibre-tile-sources` | [MIT](https://github.com/maplibre/maplibre-agent-skills/blob/main/LICENSE.md), Copyright (c) 2026 MapLibre contributors | [maplibre/maplibre-agent-skills](https://github.com/maplibre/maplibre-agent-skills) |
-| `supabase-postgres-best-practices` | [MIT](https://github.com/supabase/agent-skills/blob/main/LICENSE), Copyright (c) 2026 Supabase | [supabase/agent-skills](https://github.com/supabase/agent-skills) |
-| `wrangler` | [Apache License 2.0](https://github.com/cloudflare/skills/blob/main/LICENSE) | [cloudflare/skills](https://github.com/cloudflare/skills) |
+| `angular-developer` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [angular/skills](https://github.com/angular/skills) |
+| `maplibre-cartography`, `maplibre-source-wiring`, `maplibre-tile-sources` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [maplibre/maplibre-agent-skills](https://github.com/maplibre/maplibre-agent-skills) |
+| `supabase-postgres-best-practices` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [supabase/agent-skills](https://github.com/supabase/agent-skills) |
+| `wrangler` | [Apache License 2.0](THIRD_PARTY_NOTICES.md#apache-license-20) | [cloudflare/skills](https://github.com/cloudflare/skills) |
