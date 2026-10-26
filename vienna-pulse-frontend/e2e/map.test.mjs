@@ -179,7 +179,7 @@ async function expectDrawn(page, shown) {
   await expect.poll(() => colors(page), { timeout: 20_000 }).toEqual(expected);
 }
 
-test('draws the stops, lines and vehicles from the API, filters them by mode and credits the live times', async ({
+test('draws the stops, lines and vehicles from the API, filters them by mode and credits the timetable and live times', async ({
   page,
 }) => {
   const errors = [];
@@ -203,11 +203,27 @@ test('draws the stops, lines and vehicles from the API, filters them by mode and
   await page.getByRole('button', { name: 'All' }).click();
   await expectDrawn(page, all);
 
-  // Wiener Linien's realtime data, which the departure panel shows, is licensed under CC BY 4.0.
-  await expect(page.getByRole('link', { name: 'Wiener Linien' })).toHaveAttribute(
-    'href',
-    'https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de',
+  // Wiener Linien license their timetable and the realtime data the departure panel shows, and Stadt
+  // Wien the districts, under CC BY 4.0, which asks for credit with links to the data and the license.
+  const credits = page.locator('.maplibregl-ctrl-attrib-inner');
+  await expect(credits).toHaveText(
+    'MapLibre | Datenquelle: Stadt Wien - data.wien.gv.at (CC BY 4.0, simplified) | ' +
+      'Fahrplandaten: Wiener Linien (CC BY 4.0) | Echtzeitdaten: Wiener Linien (CC BY 4.0)',
   );
+  const license = 'https://creativecommons.org/licenses/by/4.0/';
+  expect(
+    await credits
+      .getByRole('link')
+      .evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
+  ).toEqual([
+    ['MapLibre', 'https://maplibre.org/'],
+    ['Stadt Wien - data.wien.gv.at', 'https://data.wien.gv.at'],
+    ['CC BY 4.0', license],
+    ['Wiener Linien', 'https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de'],
+    ['CC BY 4.0', license],
+    ['Wiener Linien', 'https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de'],
+    ['CC BY 4.0', license],
+  ]);
   expect(errors).toEqual([]);
 });
 

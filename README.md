@@ -84,7 +84,9 @@ internet access. Administrators and CI reach the server over Tailscale.
 ### Daily import
 
 At 07:00 Vienna time, [`ImportJob`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/ImportJob.java)
-downloads the feed's ZIP file and checks that it has every file the importer needs. It streams
+downloads the ZIP file of Wiener Linien's
+[GTFS feed](https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de),
+which they publish under CC BY 4.0, and checks that it has every file the importer needs. It streams
 the routes, stops, shapes, trips, stop times, service calendars and their exceptions into a `staging` schema with
 PostgreSQL's `COPY`. Then it classifies every platform by the modes of the trips that let
 passengers board or alight there, and records when each trip leaves its first stop and reaches
@@ -338,8 +340,8 @@ the round or joins it and waits for its answer (see [Live departures](#live-depa
 round outlasts its 2 second timeout, `liveIn` can fall a little short, and the panel gets one more
 `pending` answer first. Without `liveIn`, and after a refresh that failed while the live times were
 pending, it asks every 15 seconds instead of 30.
-The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
-license asks.
+The map's attribution credits the timetable as "Fahrplandaten: Wiener Linien" and the live times as
+"Echtzeitdaten: Wiener Linien", as their CC BY 4.0 licenses ask.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
