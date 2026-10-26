@@ -232,8 +232,8 @@ A departure planned up to an hour ago stays on the board while its live time is 
 the two departures shown for each line and headsign are the soonest by live time where there is
 one. The live time is what the displays at the stops show, but a delay computed from it can
 mislead: during a U3 disruption, Wiener Linien paired a train planned for 20:15 with 21:02 and one
-planned for 20:33 with 20:23. The [map view](#map-view) shows the live times in its departure
-panel.
+planned for 20:33 with 20:23. The [map view](#map-view) shows the live times and platform codes
+in its departure panel.
 
 Every answer also goes into `public.live_departures`, outside the schema imports replace, for
 statistics of how punctual the lines are. A row is one departure, by platform, line, direction and
@@ -377,6 +377,14 @@ minutes until it leaves and its clock time, both from Wiener Linien's live time 
 and from the timetable otherwise. A green signal marks the live times. When the live time is a
 minute or more away from the planned one, the planned time appears struck through beside it, and
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
+Under the headsign, a row names the platform it leaves from by the code that signs show, in bold,
+such as "Platform C". Only departures paired with a live one have a code, and nearly all of those
+have a live time, so a departure with neither takes the code of the row's other departure when the
+timetable has both at the same platform. When the two leave from different platforms, the row
+names them in turn, such as "Platform G, then B" at Floridsdorf, or names the one with a code as
+"Next from platform E" or "Then from platform E". Rows have no label while the live times are
+pending or at stops without codes. The label takes the line beside the clock times, so a row keeps
+its height when the codes arrive if its headsign and label each fit on one line.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
 When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
 fetched recently has planned times only, so each time shows a loader. The panel asks again when
@@ -428,3 +436,25 @@ through Cloudflare. A merge that changes neither, such as one to this README, de
 request from a branch in this repository that changes the frontend gets a Preview at
 `pr-<number>.pulse.vladdancea.com`. See [`deploy/README.md`](deploy/README.md) for credentials,
 previews, manual deployments and rollback.
+
+## License
+
+The project's own code is under the [MIT License](LICENSE). The data and the vendored agent skills
+in this repository keep the licenses they came with.
+
+Stadt Wien publishes the data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+with the credit "Datenquelle: Stadt Wien – data.wien.gv.at". That covers Wiener Linien's GTFS feed
+and realtime data, which the backend serves and whose excerpts are the test data in
+`vienna-pulse-backend/src/test/resources/`, and the district boundaries in
+`vienna-pulse-frontend/public/data/`.
+
+The project's own skills in `.agents/skills/` (`full-stop`, `full-send` and `sol-loop`) are under
+the MIT License above. The others are unchanged copies from their upstream repositories, and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) holds their copyright notices and license texts.
+
+| Skill | License | Upstream |
+| --- | --- | --- |
+| `angular-developer` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [angular/skills](https://github.com/angular/skills) |
+| `maplibre-cartography`, `maplibre-source-wiring`, `maplibre-tile-sources` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [maplibre/maplibre-agent-skills](https://github.com/maplibre/maplibre-agent-skills) |
+| `supabase-postgres-best-practices` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [supabase/agent-skills](https://github.com/supabase/agent-skills) |
+| `wrangler` | [Apache License 2.0](THIRD_PARTY_NOTICES.md#apache-license-20) | [cloudflare/skills](https://github.com/cloudflare/skills) |
