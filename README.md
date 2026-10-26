@@ -405,3 +405,25 @@ through Cloudflare. A merge that changes neither, such as one to this README, de
 request from a branch in this repository that changes the frontend gets a Preview at
 `pr-<number>.pulse.vladdancea.com`. See [`deploy/README.md`](deploy/README.md) for credentials,
 previews, manual deployments and rollback.
+
+## License
+
+The project's own code is under the [MIT License](LICENSE). The data and the vendored agent skills
+in this repository keep the licenses they came with.
+
+Stadt Wien publishes the data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+with the credit "Datenquelle: Stadt Wien – data.wien.gv.at". That covers Wiener Linien's GTFS feed
+and realtime data, which the backend serves and whose excerpts are the test data in
+`vienna-pulse-backend/src/test/resources/`, and the district boundaries in
+`vienna-pulse-frontend/public/data/`.
+
+The project's own skills in `.agents/skills/` (`full-stop`, `full-send` and `sol-loop`) are under
+the MIT License above. The others are unchanged copies from their upstream repositories, and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) holds their copyright notices and license texts.
+
+| Skill | License | Upstream |
+| --- | --- | --- |
+| `angular-developer` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [angular/skills](https://github.com/angular/skills) |
+| `maplibre-cartography`, `maplibre-source-wiring`, `maplibre-tile-sources` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [maplibre/maplibre-agent-skills](https://github.com/maplibre/maplibre-agent-skills) |
+| `supabase-postgres-best-practices` | [MIT](THIRD_PARTY_NOTICES.md#mit-license) | [supabase/agent-skills](https://github.com/supabase/agent-skills) |
+| `wrangler` | [Apache License 2.0](THIRD_PARTY_NOTICES.md#apache-license-20) | [cloudflare/skills](https://github.com/cloudflare/skills) |
