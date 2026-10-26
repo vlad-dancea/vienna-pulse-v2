@@ -15,6 +15,18 @@ tone_instructions: >-
   already says.
 
 reviews:
+  # The third-party skills in .agents/skills/ stay identical to upstream, so a finding in them
+  # cannot be fixed here (#104 got 27). The project's own full-stop, full-send and sol-loop are
+  # still reviewed. Path filters also decide which files CodeRabbit checks out, so
+  # angular-developer keeps its SKILL.md, which the code guidelines below read.
+  # .claude/skills is only a link to that folder, so no diff lists files below it.
+  path_filters:
+    - "!.agents/skills/angular-developer/references/**"
+    - "!.agents/skills/maplibre-cartography/**"
+    - "!.agents/skills/maplibre-source-wiring/**"
+    - "!.agents/skills/maplibre-tile-sources/**"
+    - "!.agents/skills/supabase-postgres-best-practices/**"
+    - "!.agents/skills/wrangler/**"
   # The description already says what changed, and it belongs to its author, so CodeRabbit
   # writes no summary into it or into the walkthrough.
   high_level_summary: false
