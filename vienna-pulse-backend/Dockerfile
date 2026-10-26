@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # Packages the boot jar that `./gradlew bootJar` built and CI tested. The image only runs it.
 # The JRE matches the JDK pinned in mise.toml, so production runs the build CI tested on.

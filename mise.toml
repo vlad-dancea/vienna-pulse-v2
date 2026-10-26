@@ -4,9 +4,9 @@ monorepo_root = true
 config_roots = ["vienna-pulse-backend", "vienna-pulse-frontend"]
 
 [tools]
-java = "temurin-25.0.4+101.0.LTS"
-node = "24.21.0"
-pnpm = "12.11.2"
+java = "temurin-25.0.5+8.0.LTS"
+node = "24.22.1"
+pnpm = "12.15.0"
 # The `lint` task below runs these three.
 actionlint = "1.7.12"
 shellcheck = "0.11.0"
