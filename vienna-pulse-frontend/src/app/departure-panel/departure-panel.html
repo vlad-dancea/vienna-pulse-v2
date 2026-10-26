@@ -53,7 +53,21 @@
         >
           {{ row.line }}
         </span>
-        <span class="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]">{{ row.headsign }}</span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-medium [overflow-wrap:anywhere]">{{ row.headsign }}</span>
+          @if (row.platform.length) {
+            <!-- The pieces are elements, so the line breaks between them add no space before a comma. -->
+            <span class="block text-xs text-slate-600">
+              @for (part of row.platform; track $index) {
+                @if (part.code) {
+                  <b class="font-semibold text-slate-900">{{ part.text }}</b>
+                } @else {
+                  <span>{{ part.text }}</span>
+                }
+              }
+            </span>
+          }
+        </span>
         <span class="grid shrink-0 grid-cols-2 gap-x-3">
           @for (departure of row.departures; track $index) {
             <span class="w-16 tabular-nums">
