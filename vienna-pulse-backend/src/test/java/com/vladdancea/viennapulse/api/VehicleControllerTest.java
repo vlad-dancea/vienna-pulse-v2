@@ -1,5 +1,8 @@
 package com.vladdancea.viennapulse.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.jayway.jsonpath.JsonPath;
 import com.vladdancea.viennapulse.TestClock;
 import com.vladdancea.viennapulse.TestcontainersConfiguration;
 import com.vladdancea.viennapulse.TimetableFixture;
@@ -7,6 +10,9 @@ import com.vladdancea.viennapulse.TimetableFixture.Call;
 import com.vladdancea.viennapulse.importer.read.calendar.ExceptionType;
 import com.vladdancea.viennapulse.importer.read.route.RouteType;
 import com.vladdancea.viennapulse.importer.read.stoptime.PickupDropOffType;
+import com.vladdancea.viennapulse.live.LiveDepartures;
+import com.vladdancea.viennapulse.live.MonitorServer;
+import com.vladdancea.viennapulse.live.Platforms;
 import java.time.LocalDate;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -39,8 +45,23 @@ class VehicleControllerTest {
     @Autowired
     TestClock clock;
 
+    @Autowired
+    LiveDepartures live;
+
+    @Autowired
+    Platforms platforms;
+
+    @Autowired
+    MonitorServer monitor;
+
     @BeforeEach
     void removeTheTimetable() {
+        platforms.load();
+        // A round forgets the stations nobody opened in the minute before it, so one far ahead
+        // forgets those of other tests.
+        clock.set("2100-01-01T00:00:00Z");
+        live.round();
+        monitor.reset();
         // Five past midnight on DAY in Vienna.
         clock.set("2026-10-19T22:05:00Z");
         timetable.clear();
@@ -129,29 +150,30 @@ class VehicleControllerTest {
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.2]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "gap", "path": [[16.1, 48.2, 0.0], [16.11, 48.2, 30.0]]}},
+                                          "headsign": "gap", "delay": null,
+                                          "path": [[16.1, 48.2, 0.0], [16.11, 48.2, 30.0]]}},
                           {"type": "Feature", "id": "moving",
                            "geometry": {"type": "Point", "coordinates": [16.075, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "moving",
+                                          "headsign": "moving", "delay": null,
                                           "path": [[16.075, 48.0, 0.0], [16.0825, 48.0, 30.0]]}},
                           {"type": "Feature", "id": "unmeasured",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "unmeasured",
+                                          "headsign": "unmeasured", "delay": null,
                                           "path": [[16.1, 48.05, 0.0], [16.1, 48.065, 30.0]]}},
                           {"type": "Feature", "id": "untimed",
                            "geometry": {"type": "Point", "coordinates": [16.05, 48.0]},
                            "properties": {"line": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa",
                                           "type": "subway", "color": "#E3000F", "textColor": "#FFFFFF",
-                                          "headsign": "untimed",
+                                          "headsign": "untimed", "delay": null,
                                           "path": [[16.05, 48.0, 0.0], [16.055, 48.0, 30.0]]}},
                           {"type": "Feature", "id": "waiting",
                            "geometry": {"type": "Point", "coordinates": [16.1, 48.05]},
                            "properties": {"line": "n25", "name": "N25", "longName": null, "type": "bus",
-                                          "color": null, "textColor": null, "headsign": "waiting",
+                                          "color": null, "textColor": null, "headsign": "waiting", "delay": null,
                                           "path": [[16.1, 48.05, 0.0], [16.1, 48.05, 30.0]]}}
                         ]}
                         """, JsonCompareMode.STRICT);
@@ -327,6 +349,54 @@ class VehicleControllerTest {
                 .isEqualTo(List.of(List.of(16.0305, 48.0), List.of(16.0305, 48.0)));
     }
 
+    // The fake monitor's answer came from Praterstern at 21:47:55 on Saturday 2026-10-24, when Wiener
+    // Linien expected the U1 towards Oberlaa to leave 34 seconds after the timetable's 21:49:00. The
+    // board opens the station, and the next round pairs the answer with the board's timetable.
+    @Test
+    void movesAVehicleGraduallyToWhereTheLiveTimeOfAnOpenStationPutsIt() {
+        clock.set(MonitorServer.ANSWERED_AT);
+        timetable.addWeeklyService("saturdays", LocalDate.parse("2026-10-24"));
+        timetable.addStop("at:49:1040:0:1", "Praterstern");
+        // 250 m a minute along the L, round the corner at Praterstern.
+        timetable.addTripTowards(
+                "u1-oberlaa",
+                "Wien Oberlaa",
+                1,
+                "u1",
+                "saturdays",
+                SHAPE,
+                call(1, null, "21:45:00", 0),
+                new Call(2, "at:49:1040:0:1", "21:49:00", "21:49:00", PickupDropOffType.REGULAR, 1000.0),
+                call(3, "21:53:00", null, 2000));
+        client.get()
+                .uri("/api/stops/at:49:1040/departures")
+                .exchange()
+                .expectStatus()
+                .isOk();
+        live.round();
+
+        // The delay changes only once the paths that maps already have end, and then by half a second
+        // each second, so the vehicle slows down to half its speed until it is 34 seconds behind.
+        assertThat(vehicleAt("2026-10-24T19:48:00Z"))
+                .isEqualTo(new Vehicle(null, List.of(List.of(16.075, 48.0, 0.0), List.of(16.0875, 48.0, 30.0))));
+        assertThat(vehicleAt("2026-10-24T19:48:30Z"))
+                .isEqualTo(new Vehicle(0, List.of(List.of(16.0875, 48.0, 0.0), List.of(16.09375, 48.0, 30.0))));
+        assertThat(vehicleAt("2026-10-24T19:49:30Z"))
+                .isEqualTo(new Vehicle(
+                        30,
+                        List.of(
+                                List.of(16.1, 48.0, 0.0),
+                                List.of(16.1, 48.001667, 8.0),
+                                List.of(16.1, 48.010833, 30.0))));
+        assertThat(vehicleAt("2026-10-24T19:50:00Z"))
+                .isEqualTo(new Vehicle(34, List.of(List.of(16.1, 48.010833, 0.0), List.of(16.1, 48.023333, 30.0))));
+        // The timetable ends the trip at 21:53, and the vehicle 34 seconds later.
+        assertThat(vehicleAt("2026-10-24T19:53:05Z"))
+                .isEqualTo(new Vehicle(34, List.of(List.of(16.1, 48.087917, 0.0), List.of(16.1, 48.1, 29.0))));
+        // Working out the vehicles asked Wiener Linien nothing.
+        assertThat(monitor.requests()).hasSize(2);
+    }
+
     @Test
     void servesNoVehiclesWhenNothingRuns() {
         client.get()
@@ -339,6 +409,21 @@ class VehicleControllerTest {
                         {"type": "FeatureCollection", "time": "2026-10-19T22:05:00Z", "features": []}
                         """, JsonCompareMode.STRICT);
     }
+
+    // The one vehicle of the answer at `instant`, by its delay and path.
+    private Vehicle vehicleAt(String instant) {
+        clock.set(instant);
+        var body = client.get()
+                .uri("/api/vehicles")
+                .exchange()
+                .returnResult(String.class)
+                .getResponseBody();
+        return new Vehicle(
+                JsonPath.read(body, "$.features[0].properties.delay"),
+                JsonPath.read(body, "$.features[0].properties.path"));
+    }
+
+    private record Vehicle(@Nullable Integer delay, List<List<Double>> path) {}
 
     // A call at a stop the test does not need, `distance` metres along the trip's shape.
     private static Call call(int sequence, @Nullable String arrival, @Nullable String departure, double distance) {

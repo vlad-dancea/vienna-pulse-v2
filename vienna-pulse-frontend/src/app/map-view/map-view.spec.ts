@@ -98,6 +98,7 @@ const tram62 = {
   color: null,
   textColor: null,
   headsign: 'Oper',
+  delay: null,
 };
 
 // A tram waiting at a stop for the whole path, so it is drawn at the same place whenever a frame comes.

@@ -2,6 +2,7 @@ package com.vladdancea.viennapulse.api;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /// The part of a trip that a vehicle's path is worked out from: the moments it leaves and reaches
 /// stops in `knots`, in order, and the points of its shape around them in `shape`, in order. Between
@@ -45,6 +46,59 @@ record Itinerary(List<Knot> knots, List<ShapePoint> shape) {
 
     /// A point of the shape and how far along the shape it is.
     record ShapePoint(double longitude, double latitude, double distance) {}
+
+    /// This itinerary as a vehicle follows it that runs `delay` behind it, with the seconds of `delay`
+    /// counted from `from`. The delay must change by less than a second each second, so that the
+    /// vehicle never turns back. Where it changes how fast it changes, the vehicle changes speed, so
+    /// those moments become knots too.
+    Itinerary delayed(double from, Delay delay) {
+        var points = delay.points();
+        var delayed = new ArrayList<Knot>();
+        var point = 0;
+        for (var knot : knots) {
+            var second = from + reached(knot.second() - from, points);
+            for (; point < points.size() && from + points.get(point).second() < second; point++) {
+                bend(from, points.get(point)).ifPresent(delayed::add);
+            }
+            delayed.add(new Knot(second, knot.distance()));
+        }
+        for (; point < points.size(); point++) {
+            bend(from, points.get(point)).ifPresent(delayed::add);
+        }
+        return new Itinerary(delayed, shape);
+    }
+
+    // Where the vehicle is at a point of its delay, unless the trip has not started or has ended then.
+    private Optional<Knot> bend(double from, Delay.Point point) {
+        var second = from + point.second() - point.delay();
+        return second > knots.getFirst().second() && second < knots.getLast().second()
+                ? Optional.of(new Knot(from + point.second(), distance(second)))
+                : Optional.empty();
+    }
+
+    // The second since `from` at which a vehicle `points` behind this itinerary reaches where it is
+    // `seconds` after `from`. Each point takes the vehicle to where this itinerary was its delay
+    // before, and so does each second between two, since the delay changes evenly.
+    private static double reached(double seconds, List<Delay.Point> points) {
+        if (points.isEmpty()) {
+            return seconds;
+        }
+        var first = points.getFirst();
+        if (seconds <= first.second() - first.delay()) {
+            return seconds + first.delay();
+        }
+        for (var index = 1; index < points.size(); index++) {
+            var next = points.get(index);
+            var nextPlace = next.second() - next.delay();
+            if (nextPlace > seconds) {
+                var last = points.get(index - 1);
+                var lastPlace = last.second() - last.delay();
+                return last.second()
+                        + (seconds - lastPlace) * (next.second() - last.second()) / (nextPlace - lastPlace);
+            }
+        }
+        return seconds + points.getLast().delay();
+    }
 
     /// The path from second `from` to `to`, or to the end of the trip if that comes first, with the
     /// seconds since `from`: where the vehicle is at the start, every point of the shape it passes,

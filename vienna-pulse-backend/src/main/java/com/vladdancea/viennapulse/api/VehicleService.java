@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 /// Works out where the vehicles of the current timetable are and where they go next.
 @Service
@@ -24,13 +26,26 @@ public class VehicleService {
     /// vehicles keep moving when one answer fails or comes late.
     static final Duration PATH = Duration.ofSeconds(30);
 
+    // The delayed trips go to the database as one JSON array, whose keys are the columns it reads.
+    private static final JsonMapper JSON = JsonMapper.builder()
+            .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .build();
+
     @TimeLimited
     private final JdbcClient jdbc;
+
+    private final VehicleDelays vehicleDelays;
 
     /// A point for every trip that has left its first stop and not yet reached its last at `now`,
     /// ordered by trip id, where its timetable puts it, with the path it follows for the next
     /// [#PATH]. Trips without a shape, or without distances along it, are left out, since there is
     /// nowhere to put them.
+    ///
+    /// A trip that the live times put behind or ahead of its timetable, as [VehicleDelays] works out,
+    /// is where its timetable puts it that many seconds earlier or later, and it runs when that
+    /// moment of its timetable falls between its first stop and its last. The delays come from the
+    /// rounds for the stations people opened, so working out the vehicles sends Wiener Linien
+    /// nothing.
     ///
     /// Between leaving one stop and reaching the next, a vehicle covers the distance between them
     /// along its shape at an even speed. It waits at a stop from its arrival until its departure.
@@ -44,6 +59,11 @@ public class VehicleService {
     /// yesterday's service day can still be running. So can tomorrow's on the evening before the
     /// clocks go forward, when its time 00:00 is 23:00 the day before.
     public Vehicles vehicles(Instant now) {
+        var delays = vehicleDelays.along(now);
+        var delayed = delays.entrySet().stream()
+                .map(entry -> new Delayed(
+                        entry.getKey(), entry.getValue().at(0), entry.getValue().last()))
+                .toList();
         var features = jdbc.sql("""
                         WITH days AS (
                             SELECT CAST(:today AS date) + shift AS day,
@@ -59,21 +79,37 @@ public class VehicleService {
                             SELECT m.day, r.service_id
                             FROM moments m CROSS JOIN LATERAL pulse.running_services(m.day) AS r
                         ),
-                        -- The spans find the running trips without reading the calls of the tens of thousands
-                        -- that run on the day but not now.
+                        -- The trips that run behind or ahead of their timetable, with their delays in seconds at
+                        -- the start and at the end of the path.
+                        delayed AS (
+                            SELECT *
+                            FROM jsonb_to_recordset(CAST(:delays AS jsonb))
+                                AS d (trip_id text, at_start double precision, at_end double precision)
+                        ),
+                        -- Each running trip with the moment and the seconds of its own times at which the path
+                        -- starts and ends, which its delay sets back. The spans find the running trips without
+                        -- reading the calls of the tens of thousands that run on the day but not now, as far
+                        -- before and after now as the delays reach. As two queries in a union, the delayed trips
+                        -- and the others led the planner to expect 27,000 running trips and to read every trip.
                         active AS (
-                            SELECT s.trip_id, m.second
+                            SELECT s.trip_id,
+                                   m.second AS moment,
+                                   m.second - coalesce(d.at_start, 0) AS second,
+                                   m.second + :path - coalesce(d.at_end, 0) AS path_end
                             FROM moments m
                             JOIN timetable.trip_spans s
-                              ON s.first_departure <= m.second AND s.last_arrival > m.second
+                              ON s.first_departure <= m.second + :ahead AND s.last_arrival > m.second - :behind
+                            LEFT JOIN delayed d ON d.trip_id = s.trip_id
                             WHERE s.service_id IN (SELECT service_id FROM running r WHERE r.day = m.day)
+                              AND s.first_departure <= m.second - coalesce(d.at_start, 0)
+                              AND s.last_arrival > m.second - coalesce(d.at_start, 0)
                         ),
                         -- The calls with times and distances from the last stop each trip left to the first it
                         -- reaches after the path ends, or its last, and the calls before and after them that
                         -- share their minutes. The first call has only a departure and the last only an arrival, so each
                         -- time stands in for the other.
                         calls AS (
-                            SELECT a.trip_id, a.second, t.route_id, t.headsign, t.shape_id, c.*
+                            SELECT a.trip_id, a.moment, t.route_id, t.headsign, t.shape_id, c.*
                             FROM active a
                             JOIN timetable.trips t ON t.id = a.trip_id
                             CROSS JOIN LATERAL (
@@ -97,7 +133,7 @@ public class VehicleService {
                                 SELECT sequence, arrival_time
                                 FROM timetable.stop_times
                                 WHERE trip_id = a.trip_id AND sequence > left_stop.sequence
-                                  AND arrival_time >= a.second + :path
+                                  AND arrival_time >= a.path_end
                                   AND distance_traveled IS NOT NULL
                                 ORDER BY sequence
                                 LIMIT 1
@@ -171,7 +207,7 @@ public class VehicleService {
                         SELECT s.trip_id,
                                s.route_id,
                                s.headsign,
-                               s.second,
+                               s.moment,
                                s.arrivals,
                                s.departures,
                                s.distances,
@@ -190,17 +226,39 @@ public class VehicleService {
                 .param("today", LocalDate.ofInstant(now, Timetable.ZONE))
                 .param("now", now.atOffset(ZoneOffset.UTC))
                 .param("path", PATH.toSeconds())
+                .param("delays", JSON.writeValueAsString(delayed))
+                .param(
+                        "ahead",
+                        Math.max(
+                                0,
+                                -delayed.stream()
+                                        .mapToDouble(Delayed::atStart)
+                                        .min()
+                                        .orElse(0)))
+                .param(
+                        "behind",
+                        Math.max(
+                                0,
+                                delayed.stream()
+                                        .mapToDouble(Delayed::atStart)
+                                        .max()
+                                        .orElse(0)))
                 .query((row, number) -> {
-                    var second = row.getDouble("second");
-                    var path = itinerary(row).path(second, second + PATH.toSeconds());
+                    var trip = row.getString("trip_id");
+                    var moment = row.getDouble("moment");
+                    var delay = delays.get(trip);
+                    var itinerary = itinerary(row);
+                    var path = (delay == null ? itinerary : itinerary.delayed(moment, delay))
+                            .path(moment, moment + PATH.toSeconds());
                     var start = path.getFirst();
                     return new Feature<>(
-                            row.getString("trip_id"),
+                            trip,
                             new Point(start.longitude(), start.latitude()),
                             new VehicleProperties(
                                     row.getString("route_id"),
                                     LineProperties.from(row),
                                     row.getString("headsign"),
+                                    delay == null ? null : (int) Math.round(delay.at(0)),
                                     path));
                 })
                 .list();
@@ -228,4 +286,8 @@ public class VehicleService {
         }
         return new Itinerary(knots, shape);
     }
+
+    // A trip that runs behind or ahead of its timetable on the path, by how many seconds at its start
+    // and at its end.
+    private record Delayed(String tripId, double atStart, double atEnd) {}
 }
