@@ -218,8 +218,8 @@ A paired departure also gets the code that signs show for its platform, such as 
 U-Bahn platform or a letter for one of the bus and tram stops at a large station. The codes come
 from Wiener Linien's
 [list of platform codes](https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-ogd-steige.csv),
-which has 452 platforms at 170 stations and loads with the list of platforms. A failed load of the
-codes leaves the live times alone. The timetable has no codes, and its platform ids have nothing in
+which has 452 platforms at 170 stations and loads like the list of platforms, but on its own, so a
+failed load of the codes leaves the live times alone. The timetable has no codes, and its platform ids have nothing in
 common with Wiener Linien's platform numbers, so a departure without a live one has no code. On
 2026-10-26, 1,098 of the 1,154 paired departures at the 14 stations with the most codes got one,
 and the other 56 left from platforms without a code. Wiener Linien's route file could tie the two

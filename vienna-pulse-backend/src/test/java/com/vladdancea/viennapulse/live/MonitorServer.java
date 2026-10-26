@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// Stands in for Wiener Linien's realtime API on a free local port. It serves a list of the
 /// platforms of Karlsplatz, Praterstern and Stephansplatz and Wiener Linien's codes for them, answers every `monitor`
@@ -34,13 +35,17 @@ public final class MonitorServer implements AutoCloseable {
 
     private final HttpServer server;
     private final List<List<Integer>> requests = new CopyOnWriteArrayList<>();
+    private final AtomicInteger platformCodeRequests = new AtomicInteger();
     private volatile HttpHandler answer = respond(200, JSON, ANSWER);
     private volatile HttpHandler codes = respond(200, "text/csv", CODES);
 
     private MonitorServer(HttpServer server) {
         this.server = server;
         server.createContext("/haltepunkte.csv", respond(200, "text/csv", PLATFORMS));
-        server.createContext("/steige.csv", exchange -> codes.handle(exchange));
+        server.createContext("/steige.csv", exchange -> {
+            platformCodeRequests.incrementAndGet();
+            codes.handle(exchange);
+        });
         server.createContext("/monitor", exchange -> {
             requests.add(platforms(exchange));
             answer.handle(exchange);
@@ -74,6 +79,7 @@ public final class MonitorServer implements AutoCloseable {
     /// platform codes again.
     public void reset() {
         requests.clear();
+        platformCodeRequests.set(0);
         answer = respond(200, JSON, ANSWER);
         codes = respond(200, "text/csv", CODES);
     }
@@ -138,6 +144,11 @@ public final class MonitorServer implements AutoCloseable {
                 // The client hung up.
             }
         };
+    }
+
+    /// How many requests asked for the list of platform codes.
+    public int platformCodeRequests() {
+        return platformCodeRequests.get();
     }
 
     /// The platforms each `monitor` request asked about, in order.

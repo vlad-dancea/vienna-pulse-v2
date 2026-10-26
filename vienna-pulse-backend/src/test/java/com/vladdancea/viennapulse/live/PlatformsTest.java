@@ -16,10 +16,10 @@ class PlatformsTest {
 
     final TestClock clock = new TestClock();
 
-    // The live times need only the platforms, so they load without the codes, which the hourly check
-    // tries again.
+    // The live times need only the platforms, so they load without the codes. A failed load of the
+    // codes keeps the last ones, if any, and the next hourly check tries again.
     @Test
-    void loadsThePlatformsWithoutTheCodesAndTheCodesWithinTheHour() {
+    void loadsThePlatformsWithoutTheCodesAndTriesTheCodesAgainEveryHour() {
         clock.set(MonitorServer.ANSWERED_AT);
         server.removePlatformCodes();
         var platforms = new Platforms(properties(), RestClient.builder(), clock);
@@ -36,6 +36,16 @@ class PlatformsTest {
 
         assertThat(platforms.code(4112)).isEqualTo("2");
         assertThat(platforms.code(2100)).isNull();
+
+        // A day later the reload fails, and so does the next hour's.
+        server.removePlatformCodes();
+        clock.set("2026-10-25T20:47:55Z");
+        platforms.refresh();
+        clock.set("2026-10-25T21:47:55Z");
+        platforms.refresh();
+
+        assertThat(platforms.code(4112)).isEqualTo("2");
+        assertThat(server.platformCodeRequests()).isEqualTo(3);
     }
 
     private LiveProperties properties() {

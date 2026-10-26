@@ -35,8 +35,10 @@ public class Platforms {
     private final RestClient client;
     private final Clock clock;
 
-    // Replaced whole by each load and read by requests and rounds on other threads.
+    // Each replaced whole by each load of its list and read by requests and rounds on other threads.
+    // The codes load on their own, so the live times never wait on them.
     private volatile @Nullable Loaded loaded;
+    private volatile @Nullable Codes codes;
 
     public Platforms(LiveProperties properties, RestClient.Builder clientBuilder, Clock clock) {
         this.properties = properties;
@@ -70,46 +72,50 @@ public class Platforms {
     /// platform or `C` for one of the tram stops at a large station, or `null` for a platform without
     /// one.
     public @Nullable String code(int platform) {
-        var current = loaded;
+        var current = codes;
         return current == null ? null : current.codes().get(platform);
     }
 
-    /// Loads the lists when they are missing or a day old. It runs at startup and then every hour, so a
-    /// failed load is tried again within the hour, while the last lists, if any, stay in use.
+    /// Loads each list when it is missing or a day old. It runs at startup and then every hour, so a
+    /// failed load is tried again within the hour, while the last list, if any, stays in use.
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.HOURS)
     void refresh() {
-        var current = loaded;
-        if (current == null
-                || current.codes().isEmpty()
-                || !clock.instant().isBefore(current.at().plus(MAX_AGE))) {
-            load();
+        var currentPlatforms = loaded;
+        if (currentPlatforms == null || isOld(currentPlatforms.at())) {
+            loadPlatforms();
+        }
+        var currentCodes = codes;
+        if (currentCodes == null || isOld(currentCodes.at())) {
+            loadCodes();
         }
     }
 
-    /// Downloads the lists and replaces the ones in memory, or keeps them if that fails. The live times
-    /// need only the platforms, so they load even when the codes fail to.
+    /// Downloads both lists and replaces the ones in memory, keeping each list whose download fails.
     public void load() {
-        var current = loaded;
+        loadPlatforms();
+        loadCodes();
+    }
+
+    private void loadPlatforms() {
         try {
-            var platforms = download(properties.platformsUrl());
-            loaded = parse(platforms, codes(current), clock.instant());
-            log.info(
-                    "Loaded the platforms of {} stations and the codes of {} platforms",
-                    loaded.platforms().size(),
-                    loaded.codes().size());
+            loaded = parse(download(properties.platformsUrl()), clock.instant());
+            log.info("Loaded the platforms of {} stations", loaded.platforms().size());
         } catch (RuntimeException exception) {
             log.warn("Could not load the platforms from {}", properties.platformsUrl(), exception);
         }
     }
 
-    // The codes from the list, or the last ones, if any, when it fails to load.
-    private Map<Integer, String> codes(@Nullable Loaded current) {
+    private void loadCodes() {
         try {
-            return parseCodes(download(properties.platformCodesUrl()));
+            codes = new Codes(parseCodes(download(properties.platformCodesUrl())), clock.instant());
+            log.info("Loaded the codes of {} platforms", codes.codes().size());
         } catch (RuntimeException exception) {
             log.warn("Could not load the platform codes from {}", properties.platformCodesUrl(), exception);
-            return current == null ? Map.of() : current.codes();
         }
+    }
+
+    private boolean isOld(Instant loadedAt) {
+        return !clock.instant().isBefore(loadedAt.plus(MAX_AGE));
     }
 
     private String download(URI list) {
@@ -122,7 +128,7 @@ public class Platforms {
 
     // Each row is a platform, `StopID;DIVA;StopText;...`, with the number of its station. Platforms out
     // of use, such as a bus stop for a diversion, have no station.
-    private static Loaded parse(String csv, Map<Integer, String> codes, Instant at) {
+    private static Loaded parse(String csv, Instant at) {
         var platforms = new HashMap<Integer, List<Integer>>();
         var stations = new HashMap<Integer, Integer>();
         for (var row :
@@ -140,7 +146,7 @@ public class Platforms {
             throw new IllegalStateException("The list of platforms has no rows");
         }
         platforms.replaceAll((station, numbers) -> List.copyOf(numbers));
-        return new Loaded(Map.copyOf(platforms), Map.copyOf(stations), codes, at);
+        return new Loaded(Map.copyOf(platforms), Map.copyOf(stations), at);
     }
 
     // Each row is a platform with a code, `StopID;Platform`, such as `4112;2`. The list has only the
@@ -162,11 +168,9 @@ public class Platforms {
         return Map.copyOf(codes);
     }
 
-    // The platforms of each station, the station of each platform, the code of each platform that has
-    // one, and when the list of platforms was loaded.
-    private record Loaded(
-            Map<Integer, List<Integer>> platforms,
-            Map<Integer, Integer> stations,
-            Map<Integer, String> codes,
-            Instant at) {}
+    // The platforms of each station, the station of each platform, and when the list was loaded.
+    private record Loaded(Map<Integer, List<Integer>> platforms, Map<Integer, Integer> stations, Instant at) {}
+
+    // The code of each platform that has one, and when the list was loaded.
+    private record Codes(Map<Integer, String> codes, Instant at) {}
 }
