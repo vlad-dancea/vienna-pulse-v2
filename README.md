@@ -84,7 +84,9 @@ internet access. Administrators and CI reach the server over Tailscale.
 ### Daily import
 
 At 07:00 Vienna time, [`ImportJob`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/importer/ImportJob.java)
-downloads the feed's ZIP file and checks that it has every file the importer needs. It streams
+downloads the ZIP file of Wiener Linien's
+[GTFS feed](https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de),
+which Stadt Wien publishes under CC BY 4.0, and checks that it has every file the importer needs. It streams
 the routes, stops, shapes, trips, stop times, service calendars and their exceptions into a `staging` schema with
 PostgreSQL's `COPY`. Then it classifies every platform by the modes of the trips that let
 passengers board or alight there, and records when each trip leaves its first stop and reaches
@@ -149,7 +151,7 @@ seconds on a database that stops answering altogether. Other database errors get
 The [`live`](vienna-pulse-backend/src/main/java/com/vladdancea/viennapulse/live) package adds
 live times to the departures from the `monitor` endpoint of Wiener Linien's
 [realtime API](https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de),
-which they publish under CC BY 4.0. It answers without a key with every departure of the next 70
+whose data Stadt Wien publishes under CC BY 4.0. It answers without a key with every departure of the next 70
 minutes from the platforms it is asked about, with a planned time and usually a live one, but
 without a trip id or a vehicle position.
 
@@ -338,8 +340,12 @@ the round or joins it and waits for its answer (see [Live departures](#live-depa
 round outlasts its 2 second timeout, `liveIn` can fall a little short, and the panel gets one more
 `pending` answer first. Without `liveIn`, and after a refresh that failed while the live times were
 pending, it asks every 15 seconds instead of 30.
-The map's attribution credits the live times as "Echtzeitdaten: Wiener Linien", as their CC BY 4.0
-license asks.
+The map's attribution credits the timetable as "Fahrplandaten: Wiener Linien" and the live times as
+"Echtzeitdaten: Wiener Linien", as their CC BY 4.0 licenses ask. Stadt Wien publishes both, and its
+[open data terms](https://digitales.wien.gv.at/ogd-nutzungsbedingungen/) ask for the credit
+"Datenquelle: Stadt Wien – data.wien.gv.at" word for word. The district boundaries' credit starts
+with it, and MapLibre drops a credit that a longer one contains, so it appears on its own only when
+the map is zoomed out past the boundaries.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
@@ -347,7 +353,7 @@ visible above the boundaries. District names appear from zoom 12 and fade out be
 zoom 14 and 15. Wider views show district numbers. The bundled geometry comes from
 [Stadt Wien's district boundaries](https://www.data.gv.at/katalog/dataset/2ee6b8bf-6292-413c-bb8b-bd22dbb2ad4b/resource/f5ad0704-ceca-4c46-87f2-f2e131eee44b)
 under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-Datenquelle: Stadt Wien - https://data.wien.gv.at.
+Datenquelle: Stadt Wien – data.wien.gv.at.
 
 The snapshot was downloaded on 2026-10-20, with source update date 2026-09-01. It is
 simplified to a 5-meter interval and coordinates rounded to five decimal places. Label
