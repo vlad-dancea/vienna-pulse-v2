@@ -354,7 +354,8 @@ for it, along its route and at its timetable's pace, from the first answer on. E
 30 seconds and continues where the vehicles are, so they keep moving when one request fails or
 comes late. When the paths have run out, such as in a tab hidden for a while, the vehicles jump to
 where the next answer puts them. With reduced motion turned on, they jump to where they are with
-every answer instead. These are positions from the timetable, not live ones.
+every answer instead. The positions come from the timetable, set back or ahead by the live delay
+for the trips the departure board's rounds paired (see [Vehicles at their live times](#vehicles-at-their-live-times)).
 
 The All, U-Bahn, Tram and Bus controls filter routes, vehicles and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while

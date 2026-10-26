@@ -19,14 +19,14 @@ class TripDelaysTest {
 
     final TripDelays delays = new TripDelays(clock);
 
-    // The U1 is expected to leave Karlsplatz a minute late and Stephansplatz, its next station, 90
-    // seconds late. The U3 runs half a minute early, the board has not read the trip of the third
-    // departure, and the 2A has no live time.
+    // The U1 is expected to leave Karlsplatz a minute late, and Stephansplatz, its next station, at a
+    // time that would have it leave there first. The U3 runs half a minute early, the board has not
+    // read the trip of the third departure, and the 2A has no live time.
     @Test
     void takesEachTripsDelayFromTheFirstStationItLeavesInTheLastRound() {
         clock.set("2026-10-24T19:47:55Z");
         delays.record(answered(
-                seen(STEPHANSPLATZ, "u1", "21:52:00", "21:53:30"),
+                seen(STEPHANSPLATZ, "u1", "21:52:00", "21:50:50"),
                 seen(KARLSPLATZ, "u1", "21:50:00", "21:51:00"),
                 seen(STEPHANSPLATZ, "u3", "21:50:00", "21:49:30"),
                 seen(STEPHANSPLATZ, null, "21:50:00", "21:51:00"),

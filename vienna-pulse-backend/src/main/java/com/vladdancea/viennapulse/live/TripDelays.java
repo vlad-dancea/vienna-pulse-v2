@@ -51,10 +51,11 @@ public class TripDelays {
             var planned = seen.planned();
             var real = seen.live().real();
             if (planned != null && real != null) {
+                // The timetable orders the stations along the trip, which predictions may not.
                 first.merge(
                         planned.trip(),
                         new Times(planned.time(), real),
-                        (one, other) -> other.real().isBefore(one.real()) ? other : one);
+                        (one, other) -> other.planned().isBefore(one.planned()) ? other : one);
             }
         }
         first.forEach((trip, times) -> {
