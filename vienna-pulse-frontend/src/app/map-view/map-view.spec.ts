@@ -670,6 +670,22 @@ describe('MapView', () => {
     expect(router.url).toBe('/');
     expect(element.querySelector('app-departure-panel')).toBeNull();
     expect(document.activeElement).toBe(search);
+
+    // Focusing the field after a tap on the close button would open a phone's keyboard, so the map gets focus.
+    const opened = firstValueFrom(router.events.pipe(filter((event) => event instanceof NavigationEnd)));
+    await find('bus');
+    await opened;
+    TestBed.tick();
+    http
+      .expectOne('/api/stops/bus/departures')
+      .flush({ stop: { id: 'bus', name: 'Bus' }, liveStatus: 'unavailable', departures: [] });
+    await harness.fixture.whenStable();
+    element
+      .querySelector('app-departure-panel button')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/');
+    expect(document.activeElement).toBe(canvas);
   });
 
   it('opens the map on the stop a link names once the map and the stops have loaded', async () => {

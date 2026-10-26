@@ -30,7 +30,7 @@ import { boardRows } from './departure-board';
     // above the map's attribution, and on phones styles.css moves the attribution above it.
     class:
       'absolute inset-x-0 bottom-0 z-10 h-[50dvh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white text-slate-900 shadow-lg md:inset-x-auto md:top-6 md:right-6 md:bottom-auto md:h-auto md:max-h-[calc(100%-4.5rem)] md:w-96 md:rounded-2xl',
-    '(document:keydown.escape)': 'closed.emit()',
+    '(document:keydown.escape)': 'closed.emit($event)',
   },
 })
 export class DeparturePanel {
@@ -40,8 +40,8 @@ export class DeparturePanel {
   readonly name = input<string>();
   /** The transport mode the map's filter shows, such as `subway`, so the board shows only its lines, or `all`. */
   readonly mode = input('all');
-  /** Emits when the close button or Escape asks to close the panel. */
-  readonly closed = output();
+  /** Emits the click on the close button or the Escape key press that asks to close the panel. */
+  readonly closed = output<Event>();
 
   // The loaders and the faster refresh follow the same answer, which stays while a reload fails.
   protected readonly departures = stopDepartures(this.stop, () => this.loaded());

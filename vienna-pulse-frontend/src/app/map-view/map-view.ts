@@ -80,6 +80,8 @@ export class MapView {
   );
   /** Where the open stop was opened from, which decides how the map moves to it and where focus goes when it closes. */
   private openedFrom: OpenedFrom = 'link';
+  /** Whether a click or tap closed the open stop, rather than a key. */
+  private closedByPointer = false;
   private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
   protected readonly styleFailed = signal(false);
   protected readonly stopRetryShown = computed(() => !!this.stops.stops.error() && !this.stops.latest());
@@ -92,12 +94,15 @@ export class MapView {
     { name: 'lines', shown: this.lineRetryShown, resource: this.lines.routes },
   ];
 
-  protected closeStop() {
+  protected closeStop(event: Event) {
+    // A click from a key, such as Enter on the close button, counts no clicks.
+    this.closedByPointer = event instanceof MouseEvent && event.detail > 0;
     void this.router.navigate([], { queryParams: {} });
   }
 
   protected openFound(id: string) {
     this.openedFrom = 'search';
+    this.closedByPointer = false;
     if (id !== this.stop()) {
       void this.router.navigate([], { queryParams: { stop: id } });
       return;
@@ -162,11 +167,12 @@ export class MapView {
 
     effect(() => {
       // Closing removes the panel and the focus in it, so move focus back to where the stop was opened
-      // before Angular updates the view.
+      // before Angular updates the view. Focusing the search field would open a phone's keyboard, so after
+      // a click or tap focus goes to the map instead.
       const panel = this.panel()?.nativeElement;
       const active = document.activeElement;
       if (!this.stop() && panel && (active === document.body || panel.contains(active))) {
-        if (this.openedFrom === 'search') {
+        if (this.openedFrom === 'search' && !this.closedByPointer) {
           this.search().focus();
         } else {
           this.map()?.getCanvas().focus();

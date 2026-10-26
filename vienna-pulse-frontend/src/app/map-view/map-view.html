@@ -69,6 +69,6 @@
     [stop]="id"
     [name]="selectedStop()?.properties.name"
     [mode]="selectedMode()"
-    (closed)="closeStop()"
+    (closed)="closeStop($event)"
   />
 }
