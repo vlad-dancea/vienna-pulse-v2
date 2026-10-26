@@ -78,8 +78,11 @@ export class MapView {
   protected readonly mapControls = computed(
     () => this.map()?.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-bottom-right') ?? undefined,
   );
-  /** Where the open stop was opened from, which decides how the map moves to it and where focus goes when it closes. */
-  private openedFrom: OpenedFrom = 'link';
+  /**
+   * The last stop opened and where it was opened from, which decides how the map moves to it and where focus
+   * goes when it closes.
+   */
+  private opened: { stop?: string; from: OpenedFrom } = { from: 'link' };
   /** Whether a click or tap closed the open stop, rather than a key. */
   private closedByPointer = false;
   private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
@@ -101,7 +104,7 @@ export class MapView {
   }
 
   protected openFound(id: string) {
-    this.openedFrom = 'search';
+    this.opened = { stop: id, from: 'search' };
     this.closedByPointer = false;
     if (id !== this.stop()) {
       void this.router.navigate([], { queryParams: { stop: id } });
@@ -166,13 +169,21 @@ export class MapView {
     });
 
     effect(() => {
+      // A stop the URL opens on its own, such as with the browser's back button, counts as linked.
+      const stop = this.stop();
+      if (stop && stop !== this.opened.stop) {
+        this.opened = { stop, from: 'link' };
+      }
+    });
+
+    effect(() => {
       // Closing removes the panel and the focus in it, so move focus back to where the stop was opened
       // before Angular updates the view. Focusing the search field would open a phone's keyboard, so after
       // a click or tap focus goes to the map instead.
       const panel = this.panel()?.nativeElement;
       const active = document.activeElement;
       if (!this.stop() && panel && (active === document.body || panel.contains(active))) {
-        if (this.openedFrom === 'search' && !this.closedByPointer) {
+        if (this.opened.from === 'search' && !this.closedByPointer) {
           this.search().focus();
         } else {
           this.map()?.getCanvas().focus();
@@ -251,7 +262,7 @@ export class MapView {
         map.on('click', (event) => {
           const stop = stopAt(map, event.point);
           if (stop) {
-            this.openedFrom = 'map';
+            this.opened = { stop, from: 'map' };
             void this.router.navigate([], { queryParams: { stop } });
           }
         });
@@ -278,7 +289,7 @@ export class MapView {
     const stop = this.selectedStop();
     const panel = this.panel()?.nativeElement;
     if (map && stop && panel) {
-      showStop(map, stop.geometry.coordinates, { panel, card: this.card().nativeElement }, this.openedFrom);
+      showStop(map, stop.geometry.coordinates, { panel, card: this.card().nativeElement }, this.opened.from);
     }
   }
 

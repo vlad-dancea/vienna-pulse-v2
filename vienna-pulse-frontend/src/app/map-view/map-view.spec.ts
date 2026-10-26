@@ -688,6 +688,43 @@ describe('MapView', () => {
     expect(document.activeElement).toBe(canvas);
   });
 
+  it('treats a stop the URL opens after a search, such as with the back button, as linked', async () => {
+    // jsdom does not lay out pages, so it cannot scroll an option into view.
+    Element.prototype.scrollIntoView = vi.fn();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/', MapView);
+    loadMap();
+    http.expectOne((request) => request.url === '/api/lines').flush(routes);
+    http.expectOne('/api/stops').flush(stops);
+    http.expectOne('/api/vehicles').flush(noVehicles);
+    await harness.fixture.whenStable();
+    const router = TestBed.inject(Router);
+    const search = document.getElementById('stop-search') as HTMLInputElement;
+    search.focus();
+    search.value = 'tram';
+    search.dispatchEvent(new Event('input'));
+    await harness.fixture.whenStable();
+    const found = firstValueFrom(router.events.pipe(filter((event) => event instanceof NavigationEnd)));
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await found;
+    TestBed.tick();
+    http
+      .expectOne('/api/stops/tram/departures')
+      .flush({ stop: { id: 'tram', name: 'Tram' }, liveStatus: 'unavailable', departures: [] });
+    await harness.fixture.whenStable();
+
+    await harness.navigateByUrl('/?stop=bus');
+    http
+      .expectOne('/api/stops/bus/departures')
+      .flush({ stop: { id: 'bus', name: 'Bus' }, liveStatus: 'unavailable', departures: [] });
+    await harness.fixture.whenStable();
+    expect(map.easeTo).toHaveBeenLastCalledWith({ center: [16.39, 48.2], offset: [0, 0], zoom: 15, duration: 0 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await harness.fixture.whenStable();
+    expect(router.url).toBe('/');
+    expect(document.activeElement).toBe(canvas);
+  });
+
   it('opens the map on the stop a link names once the map and the stops have loaded', async () => {
     // A phone, where the sheet covers the map's bottom half and the card with the search and the filters its top.
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
