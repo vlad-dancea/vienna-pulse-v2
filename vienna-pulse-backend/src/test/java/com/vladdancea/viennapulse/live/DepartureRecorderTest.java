@@ -44,7 +44,7 @@ class DepartureRecorderTest {
     // departure with none, as when the board read the timetable more than an hour after it was planned.
     @Test
     void keepsTheLastPredictionOfADepartureSeenInSeveralRounds() {
-        var trip = new PlannedDeparture("u1-leopoldau", "u1", "U1", 0, vienna("21:50:00"));
+        var trip = new PlannedDeparture("u1-leopoldau", "u1", "U1", "Wien Leopoldau", 0, vienna("21:50:00"));
         recorder.record(answered("21:47:40", departure("21:50:00", "21:52:00", 4, null)));
         recorder.record(answered("21:48:10", departure("21:50:00", "21:52:30", 4, trip)));
         recorder.record(answered("21:52:00", departure("21:50:00", "21:52:40", 0, null)));
@@ -81,7 +81,7 @@ class DepartureRecorderTest {
     // The timetable departure pairs with one of the two.
     @Test
     void keepsTheTripOfADepartureAnAnswerListsTwice() {
-        var trip = new PlannedDeparture("u1-leopoldau", "u1", "U1", 0, vienna("21:50:00"));
+        var trip = new PlannedDeparture("u1-leopoldau", "u1", "U1", "Wien Leopoldau", 0, vienna("21:50:00"));
         recorder.record(answered(
                 "21:47:40",
                 departure("21:50:00", "21:52:00", 4, null),
@@ -133,7 +133,9 @@ class DepartureRecorderTest {
     private static RoundAnswered.Seen departure(
             String planned, String real, int countdown, @Nullable PlannedDeparture trip) {
         return new RoundAnswered.Seen(
-                STATION, new LiveDeparture(PLATFORM, "U1", "H", vienna(planned), vienna(real), countdown), trip);
+                STATION,
+                new LiveDeparture(PLATFORM, "U1", "H", "Leopoldau", vienna(planned), vienna(real), countdown),
+                trip);
     }
 
     private static Instant vienna(String time) {

@@ -20,18 +20,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /// Stands in for Wiener Linien's realtime API on a free local port. It serves a list of the
-/// platforms of Karlsplatz, Praterstern and Stephansplatz and Wiener Linien's codes for them, answers every `monitor`
-/// request with an
-/// answer that Wiener Linien sent for Praterstern and Karlsplatz, cut to a few departures, and
-/// remembers the platforms each request asked about.
+/// platforms of Karlsplatz, Praterstern and Stephansplatz and of tram 10 at Hietzing and Wiener
+/// Linien's codes for them, answers every `monitor` request with an answer that Wiener Linien sent
+/// for Praterstern and Karlsplatz, cut to a few departures, and remembers the platforms each request
+/// asked about.
 public final class MonitorServer implements AutoCloseable {
     /// When Wiener Linien sent the answer, 21:47:55 on Saturday 2026-10-24 in Vienna.
     public static final String ANSWERED_AT = "2026-10-24T19:47:55Z";
+
+    /// When Wiener Linien sent the answer for Hietzing, 12:39:44 on Monday 2026-10-26 in Vienna.
+    public static final String HIETZING_ANSWERED_AT = "2026-10-26T11:39:44Z";
 
     private static final String JSON = "application/json";
     private static final byte[] PLATFORMS = resource("/live/haltepunkte.csv");
     private static final byte[] CODES = resource("/live/steige.csv");
     private static final byte[] ANSWER = resource("/live/monitor.json");
+    private static final byte[] HIETZING = resource("/live/hietzing.json");
 
     private final HttpServer server;
     private final List<List<Integer>> requests = new CopyOnWriteArrayList<>();
@@ -82,6 +86,12 @@ public final class MonitorServer implements AutoCloseable {
         platformCodeRequests.set(0);
         answer = respond(200, JSON, ANSWER);
         codes = respond(200, "text/csv", CODES);
+    }
+
+    /// Answers the next requests with an answer that Wiener Linien sent for tram 10 at Hietzing, cut to
+    /// two departures each way.
+    public void answerForHietzing() {
+        answer = respond(200, JSON, HIETZING);
     }
 
     /// Answers the next requests for the list of platform codes with a 404, as if Wiener Linien had

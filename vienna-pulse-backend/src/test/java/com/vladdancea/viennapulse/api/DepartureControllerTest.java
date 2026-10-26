@@ -38,6 +38,7 @@ class DepartureControllerTest {
     private static final String STOP = "at:49:1320";
     private static final String NEXT_STOP = "at:49:1350:0:1";
     private static final String PRATERSTERN = "at:49:1040";
+    private static final String HIETZING = "at:49:520";
     // The lines at Praterstern, as the API serves them.
     private static final String U1 = """
             {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway", "color": "#E3000F",
@@ -46,6 +47,8 @@ class DepartureControllerTest {
             {"id": "o", "name": "O", "longName": null, "type": "tram", "color": null, "textColor": null}""";
     private static final String BUS_5B = """
             {"id": "5b", "name": "5B", "longName": null, "type": "bus", "color": null, "textColor": null}""";
+    private static final String TRAM_10 = """
+            {"id": "10", "name": "10", "longName": null, "type": "tram", "color": null, "textColor": null}""";
 
     @Autowired
     RestTestClient client;
@@ -314,6 +317,42 @@ class DepartureControllerTest {
                 .isEqualTo(6));
     }
 
+    // The fake monitor's other answer came from Hietzing at 12:39:44 on Monday 2026-10-26. Wiener Linien
+    // planned tram 10 towards Unter St. Veit five minutes after the timetable's trips, which put it as
+    // close to the trips the other way, so their live times and platform codes went to the wrong
+    // direction. The destinations pair them the right way, and the trips towards Unter St. Veit get
+    // none.
+    @Test
+    void pairsEachLiveDepartureWithTheDirectionItsDestinationNames() {
+        monitor.answerForHietzing();
+        clock.set(MonitorServer.HIETZING_ANSWERED_AT);
+        timetable.addWeeklyService("mondays", LocalDate.parse("2026-10-26"));
+        timetable.addStop(HIETZING + ":0:1", "Hietzing");
+        timetable.addStop(HIETZING + ":0:15", "Hietzing");
+        timetable.addRoute("10", "10", null, RouteType.TRAM, null, null);
+        addMondayDeparture("dornbach-1", "Wien Dornbach", 1, ":0:1", "12:45:00");
+        addMondayDeparture("dornbach-2", "Wien Dornbach", 1, ":0:1", "12:55:00");
+        addMondayDeparture("unter-st-veit-1", "Wien Unter St. Veit, Hummelgasse", 0, ":0:15", "12:48:00");
+        addMondayDeparture("unter-st-veit-2", "Wien Unter St. Veit, Hummelgasse", 0, ":0:15", "12:58:00");
+
+        client.get()
+                .uri("/api/stops/at:49:520/departures")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json(
+                        """
+                        {"stop": {"id": "at:49:520", "name": "Hietzing"}, "liveStatus": "live", "liveIn": null,
+                         "departures": [%s, %s, %s, %s]}
+                        """.formatted(
+                                        hietzing("12:45:00", "12:45:50", "Wien Dornbach", ":0:1", "C"),
+                                        hietzing("12:48:00", null, "Wien Unter St. Veit, Hummelgasse", ":0:15", null),
+                                        hietzing("12:55:00", "12:56:00", "Wien Dornbach", ":0:1", "C"),
+                                        hietzing("12:58:00", null, "Wien Unter St. Veit, Hummelgasse", ":0:15", null)),
+                        JsonCompareMode.STRICT);
+    }
+
     @Test
     void hasNoLiveTimesForAStopOutsideVienna() {
         timetable.addStop("at:43:3121:0:1", "Baden Josefsplatz");
@@ -375,6 +414,37 @@ class DepartureControllerTest {
                 "saturdays",
                 Call.at(1, PRATERSTERN + platform, time),
                 Call.at(2, NEXT_STOP, time));
+    }
+
+    // A trip of tram 10 on Monday 2026-10-26 towards `headsign` in `direction`, leaving Hietzing's
+    // platform with the id ending in `platform` at `time` and calling at the next stop after.
+    private void addMondayDeparture(String trip, String headsign, int direction, String platform, String time) {
+        timetable.addTripTowards(
+                trip,
+                headsign,
+                direction,
+                "10",
+                "mondays",
+                Call.at(1, HIETZING + platform, time),
+                Call.at(2, NEXT_STOP, time));
+    }
+
+    // A departure of tram 10 from Hietzing on 2026-10-26 as the API answers it, with its times in Vienna.
+    private static String hietzing(
+            String plannedTime,
+            @Nullable String liveTime,
+            String headsign,
+            String platform,
+            @Nullable String platformCode) {
+        return """
+                {"plannedTime": "2026-10-26T%s+01:00", "liveTime": %s, "headsign": "%s", "platform": "%s",
+                 "platformCode": %s, "line": %s}""".formatted(
+                        plannedTime,
+                        liveTime == null ? "null" : "\"2026-10-26T%s+01:00\"".formatted(liveTime),
+                        headsign,
+                        HIETZING + platform,
+                        platformCode == null ? "null" : "\"%s\"".formatted(platformCode),
+                        TRAM_10);
     }
 
     // A departure from Praterstern on 2026-10-24 as the API answers it, with its times in Vienna.

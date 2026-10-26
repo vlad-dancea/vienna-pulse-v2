@@ -174,6 +174,7 @@ public class DepartureService {
                         departure.trip(),
                         departure.line().id(),
                         departure.line().properties().name(),
+                        departure.headsign(),
                         departure.direction(),
                         departure.time().toInstant()))
                 .toList();

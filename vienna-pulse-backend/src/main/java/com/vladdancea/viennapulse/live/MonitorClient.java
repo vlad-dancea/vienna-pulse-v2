@@ -138,10 +138,15 @@ public class MonitorClient {
                         continue;
                     }
                     var real = departure.departureTime().timeReal();
+                    // A train may end short of the line's destination, as every other U1 towards Oberlaa
+                    // does at Alaudagasse, which only its vehicle says.
+                    var vehicle = departure.vehicle();
+                    var towards = vehicle == null ? null : vehicle.towards();
                     departures.add(new LiveDeparture(
                             platform,
                             line.name(),
                             line.direction(),
+                            towards != null ? towards : line.towards(),
                             instant(planned),
                             real == null ? null : instant(real),
                             departure.departureTime().countdown()));
@@ -182,11 +187,13 @@ public class MonitorClient {
     // `rbl` is the platform's number, which requests call `stopId`.
     record Attributes(int rbl) {}
 
-    record Line(String name, String direction, Departures departures) {}
+    record Line(String name, @Nullable String towards, String direction, Departures departures) {}
 
     record Departures(@Nullable List<Departure> departure) {}
 
-    record Departure(DepartureTime departureTime) {}
+    record Departure(DepartureTime departureTime, @Nullable Vehicle vehicle) {}
+
+    record Vehicle(@Nullable String towards) {}
 
     record DepartureTime(
             @Nullable String timePlanned, @Nullable String timeReal, int countdown) {}

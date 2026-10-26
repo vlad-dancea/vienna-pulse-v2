@@ -32,16 +32,16 @@ class LiveDeparturesTest {
 
     // The live departures of the recorded answer, by station.
     private static final Live PRATERSTERN_LIVE = Live.live(List.of(
-            departure(2100, "5B", "H", "21:49:00", "21:49:00", 1),
-            departure(2100, "5B", "H", "22:04:00", "22:04:00", 16),
-            departure(311, "O", "H", "21:42:00", "21:49:07", 1),
-            departure(311, "O", "H", "21:57:00", "21:57:40", 9),
-            departure(4112, "U1", "R", "21:49:30", "21:49:34", 1),
-            departure(4112, "U1", "R", "21:57:00", "21:58:25", 10)));
+            departure(2100, "5B", "H", "Bhf. Heiligenstadt S U", "21:49:00", "21:49:00", 1),
+            departure(2100, "5B", "H", "Bhf. Heiligenstadt S U", "22:04:00", "22:04:00", 16),
+            departure(311, "O", "H", "Bruno-Marek-Allee", "21:42:00", "21:49:07", 1),
+            departure(311, "O", "H", "Bruno-Marek-Allee", "21:57:00", "21:57:40", 9),
+            departure(4112, "U1", "R", "Oberlaa", "21:49:30", "21:49:34", 1),
+            departure(4112, "U1", "R", "Alaudagasse", "21:57:00", "21:58:25", 10)));
     // The third train has no planned time, as a train put in on top of the timetable.
     private static final Live KARLSPLATZ_LIVE = Live.live(List.of(
-            departure(4421, "U4", "H", "21:51:30", "21:52:39", 4),
-            departure(4421, "U4", "H", "21:59:00", "21:58:05", 10)));
+            departure(4421, "U4", "H", "Heiligenstadt", "21:51:30", "21:52:39", 4),
+            departure(4421, "U4", "H", "Heiligenstadt", "21:59:00", "21:58:05", 10)));
 
     // How Wiener Linien refuse a client over their limit.
     private static final String QUERY_LIMIT = """
@@ -252,8 +252,8 @@ class LiveDeparturesTest {
     @Test
     void publishesEachAnswerPairedWithTheTimetableTheLastRequestRead() {
         var live = live(100);
-        var tram = new PlannedDeparture("o-late", "o", "O", 0, vienna("21:41:00"));
-        var subway = new PlannedDeparture("u1-oberlaa", "u1", "U1", 1, vienna("21:49:00"));
+        var tram = new PlannedDeparture("o-late", "o", "O", "Wien Bruno-Marek-Allee", 0, vienna("21:41:00"));
+        var subway = new PlannedDeparture("u1-oberlaa", "u1", "U1", "Wien Oberlaa", 1, vienna("21:49:00"));
         live.open("at:49:1040", clock.instant());
         assertThat(live.await("at:49:1040", clock.instant(), List.of(tram, subway)))
                 .isEqualTo(Live.pending(15));
@@ -453,8 +453,8 @@ class LiveDeparturesTest {
 
     // A departure on 2026-10-24, with its times in Vienna.
     private static LiveDeparture departure(
-            int platform, String line, String direction, String planned, String real, int countdown) {
-        return new LiveDeparture(platform, line, direction, vienna(planned), vienna(real), countdown);
+            int platform, String line, String direction, String towards, String planned, String real, int countdown) {
+        return new LiveDeparture(platform, line, direction, towards, vienna(planned), vienna(real), countdown);
     }
 
     private static Instant vienna(String time) {

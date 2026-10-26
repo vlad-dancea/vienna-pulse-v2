@@ -1,0 +1,233 @@
+{
+  "data": {
+    "monitors": [
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.30409,
+              48.1876316
+            ]
+          },
+          "properties": {
+            "name": "60200520",
+            "title": "Hietzing U",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "B",
+            "attributes": {
+              "rbl": 1610
+            }
+          }
+        },
+        "lines": [
+          {
+            "name": "10",
+            "towards": "Unter St. Veit, Hummelgasse",
+            "direction": "H",
+            "platform": "1",
+            "richtungsId": "1",
+            "barrierFree": true,
+            "realtimeSupported": true,
+            "trafficjam": false,
+            "departures": {
+              "departure": [
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-10-26T12:43:00.000+0100",
+                    "timeReal": "2026-10-26T12:43:36.000+0100",
+                    "countdown": 3
+                  },
+                  "vehicle": {
+                    "name": "10",
+                    "towards": "Unter St. Veit, Hummelgasse",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptTram",
+                    "attributes": {},
+                    "linienId": 110
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-10-26T12:53:00.000+0100",
+                    "timeReal": "2026-10-26T12:51:56.000+0100",
+                    "countdown": 12
+                  },
+                  "vehicle": {
+                    "name": "10",
+                    "towards": "Unter St. Veit, Hummelgasse",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptTram",
+                    "attributes": {},
+                    "linienId": 110
+                  }
+                }
+              ]
+            },
+            "type": "ptTram",
+            "lineId": 110
+          }
+        ],
+        "attributes": {}
+      },
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.3036948,
+              48.187919
+            ]
+          },
+          "properties": {
+            "name": "60200520",
+            "title": "Hietzing U",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "C",
+            "attributes": {
+              "rbl": 574
+            }
+          }
+        },
+        "lines": [
+          {
+            "name": "10",
+            "towards": "Dornbach",
+            "direction": "R",
+            "platform": "2",
+            "richtungsId": "2",
+            "barrierFree": true,
+            "realtimeSupported": true,
+            "trafficjam": false,
+            "departures": {
+              "departure": [
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-10-26T12:46:00.000+0100",
+                    "timeReal": "2026-10-26T12:45:50.000+0100",
+                    "countdown": 6
+                  },
+                  "vehicle": {
+                    "name": "10",
+                    "towards": "Dornbach",
+                    "direction": "R",
+                    "platform": "2",
+                    "richtungsId": "2",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptTram",
+                    "attributes": {},
+                    "linienId": 110
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-10-26T12:56:00.000+0100",
+                    "timeReal": "2026-10-26T12:56:00.000+0100",
+                    "countdown": 16
+                  },
+                  "vehicle": {
+                    "name": "10",
+                    "towards": "Dornbach",
+                    "direction": "R",
+                    "platform": "2",
+                    "richtungsId": "2",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptTram",
+                    "attributes": {},
+                    "linienId": 110
+                  }
+                }
+              ]
+            },
+            "type": "ptTram",
+            "lineId": 110
+          }
+        ],
+        "attributes": {}
+      },
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.30409,
+              48.1876316
+            ]
+          },
+          "properties": {
+            "name": "60200520",
+            "title": "Hietzing U",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "B",
+            "attributes": {
+              "rbl": 1610
+            }
+          }
+        },
+        "lines": [],
+        "attributes": {}
+      },
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.3036948,
+              48.187919
+            ]
+          },
+          "properties": {
+            "name": "60200520",
+            "title": "Hietzing U",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "C",
+            "attributes": {
+              "rbl": 574
+            }
+          }
+        },
+        "lines": [],
+        "attributes": {}
+      }
+    ]
+  },
+  "message": {
+    "value": "OK",
+    "messageCode": 1,
+    "serverTime": "2026-10-26T12:39:44.000+0100"
+  }
+}
