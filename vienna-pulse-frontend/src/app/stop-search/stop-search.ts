@@ -122,8 +122,12 @@ export class StopSearch {
   }
 
   protected press(event: KeyboardEvent) {
-    // While an input method composes a word, its Enter and arrows choose the word, not a stop.
+    // While an input method composes a word, its Enter and arrows choose the word, not a stop, and its Escape
+    // cancels the word without reaching the departure panel.
     if (event.isComposing) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+      }
       return;
     }
     const down = event.key === 'ArrowDown';

@@ -133,6 +133,9 @@ describe('StopSearch', () => {
     await load(stopsNamed(['Karlsplatz', ['subway']]));
     await type('karls');
 
+    // An input method's Escape cancels the word it composes.
+    expect(await press('Escape', { isComposing: true })).toBe(false);
+    expect(shown().expanded).toBe('true');
     expect(await press('Escape')).toBe(false);
     expect(shown().expanded).toBe('false');
     expect(input.value).toBe('karls');
