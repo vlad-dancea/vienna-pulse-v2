@@ -183,7 +183,8 @@ describe('DeparturePanel', () => {
           // Platform 12 has no code.
           from(18, 'E', departure(bus13a, 'Wien Alser Straße', 4, 4)),
           from(12, null, departure(bus13a, 'Wien Alser Straße', 8, 8)),
-          from(12, null, departure(bus13a, 'Wien Skodagasse', 4, 4)),
+          // Without a live time, at another platform than the one after.
+          from(12, null, departure(bus13a, 'Wien Skodagasse', 4)),
           from(18, 'E', departure(bus13a, 'Wien Skodagasse', 8, 8)),
         ],
         'live',

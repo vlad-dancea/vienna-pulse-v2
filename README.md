@@ -352,7 +352,8 @@ of the row's other departure when the timetable has both at the same platform. W
 from different platforms, the row names them in turn, such as "Platform G, then B" at Floridsdorf,
 or names the one with a code as "Next from platform E" or "Then from platform E". Rows have no
 label while the live times are pending or at stops without codes. The label takes the line beside
-the clock times, so a row whose headsign fits on one line keeps its height when the codes arrive.
+the clock times, so a row keeps its height when the codes arrive if its headsign and label each fit
+on one line.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
 When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
 fetched recently has planned times only, so each time shows a loader. The panel asks again when
