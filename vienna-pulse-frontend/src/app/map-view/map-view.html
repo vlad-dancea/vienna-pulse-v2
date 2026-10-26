@@ -1,8 +1,9 @@
-<!-- The card comes first, so the search is the first stop for the Tab key. While focus is in it, it stays above
-     the departure sheet, which the card and its list reach into on a short screen. -->
+<!-- The card comes first, so the search is the first stop for the Tab key. On a short screen the list and the
+     filter buttons reach into the departure sheet, so the card rises above it while the list is open or a filter
+     button has focus, and otherwise leaves the sheet's heading and close button uncovered. -->
 <div
   #card
-  class="absolute top-4 right-4 left-4 z-10 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-lg focus-within:z-20 sm:top-6 sm:right-auto sm:left-6 sm:w-80"
+  class="absolute top-4 right-4 left-4 z-10 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-lg has-[#stop-search-popup:not([hidden])]:z-20 has-[section:focus-within]:z-20 sm:top-6 sm:right-auto sm:left-6 sm:w-80"
 >
   <app-stop-search [mode]="selectedMode()" [floor]="mapControls()" (picked)="openFound($event)" />
 

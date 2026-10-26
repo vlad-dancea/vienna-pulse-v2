@@ -334,20 +334,35 @@ test('opens a stop found by name with the keyboard alone and returns to the sear
   expect(errors).toEqual([]);
 });
 
-test('keeps the selected stop above the departure sheet on a short screen', async ({ page }) => {
-  // A phone held sideways, where the sheet covers the lower half and the list reaches into it.
+/** Tells whether `locator`'s element is what a click at its center reaches, rather than something drawn above it. */
+function onTop(locator) {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  });
+}
+
+test('keeps the list and the focused filter above the departure sheet on a short screen, and the sheet otherwise', async ({
+  page,
+}) => {
+  // A phone held sideways, where the sheet covers the lower half and the list and the filter buttons reach into it.
   await page.setViewportSize({ width: 568, height: 280 });
   await page.goto(`${origin}/?stop=at:49:1`);
+  const close = page.getByRole('region', { name: 'U-Bahn stop' }).getByRole('button', { name: 'Close' });
   await expect(page.getByRole('heading', { name: 'U-Bahn stop' })).toBeFocused();
-  const search = page.getByRole('combobox', { name: 'Find a stop' });
-  await search.focus();
+  await page.getByRole('combobox', { name: 'Find a stop' }).focus();
   await page.keyboard.type('stop');
   await page.keyboard.press('ArrowUp');
   const selected = page.getByRole('option', { selected: true });
   await expect(selected).toHaveText(/U-Bahn stop/);
-  const onTop = await selected.evaluate((option) => {
-    const box = option.getBoundingClientRect();
-    return option.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
-  });
-  expect(onTop).toBe(true);
+  expect(await onTop(selected)).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toBeHidden();
+  expect(await onTop(close)).toBe(true);
+
+  await page.keyboard.press('Tab');
+  const all = page.getByRole('button', { name: 'All' });
+  await expect(all).toBeFocused();
+  expect(await onTop(all)).toBe(true);
 });

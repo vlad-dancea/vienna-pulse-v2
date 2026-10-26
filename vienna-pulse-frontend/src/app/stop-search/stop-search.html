@@ -34,6 +34,7 @@
 <!-- Pressing inside the popup would move focus out of the field and close it before the click arrives. -->
 <div
   #popup
+  id="stop-search-popup"
   class="absolute inset-x-0 top-full z-10 mt-1 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
   [hidden]="!shown()"
   (mousedown)="$event.preventDefault()"
