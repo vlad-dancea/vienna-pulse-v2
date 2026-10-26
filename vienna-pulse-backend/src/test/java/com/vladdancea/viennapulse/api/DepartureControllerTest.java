@@ -136,19 +136,19 @@ class DepartureControllerTest {
                         {"stop": {"id": "at:49:1320", "name": "Stephansplatz"}, "liveStatus": "live", "liveIn": null,
                          "departures": [
                            {"plannedTime": "2026-10-20T00:30:00+02:00", "liveTime": null, "headsign": "now",
-                            "platform": "at:49:1320:0:2",
+                            "platform": "at:49:1320:0:2", "platformCode": null,
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}},
                            {"plannedTime": "2026-10-20T00:40:00+02:00", "liveTime": null, "headsign": "late",
-                            "platform": "at:49:1320:0:1",
+                            "platform": "at:49:1320:0:1", "platformCode": null,
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}},
                            {"plannedTime": "2026-10-20T01:00:00+02:00", "liveTime": null, "headsign": "night",
-                            "platform": "at:49:1320:0:3",
+                            "platform": "at:49:1320:0:3", "platformCode": null,
                             "line": {"id": "n25", "name": "N25", "longName": null, "type": "bus",
                                      "color": null, "textColor": null}},
                            {"plannedTime": "2026-10-20T01:10:00+02:00", "liveTime": null, "headsign": "added",
-                            "platform": "at:49:1320:0:1",
+                            "platform": "at:49:1320:0:1", "platformCode": null,
                             "line": {"id": "u1", "name": "U1", "longName": "Leopoldau - Oberlaa", "type": "subway",
                                      "color": "#E3000F", "textColor": "#FFFFFF"}}
                          ]}
@@ -261,9 +261,11 @@ class DepartureControllerTest {
     }
 
     // The fake monitor's answer came from Praterstern at 21:47:55 on Saturday 2026-10-24. Nobody had
-    // the station open, so the request asks for it at once and waits for the answer.
+    // the station open, so the request asks for it at once and waits for the answer. Wiener Linien's
+    // list of platform codes calls the U1's platform towards Oberlaa 2, and has no code for the stops
+    // of the tram O and the bus 5B.
     @Test
-    void addsTheLiveTimesToTheFirstAnswer() {
+    void addsTheLiveTimesAndPlatformCodesToTheFirstAnswer() {
         jdbc.sql("DELETE FROM public.live_departures WHERE station = 60201040").update();
         clock.set(MonitorServer.ANSWERED_AT);
         timetable.addWeeklyService("saturdays", LocalDate.parse("2026-10-24"));
@@ -281,7 +283,8 @@ class DepartureControllerTest {
         addSaturdayDeparture("5b", "Wien Heiligenstadt", 1, "5b", ":0:3", "21:49:00");
         addSaturdayDeparture("u1-oberlaa", "Wien Oberlaa", 1, "u1", ":0:1", "21:49:00");
         addSaturdayDeparture("u1-alaudagasse", "Wien Alaudagasse", 1, "u1", ":0:1", "21:57:00");
-        // Leaves when the U1 to Oberlaa does, the other way, which the answer has no departures of.
+        // Leaves when the U1 to Oberlaa does, the other way, which the answer has no departures of. The
+        // timetable puts both on one platform, so without a live departure it has no code.
         addSaturdayDeparture("u1-leopoldau", "Wien Leopoldau", 0, "u1", ":0:1", "21:49:00");
 
         client.get()
@@ -295,12 +298,12 @@ class DepartureControllerTest {
                         {"stop": {"id": "at:49:1040", "name": "Praterstern"}, "liveStatus": "live", "liveIn": null,
                          "departures": [%s, %s, %s, %s, %s, %s]}
                         """.formatted(
-                                        praterstern("21:49:00", "21:49:00", "Wien Heiligenstadt", ":0:3", BUS_5B),
-                                        praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", U1),
-                                        praterstern("21:41:00", "21:49:07", "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
-                                        praterstern("21:49:00", "21:49:34", "Wien Oberlaa", ":0:1", U1),
-                                        praterstern("21:56:00", "21:57:40", "Wien Bruno-Marek-Allee", ":0:2", TRAM_O),
-                                        praterstern("21:57:00", "21:58:25", "Wien Alaudagasse", ":0:1", U1)),
+                                praterstern("21:49:00", "21:49:00", "Wien Heiligenstadt", ":0:3", null, BUS_5B),
+                                praterstern("21:49:00", null, "Wien Leopoldau", ":0:1", null, U1),
+                                praterstern("21:41:00", "21:49:07", "Wien Bruno-Marek-Allee", ":0:2", null, TRAM_O),
+                                praterstern("21:49:00", "21:49:34", "Wien Oberlaa", ":0:1", "2", U1),
+                                praterstern("21:56:00", "21:57:40", "Wien Bruno-Marek-Allee", ":0:2", null, TRAM_O),
+                                praterstern("21:57:00", "21:58:25", "Wien Alaudagasse", ":0:1", "2", U1)),
                         JsonCompareMode.STRICT);
         assertThat(monitor.requests()).hasSize(1);
         // The round records the answer after the request has it.
@@ -376,14 +379,20 @@ class DepartureControllerTest {
 
     // A departure from Praterstern on 2026-10-24 as the API answers it, with its times in Vienna.
     private static String praterstern(
-            String plannedTime, @Nullable String liveTime, String headsign, String platform, String line) {
+            String plannedTime,
+            @Nullable String liveTime,
+            String headsign,
+            String platform,
+            @Nullable String platformCode,
+            String line) {
         return """
                 {"plannedTime": "2026-10-24T%s+02:00", "liveTime": %s, "headsign": "%s", "platform": "%s",
-                 "line": %s}""".formatted(
+                 "platformCode": %s, "line": %s}""".formatted(
                         plannedTime,
                         liveTime == null ? "null" : "\"2026-10-24T%s+02:00\"".formatted(liveTime),
                         headsign,
                         PRATERSTERN + platform,
+                        platformCode == null ? "null" : "\"%s\"".formatted(platformCode),
                         line);
     }
 

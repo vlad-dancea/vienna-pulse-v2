@@ -80,6 +80,7 @@ export interface components {
             /** Format: date-time */
             plannedTime: string;
             platform: string;
+            platformCode: string | null;
         };
         Departures: {
             departures: components["schemas"]["Departure"][];

@@ -121,7 +121,7 @@ which days the timetable covers and where a service day's times start, are SQL f
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
 | `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors, the headsign and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
-| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign and its platform, and a `liveStatus` for the stop, with `liveIn`, the seconds until the next round, while it is `pending`. Times are in Vienna. An unknown stop gets a 404. |
+| `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign, its platform and the code signs show for that platform if the live data has one, and a `liveStatus` for the stop, with `liveIn`, the seconds until the next round, while it is `pending`. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
 its arrival and departure. The timetable gives whole minutes, so two stops can share one, and the
@@ -213,6 +213,20 @@ each line takes the reading that pairs more of its departures. One request for S
 Karlsplatz, Westbahnhof, Praterstern and Floridsdorf on 2026-10-24 paired 278 of the 279 live
 departures of the next hour. The one left was a tram ending at Floridsdorf, which the board does
 not list.
+
+A paired departure also gets the code that signs show for its platform, such as `1` or `2` for a
+U-Bahn platform or a letter for one of the bus and tram stops at a large station. The codes come
+from Wiener Linien's
+[list of platform codes](https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-ogd-steige.csv),
+which has 452 platforms at 170 stations and loads with the list of platforms. A failed load of the
+codes leaves the live times alone. The timetable has no codes, and its platform ids have nothing in
+common with Wiener Linien's platform numbers, so a departure without a live one has no code. On
+2026-10-26, 1,098 of the 1,154 paired departures at the 14 stations with the most codes got one,
+and the other 56 left from platforms without a code. Wiener Linien's route file could tie the two
+lists by line and next station, but that left 22% of the same departures without a code and put
+tram 2 at Schwedenplatz at the stop its route lists instead of the one it left from that day. The
+live answers have a `platform` field of their own, which says 1 or 2 at most bus and tram stops,
+also where the list has a letter.
 
 A departure planned up to an hour ago stays on the board while its live time is still ahead, and
 the two departures shown for each line and headsign are the soonest by live time where there is

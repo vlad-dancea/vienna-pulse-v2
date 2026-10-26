@@ -1,7 +1,5 @@
 package com.vladdancea.viennapulse.live;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -18,13 +16,9 @@ public record Live(LiveStatus status, @Nullable Integer liveIn, List<LiveDepartu
         return new Live(LiveStatus.LIVE, null, departures);
     }
 
-    /// When Wiener Linien expect each departure of `timetable`, in the same order, or `null` where
-    /// they have no live time for it.
-    public List<@Nullable Instant> times(List<PlannedDeparture> timetable) {
-        var times = new ArrayList<@Nullable Instant>();
-        for (var departure : Matching.pair(timetable, departures)) {
-            times.add(departure == null ? null : departure.real());
-        }
-        return times;
+    /// The live departure paired with each departure of `timetable`, in the same order, or `null` for
+    /// the departures without one.
+    public List<@Nullable LiveDeparture> pair(List<PlannedDeparture> timetable) {
+        return Matching.pair(timetable, departures);
     }
 }
