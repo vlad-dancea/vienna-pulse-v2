@@ -111,6 +111,9 @@ describe('StopSearch', () => {
     expect(shown().options[0]).toBe('> Karlsplatz U-Bahn, tram and bus');
 
     await press('ArrowDown');
+    // An input method's Enter confirms the word it composes.
+    await press('Enter', { isComposing: true });
+    expect(picked).toEqual([]);
     await press('Enter');
     expect(picked).toEqual(['at:49:2']);
     expect(shown()).toEqual({ expanded: 'false', options: [], note: undefined, status: '' });

@@ -122,6 +122,10 @@ export class StopSearch {
   }
 
   protected press(event: KeyboardEvent) {
+    // While an input method composes a word, its Enter and arrows choose the word, not a stop.
+    if (event.isComposing) {
+      return;
+    }
     const down = event.key === 'ArrowDown';
     if (down || event.key === 'ArrowUp') {
       // The arrows would move the caret to the start or end of the field.
