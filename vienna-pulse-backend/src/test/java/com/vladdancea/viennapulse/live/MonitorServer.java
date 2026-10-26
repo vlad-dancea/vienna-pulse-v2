@@ -19,7 +19,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
 /// Stands in for Wiener Linien's realtime API on a free local port. It serves a list of the
-/// platforms of Karlsplatz, Praterstern and Stephansplatz, answers every `monitor` request with an
+/// platforms of Karlsplatz, Praterstern and Stephansplatz and Wiener Linien's codes for them, answers every `monitor`
+/// request with an
 /// answer that Wiener Linien sent for Praterstern and Karlsplatz, cut to a few departures, and
 /// remembers the platforms each request asked about.
 public final class MonitorServer implements AutoCloseable {
@@ -28,15 +29,18 @@ public final class MonitorServer implements AutoCloseable {
 
     private static final String JSON = "application/json";
     private static final byte[] PLATFORMS = resource("/live/haltepunkte.csv");
+    private static final byte[] CODES = resource("/live/steige.csv");
     private static final byte[] ANSWER = resource("/live/monitor.json");
 
     private final HttpServer server;
     private final List<List<Integer>> requests = new CopyOnWriteArrayList<>();
     private volatile HttpHandler answer = respond(200, JSON, ANSWER);
+    private volatile HttpHandler codes = respond(200, "text/csv", CODES);
 
     private MonitorServer(HttpServer server) {
         this.server = server;
         server.createContext("/haltepunkte.csv", respond(200, "text/csv", PLATFORMS));
+        server.createContext("/steige.csv", exchange -> codes.handle(exchange));
         server.createContext("/monitor", exchange -> {
             requests.add(platforms(exchange));
             answer.handle(exchange);
@@ -62,10 +66,22 @@ public final class MonitorServer implements AutoCloseable {
         return uri("/haltepunkte.csv");
     }
 
-    /// Forgets the requests and answers the next ones with the recorded answer again.
+    public URI platformCodesUrl() {
+        return uri("/steige.csv");
+    }
+
+    /// Forgets the requests and answers the next ones with the recorded answer and the list of
+    /// platform codes again.
     public void reset() {
         requests.clear();
         answer = respond(200, JSON, ANSWER);
+        codes = respond(200, "text/csv", CODES);
+    }
+
+    /// Answers the next requests for the list of platform codes with a 404, as if Wiener Linien had
+    /// removed it.
+    public void removePlatformCodes() {
+        codes = respond(404, "text/plain", new byte[0]);
     }
 
     /// Answers the next requests with `status` and `body`, as Wiener Linien do when they fail or

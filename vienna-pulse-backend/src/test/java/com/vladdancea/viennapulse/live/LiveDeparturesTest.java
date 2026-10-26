@@ -431,6 +431,7 @@ class LiveDeparturesTest {
         var properties = new LiveProperties(
                 server.monitorUrl(),
                 server.platformsUrl(),
+                server.platformCodesUrl(),
                 Duration.ofSeconds(15),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(60),
