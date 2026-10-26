@@ -179,9 +179,7 @@ async function expectDrawn(page, shown) {
   await expect.poll(() => colors(page), { timeout: 20_000 }).toEqual(expected);
 }
 
-test('draws the stops, lines and vehicles from the API, filters them by mode and credits the timetable and live times', async ({
-  page,
-}) => {
+test('draws the stops, lines and vehicles from the API and filters them by mode', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -203,28 +201,58 @@ test('draws the stops, lines and vehicles from the API, filters them by mode and
   await page.getByRole('button', { name: 'All' }).click();
   await expectDrawn(page, all);
 
+  expect(errors).toEqual([]);
+});
+
+test('credits Stadt Wien and Wiener Linien with links to the data and the license, also zoomed out past the districts', async ({
+  page,
+}) => {
+  // A phone's height lets the map zoom out below 10, where the district boundaries no longer draw.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(origin);
+
   // Stadt Wien publishes Wiener Linien's timetable, the realtime data the departure panel shows and the
   // district boundaries under CC BY 4.0, which asks for credit with links to the data and the license.
   const credits = page.locator('.maplibregl-ctrl-attrib-inner');
   await expect(credits).toHaveText(
-    'MapLibre | Datenquelle: Stadt Wien - data.wien.gv.at (CC BY 4.0, simplified) | ' +
+    'MapLibre | Datenquelle: Stadt Wien – data.wien.gv.at (CC BY 4.0, simplified) | ' +
       'Fahrplandaten: Wiener Linien (CC BY 4.0) | Echtzeitdaten: Wiener Linien (CC BY 4.0)',
   );
   const license = 'https://creativecommons.org/licenses/by/4.0/';
-  expect(
-    await credits
+  const timetable = 'https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de';
+  const realtime = 'https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de';
+  const links = () =>
+    credits
       .getByRole('link')
-      .evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')])),
-  ).toEqual([
+      .evaluateAll((links) => links.map((link) => [link.textContent, link.getAttribute('href')]));
+  expect(await links()).toEqual([
     ['MapLibre', 'https://maplibre.org/'],
-    ['Stadt Wien - data.wien.gv.at', 'https://data.wien.gv.at'],
+    ['Stadt Wien – data.wien.gv.at', 'https://data.wien.gv.at'],
     ['CC BY 4.0', license],
-    ['Wiener Linien', 'https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de'],
+    ['Wiener Linien', timetable],
     ['CC BY 4.0', license],
-    ['Wiener Linien', 'https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de'],
+    ['Wiener Linien', realtime],
     ['CC BY 4.0', license],
   ]);
-  expect(errors).toEqual([]);
+
+  // Stadt Wien's terms ask for its credit on Wiener Linien's data too, so it stays once the boundaries hide.
+  await page.getByRole('region', { name: 'Map' }).focus();
+  await expect(async () => {
+    await page.keyboard.press('Minus');
+    await expect(credits).toHaveText(
+      'MapLibre | Datenquelle: Stadt Wien – data.wien.gv.at | ' +
+        'Fahrplandaten: Wiener Linien (CC BY 4.0) | Echtzeitdaten: Wiener Linien (CC BY 4.0)',
+      { timeout: 1_000 },
+    );
+  }).toPass();
+  expect(await links()).toEqual([
+    ['MapLibre', 'https://maplibre.org/'],
+    ['Stadt Wien – data.wien.gv.at', 'https://data.wien.gv.at'],
+    ['Wiener Linien', timetable],
+    ['CC BY 4.0', license],
+    ['Wiener Linien', realtime],
+    ['CC BY 4.0', license],
+  ]);
 });
 
 test("opens a clicked stop's departures, closes them on Escape, opens them from the link and filters them by mode", async ({

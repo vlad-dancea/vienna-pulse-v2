@@ -1,5 +1,8 @@
 import type { FilterSpecification, MapLibreMap } from 'maplibre-gl';
 
+/** The credit Stadt Wien's open data terms ask for word for word, Wiener Linien's data included. */
+export const stadtWienCredit = 'Datenquelle: <a href="https://data.wien.gv.at">Stadt Wien – data.wien.gv.at</a>';
+
 /** Replaces neighborhood labels with Vienna's numbered districts and boundaries. */
 export function addDistricts(map: MapLibreMap): void {
   const layers = map.getStyle().layers;
@@ -16,8 +19,7 @@ export function addDistricts(map: MapLibreMap): void {
   map.addSource('districts', {
     type: 'geojson',
     data: 'data/vienna-districts.geojson',
-    attribution:
-      'Datenquelle: <a href="https://data.wien.gv.at">Stadt Wien - data.wien.gv.at</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, simplified)',
+    attribution: `${stadtWienCredit} (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, simplified)`,
   });
   // Boundaries are context, so they stay beneath the base map's street and water names.
   const firstLabel = layers.find((layer) => layer.type === 'symbol')?.id ?? 'lines-bus-casing';

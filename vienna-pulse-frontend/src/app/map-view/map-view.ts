@@ -22,7 +22,7 @@ import { DeparturePanel } from '../departure-panel/departure-panel';
 import { NetworkStops } from '../timetable/network-stops';
 import { RunningLines } from '../timetable/running-lines';
 import { RunningVehicles } from '../timetable/running-vehicles';
-import { addDistricts } from './districts';
+import { addDistricts, stadtWienCredit } from './districts';
 import { lineLayers, lineNamesLayer, routeLayers } from './lines';
 import { lineProperty, stopProperty } from './properties';
 import { selectedStopLayer, showStop, stopAt, stopsLayer, withIds } from './stops';
@@ -185,11 +185,14 @@ export class MapView {
         ],
         // The stops, lines and vehicles come from Wiener Linien's timetable and the departure panel's live
         // times from their realtime data, both published by Stadt Wien under CC BY 4.0, which asks for
-        // credit. These options replace MapLibre's defaults, so they repeat its compact control and link.
+        // credit. MapLibre drops a credit that a longer one contains, so Stadt Wien's own shows by itself
+        // only while the district boundaries, whose credit starts with it, are hidden. These options
+        // replace MapLibre's defaults, so they repeat its compact control and link.
         attributionControl: {
           compact: true,
           customAttribution: [
             '<a href="https://maplibre.org/" target="_blank">MapLibre</a>',
+            stadtWienCredit,
             'Fahrplandaten: <a href="https://www.data.gv.at/datasets/ab4a73b6-1c2d-42e1-b4d9-049e04889cf0?locale=de">Wiener Linien</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)',
             'Echtzeitdaten: <a href="https://www.data.gv.at/datasets/cfba4373-a654-3e0b-80f8-348738169f95?locale=de">Wiener Linien</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>)',
           ],

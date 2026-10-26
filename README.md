@@ -341,7 +341,11 @@ round outlasts its 2 second timeout, `liveIn` can fall a little short, and the p
 `pending` answer first. Without `liveIn`, and after a refresh that failed while the live times were
 pending, it asks every 15 seconds instead of 30.
 The map's attribution credits the timetable as "Fahrplandaten: Wiener Linien" and the live times as
-"Echtzeitdaten: Wiener Linien", as their CC BY 4.0 licenses ask.
+"Echtzeitdaten: Wiener Linien", as their CC BY 4.0 licenses ask. Stadt Wien publishes both, and its
+[open data terms](https://digitales.wien.gv.at/ogd-nutzungsbedingungen/) ask for the credit
+"Datenquelle: Stadt Wien – data.wien.gv.at" word for word. The district boundaries' credit starts
+with it, and MapLibre drops a credit that a longer one contains, so it appears on its own only when
+the map is zoomed out past the boundaries.
 
 Vienna's 23 Bezirke have dashed boundaries and numbered names, replacing the base map's
 neighborhood labels inside and outside the city. Street, town and village names stay
@@ -349,7 +353,7 @@ visible above the boundaries. District names appear from zoom 12 and fade out be
 zoom 14 and 15. Wider views show district numbers. The bundled geometry comes from
 [Stadt Wien's district boundaries](https://www.data.gv.at/katalog/dataset/2ee6b8bf-6292-413c-bb8b-bd22dbb2ad4b/resource/f5ad0704-ceca-4c46-87f2-f2e131eee44b)
 under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-Datenquelle: Stadt Wien - https://data.wien.gv.at.
+Datenquelle: Stadt Wien – data.wien.gv.at.
 
 The snapshot was downloaded on 2026-10-20, with source update date 2026-09-01. It is
 simplified to a 5-meter interval and coordinates rounded to five decimal places. Label
