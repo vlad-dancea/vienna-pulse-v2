@@ -167,6 +167,8 @@ export interface components {
         };
         VehicleProperties: {
             color: string | null;
+            /** Format: int32 */
+            delay: number | null;
             headsign: string | null;
             line: string;
             longName: string | null;

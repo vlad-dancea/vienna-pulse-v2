@@ -20,6 +20,7 @@ const tram = {
         color: null,
         textColor: null,
         headsign: 'Oper',
+        delay: null,
         path: [
           [16.37, 48.2, 0],
           [16.38, 48.2, 30],

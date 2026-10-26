@@ -145,11 +145,12 @@ class ImportJobTest {
                 {"type": "FeatureCollection", "time": "2026-10-20T06:03:00Z", "features": [
                   {"type": "Feature", "id": "1.T2.21-U1-j26-1.6.R",
                    "geometry": {"type": "Point", "coordinates": [16.370368, 48.204873]},
-                   "properties": {"line": "21-U1-j26-1", "headsign": "Wien Oberlaa", %s,
+                   "properties": {"line": "21-U1-j26-1", "headsign": "Wien Oberlaa", "delay": null, %s,
                                   "path": [[16.370368, 48.204873, 0.0], [16.369597, 48.203067, 30.0]]}},
                   {"type": "Feature", "id": "1.T2.22-2-j26-1.1.H",
                    "geometry": {"type": "Point", "coordinates": [16.377715, 48.211771]},
-                   "properties": {"line": "22-2-j26-1", "headsign": "Wien Friedrich-Engels-Platz", %s,
+                   "properties": {"line": "22-2-j26-1", "headsign": "Wien Friedrich-Engels-Platz", "delay": null,
+                                  %s,
                                   "path": [[16.377715, 48.211771, 0.0], [16.377715, 48.211771, 30.0]]}}
                 ]}
                 """.formatted(unwrapped(U1), unwrapped(TRAM_2)), JsonCompareMode.STRICT);
