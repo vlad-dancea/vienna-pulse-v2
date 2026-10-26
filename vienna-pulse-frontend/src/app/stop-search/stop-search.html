@@ -23,7 +23,7 @@
   aria-autocomplete="list"
   aria-controls="stop-search-options"
   class="h-11 w-full rounded-lg border border-slate-500 bg-white pr-3 pl-10 text-base placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-  [attr.aria-expanded]="shown()"
+  [attr.aria-expanded]="expanded()"
   [attr.aria-activedescendant]="activeId()"
   [value]="query()"
   (input)="type(input.value)"
@@ -39,7 +39,7 @@
   [hidden]="!shown()"
   (mousedown)="$event.preventDefault()"
 >
-  <ul id="stop-search-options" role="listbox" aria-label="Stops">
+  <ul id="stop-search-options" role="listbox" aria-label="Stops" [hidden]="!options().length">
     @for (option of options(); track option.id) {
       @let selected = option.id === activeId();
       <!-- Forced colors drop the dark background, and draw the transparent outline in a system color instead. -->
