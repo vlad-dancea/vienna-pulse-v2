@@ -8,7 +8,15 @@ export interface BoardRow {
   background: string;
   text: string;
   headsign: string;
+  /** Which platforms the departures leave from, such as "Platform C", or empty when the live data names none. */
+  platform: LabelPart[];
   departures: BoardDeparture[];
+}
+
+/** A piece of a row's platform label: a code that signs show, or the words around it. */
+export interface LabelPart {
+  text: string;
+  code: boolean;
 }
 
 /** One departure in a row of the board. */
@@ -57,14 +65,47 @@ export function boardRows(departures: readonly Departure[], now: number): BoardR
         a.line.name.localeCompare(b.line.name, 'de', { numeric: true }) ||
         (a.headsign ?? '').localeCompare(b.headsign ?? '', 'de'),
     )
-    .map(([key, row]) => ({
-      key,
-      line: row.line.name,
-      ...badgeColors(row.line),
-      // The displays at the stops leave out the "Wien " that most headsigns start with.
-      headsign: row.headsign?.replace(/^Wien /, '') ?? '',
-      departures: row.departures.slice(0, 2).map((departure) => boardDeparture(departure, now)),
-    }));
+    .map(([key, row]) => {
+      const next = row.departures.slice(0, 2);
+      return {
+        key,
+        line: row.line.name,
+        ...badgeColors(row.line),
+        // The displays at the stops leave out the "Wien " that most headsigns start with.
+        headsign: row.headsign?.replace(/^Wien /, '') ?? '',
+        platform: platformLabel(next),
+        departures: next.map((departure) => boardDeparture(departure, now)),
+      };
+    });
+}
+
+/**
+ * Names the platforms that a row's departures leave from by the codes signs show. Wiener Linien name
+ * the platform only of a departure with a live time, so one without takes the code of the row's other
+ * departure when the timetable has both at the same platform. A departure with a live time and no
+ * code leaves from a platform without one. Departures from different platforms are named in turn,
+ * like the times beside them.
+ */
+function platformLabel(departures: readonly Departure[]): LabelPart[] {
+  const codes = departures.map((departure) =>
+    departure.liveTime === null
+      ? (departures.find((other) => other.platform === departure.platform && other.platformCode !== null)
+          ?.platformCode ?? null)
+      : departure.platformCode,
+  );
+  const [first = null, second = first] = codes;
+  if (first !== null && second !== null) {
+    return first === second ? label('Platform ', first) : label('Platform ', first, ', then ', second);
+  }
+  if (first !== null) {
+    return label('Next from platform ', first);
+  }
+  return second === null ? [] : label('Then from platform ', second);
+}
+
+// Words and codes take turns, starting with words.
+function label(...texts: string[]): LabelPart[] {
+  return texts.map((text, index) => ({ text, code: index % 2 === 1 }));
 }
 
 function boardDeparture(departure: Departure, now: number): BoardDeparture {

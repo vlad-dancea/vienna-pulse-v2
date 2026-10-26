@@ -232,8 +232,8 @@ A departure planned up to an hour ago stays on the board while its live time is 
 the two departures shown for each line and headsign are the soonest by live time where there is
 one. The live time is what the displays at the stops show, but a delay computed from it can
 mislead: during a U3 disruption, Wiener Linien paired a train planned for 20:15 with 21:02 and one
-planned for 20:33 with 20:23. The [map view](#map-view) shows the live times in its departure
-panel.
+planned for 20:33 with 20:23. The [map view](#map-view) shows the live times and platform codes
+in its departure panel.
 
 Every answer also goes into `public.live_departures`, outside the schema imports replace, for
 statistics of how punctual the lines are. A row is one departure, by platform, line, direction and
@@ -346,6 +346,13 @@ minutes until it leaves and its clock time, both from Wiener Linien's live time 
 and from the timetable otherwise. A green signal marks the live times. When the live time is a
 minute or more away from the planned one, the planned time appears struck through beside it, and
 screen readers hear "planned" and "expected" instead. From 3 minutes late the live time is red.
+Under the headsign, a row names the platform it leaves from by the code that signs show, in bold,
+such as "Platform C". Only departures with a live time have a code, so one without takes the code
+of the row's other departure when the timetable has both at the same platform. When the two leave
+from different platforms, the row names them in turn, such as "Platform G, then B" at Floridsdorf,
+or names the one with a code as "Next from platform E" or "Then from platform E". Rows have no
+label while the live times are pending or at stops without codes. The label takes the line beside
+the clock times, so a row whose headsign fits on one line keeps its height when the codes arrive.
 The panel refreshes every 30 seconds while the tab is visible, and at once when it becomes visible.
 When the backend asked Wiener Linien in the last 15 seconds, the first answer for a stop it has not
 fetched recently has planned times only, so each time shows a loader. The panel asks again when
