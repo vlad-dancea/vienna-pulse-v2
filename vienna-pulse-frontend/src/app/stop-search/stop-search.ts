@@ -174,9 +174,16 @@ export class StopSearch {
       const popup = this.popup().nativeElement;
       const viewport = window?.visualViewport;
       const visible = viewport ? viewport.offsetTop + viewport.height : (window?.innerHeight ?? 0);
-      const bottom = Math.min(visible, this.floor()?.getBoundingClientRect().top ?? visible);
-      // The margin keeps the popup's shadow clear, and two options always fit.
-      popup.style.maxHeight = `${Math.max(bottom - popup.getBoundingClientRect().top - 8, 112).toString()}px`;
+      // A margin keeps the popup's shadow clear.
+      const top = popup.getBoundingClientRect().top + 8;
+      const room = Math.min(visible, this.floor()?.getBoundingClientRect().top ?? visible) - top;
+      // On a short screen the list covers the controls rather than show less than two options, but it never
+      // reaches under the keyboard.
+      popup.style.maxHeight = `${Math.max(room, Math.min(112, visible - top), 0).toString()}px`;
+      const active = this.activeId();
+      if (active) {
+        document.getElementById(active)?.scrollIntoView({ block: 'nearest' });
+      }
     };
     const listeners = new AbortController();
     window?.addEventListener('resize', fit, { signal: listeners.signal });
@@ -185,16 +192,14 @@ export class StopSearch {
     inject(DestroyRef).onDestroy(() => {
       listeners.abort();
     });
+    // The controls appear once the map loads and move with the departure sheet, so the list fits again
+    // whenever it changes, which also scrolls the selected option into view.
     afterRenderEffect(() => {
       if (this.shown()) {
+        this.floor();
+        this.options();
+        this.activeId();
         untracked(fit);
-      }
-    });
-
-    afterRenderEffect(() => {
-      const id = this.activeId();
-      if (id) {
-        untracked(() => document.getElementById(id)?.scrollIntoView({ block: 'nearest' }));
       }
     });
   }

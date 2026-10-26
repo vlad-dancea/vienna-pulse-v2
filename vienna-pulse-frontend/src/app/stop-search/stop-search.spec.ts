@@ -197,27 +197,47 @@ describe('StopSearch', () => {
     expect(shown().options[7]).toBe('> Zentralfriedhof Babygruppe Bus');
   });
 
-  it("ends the list above a phone's keyboard and the map's controls", async () => {
+  it("ends the list above a phone's keyboard and the map's controls, keeping the selected option in view", async () => {
     const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: 800 });
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
-    const controls = document.createElement('div');
     const box = (top: number) => () => DOMRect.fromRect({ x: 0, y: top, width: 390, height: 40 });
-    controls.getBoundingClientRect = box(700);
+    const resize = async (height: number) => {
+      viewport.height = height;
+      viewport.dispatchEvent(new Event('resize'));
+      await fixture.whenStable();
+    };
     try {
-      await load(stopsNamed(['Karlsplatz', ['subway']]));
-      fixture.componentRef.setInput('floor', controls);
+      await load(stopsNamed(['Karlsplatz', ['subway']], ['Oper/Karlsplatz', ['tram']]));
       const popup = document.getElementById('stop-search-options')?.parentElement;
       if (!popup) {
         throw new Error('The list has no popup.');
       }
+      // The list starts 8 pixels above its top edge, which keeps its shadow clear.
       popup.getBoundingClientRect = box(80);
       await type('karls');
-      expect(popup.style.maxHeight).toBe(`${(700 - 80 - 8).toString()}px`);
+      await press('ArrowDown');
+      expect(popup.style.maxHeight).toBe('712px');
 
-      // The keyboard opens and leaves the top 420 pixels visible.
-      viewport.height = 420;
-      viewport.dispatchEvent(new Event('resize'));
-      expect(popup.style.maxHeight).toBe(`${(420 - 80 - 8).toString()}px`);
+      // The map's controls appear once the map loads.
+      const controls = document.createElement('div');
+      controls.getBoundingClientRect = box(700);
+      fixture.componentRef.setInput('floor', controls);
+      await fixture.whenStable();
+      expect(popup.style.maxHeight).toBe('612px');
+
+      // The keyboard opens and leaves the top 420 pixels visible, and the list scrolls to the selected option.
+      const scrolled = vi.fn();
+      Element.prototype.scrollIntoView = scrolled;
+      await resize(420);
+      expect(popup.style.maxHeight).toBe('332px');
+      expect(scrolled.mock.contexts).toEqual([document.getElementById('stop-search-at:49:1')]);
+
+      // Without room for two options above the controls, the list covers them, but never the keyboard.
+      controls.getBoundingClientRect = box(150);
+      await resize(420);
+      expect(popup.style.maxHeight).toBe('112px');
+      await resize(150);
+      expect(popup.style.maxHeight).toBe('62px');
     } finally {
       Reflect.deleteProperty(window, 'visualViewport');
     }
