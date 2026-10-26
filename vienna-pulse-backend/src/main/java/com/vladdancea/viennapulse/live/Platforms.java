@@ -1,6 +1,7 @@
 package com.vladdancea.viennapulse.live;
 
 import de.siegmar.fastcsv.reader.CsvReader;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -18,7 +19,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /// The platforms of every station in Wiener Linien's realtime API, from their list of platforms
-/// (`wienerlinien-ogd-haltepunkte.csv`), kept in memory.
+/// (`wienerlinien-ogd-haltepunkte.csv`), and the codes that signs show for some of them, from their
+/// list of platform codes (`wienerlinien-ogd-steige.csv`), kept in memory.
 @Component
 @Slf4j
 public class Platforms {
@@ -33,8 +35,10 @@ public class Platforms {
     private final RestClient client;
     private final Clock clock;
 
-    // Replaced whole by each load and read by requests and rounds on other threads.
+    // Each replaced whole by each load of its list and read by requests and rounds on other threads.
+    // The codes load on their own, so the live times never wait on them.
     private volatile @Nullable Loaded loaded;
+    private volatile @Nullable Codes codes;
 
     public Platforms(LiveProperties properties, RestClient.Builder clientBuilder, Clock clock) {
         this.properties = properties;
@@ -64,28 +68,62 @@ public class Platforms {
         return current == null ? null : current.stations().get(platform);
     }
 
-    /// Loads the list when it is missing or a day old. It runs at startup and then every hour, so a
+    /// The code that signs show for the platform with the number `platform`, such as `1` for a U-Bahn
+    /// platform or `C` for one of the tram stops at a large station, or `null` for a platform without
+    /// one.
+    public @Nullable String code(int platform) {
+        var current = codes;
+        return current == null ? null : current.codes().get(platform);
+    }
+
+    /// Loads each list when it is missing or a day old. It runs at startup and then every hour, so a
     /// failed load is tried again within the hour, while the last list, if any, stays in use.
     @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.HOURS)
     void refresh() {
-        var current = loaded;
-        if (current == null || !clock.instant().isBefore(current.at().plus(MAX_AGE))) {
-            load();
+        var currentPlatforms = loaded;
+        if (currentPlatforms == null || isOld(currentPlatforms.at())) {
+            loadPlatforms();
+        }
+        var currentCodes = codes;
+        if (currentCodes == null || isOld(currentCodes.at())) {
+            loadCodes();
         }
     }
 
-    /// Downloads the list and replaces the one in memory, or keeps it if that fails.
+    /// Downloads both lists and replaces the ones in memory, keeping each list whose download fails.
     public void load() {
+        loadPlatforms();
+        loadCodes();
+    }
+
+    private void loadPlatforms() {
         try {
-            var csv = client.get().uri(properties.platformsUrl()).retrieve().body(byte[].class);
-            if (csv == null) {
-                throw new IllegalStateException("The list of platforms is empty");
-            }
-            loaded = parse(new String(csv, StandardCharsets.UTF_8), clock.instant());
+            loaded = parse(download(properties.platformsUrl()), clock.instant());
             log.info("Loaded the platforms of {} stations", loaded.platforms().size());
         } catch (RuntimeException exception) {
             log.warn("Could not load the platforms from {}", properties.platformsUrl(), exception);
         }
+    }
+
+    private void loadCodes() {
+        try {
+            codes = new Codes(parseCodes(download(properties.platformCodesUrl())), clock.instant());
+            log.info("Loaded the codes of {} platforms", codes.codes().size());
+        } catch (RuntimeException exception) {
+            log.warn("Could not load the platform codes from {}", properties.platformCodesUrl(), exception);
+        }
+    }
+
+    private boolean isOld(Instant loadedAt) {
+        return !clock.instant().isBefore(loadedAt.plus(MAX_AGE));
+    }
+
+    private String download(URI list) {
+        var csv = client.get().uri(list).retrieve().body(byte[].class);
+        if (csv == null) {
+            throw new IllegalStateException("The list at " + list + " is empty");
+        }
+        return new String(csv, StandardCharsets.UTF_8);
     }
 
     // Each row is a platform, `StopID;DIVA;StopText;...`, with the number of its station. Platforms out
@@ -111,6 +149,28 @@ public class Platforms {
         return new Loaded(Map.copyOf(platforms), Map.copyOf(stations), at);
     }
 
+    // Each row is a platform with a code, `StopID;Platform`, such as `4112;2`. The list has only the
+    // platforms with a code: those of the U-Bahn and the stops at large stations, which signs tell
+    // apart by letters.
+    private static Map<Integer, String> parseCodes(String csv) {
+        var codes = new HashMap<Integer, String>();
+        for (var row :
+                CsvReader.builder().fieldSeparator(';').detectBomHeader(true).ofNamedCsvRecord(csv)) {
+            var platform = row.getField("StopID").strip();
+            var code = row.getField("Platform").strip();
+            if (NUMBER.matcher(platform).matches() && !code.isEmpty()) {
+                codes.put(Integer.parseInt(platform), code);
+            }
+        }
+        if (codes.isEmpty()) {
+            throw new IllegalStateException("The list of platform codes has no rows");
+        }
+        return Map.copyOf(codes);
+    }
+
     // The platforms of each station, the station of each platform, and when the list was loaded.
     private record Loaded(Map<Integer, List<Integer>> platforms, Map<Integer, Integer> stations, Instant at) {}
+
+    // The code of each platform that has one, and when the list was loaded.
+    private record Codes(Map<Integer, String> codes, Instant at) {}
 }

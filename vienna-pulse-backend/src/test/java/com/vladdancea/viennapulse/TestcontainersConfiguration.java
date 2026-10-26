@@ -76,6 +76,7 @@ public class TestcontainersConfiguration {
         return registry -> {
             registry.add("pulse.live.monitor-url", monitor::monitorUrl);
             registry.add("pulse.live.platforms-url", monitor::platformsUrl);
+            registry.add("pulse.live.platform-codes-url", monitor::platformCodesUrl);
         };
     }
 

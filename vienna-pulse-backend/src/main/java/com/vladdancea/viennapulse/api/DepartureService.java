@@ -5,6 +5,7 @@ import com.vladdancea.viennapulse.api.Departures.Line;
 import com.vladdancea.viennapulse.database.TimeLimited;
 import com.vladdancea.viennapulse.live.LiveDepartures;
 import com.vladdancea.viennapulse.live.PlannedDeparture;
+import com.vladdancea.viennapulse.live.Platforms;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -39,6 +40,8 @@ public class DepartureService {
 
     private final LiveDepartures liveDepartures;
 
+    private final Platforms platforms;
+
     /// The next two departures of each line and headsign, soonest first, from any platform of the
     /// stop whose merged id, like `at:49:1320`, the map shows, and whether Wiener Linien's live times
     /// for them have been fetched. Fails with a 404 for an unknown stop. When the stop's station has no
@@ -54,6 +57,11 @@ public class DepartureService {
     /// number of the soonest departures would show one time for most groups at a busy stop, where
     /// frequent U-Bahn trains take most of them, and miss some trams and buses leaving within half
     /// an hour.
+    ///
+    /// A departure has the code that signs show for its platform, such as `1` or `C`, when the live
+    /// departure paired with it leaves from a platform that Wiener Linien's list of platform codes
+    /// has. The timetable's platforms have no codes, and their ids have nothing in common with Wiener
+    /// Linien's platform numbers, so a departure without a live one has no code either.
     ///
     /// A call is a departure when passengers can board and the trip goes on to another stop. Its
     /// time counts from noon minus 12 hours on its service day, which is midnight except on the
@@ -170,11 +178,15 @@ public class DepartureService {
                         departure.time().toInstant()))
                 .toList();
         var live = liveDepartures.await(stopId, now, timetable);
-        var liveTimes = live.times(timetable);
+        var paired = live.pair(timetable);
         var leaving = new ArrayList<Departure>();
         for (var i = 0; i < planned.size(); i++) {
-            var liveTime = liveTimes.get(i);
-            var departure = planned.get(i).withLiveTime(liveTime == null ? null : vienna(liveTime));
+            var liveDeparture = paired.get(i);
+            var liveTime = liveDeparture == null ? null : liveDeparture.real();
+            var departure = planned.get(i)
+                    .withLiveData(
+                            liveTime == null ? null : vienna(liveTime),
+                            liveDeparture == null ? null : platforms.code(liveDeparture.platform()));
             if (!leaves(departure).toInstant().isBefore(now)) {
                 leaving.add(departure);
             }
@@ -222,8 +234,8 @@ public class DepartureService {
             @Nullable String headsign,
             String platform,
             @Nullable Integer direction) {
-        Departure withLiveTime(@Nullable OffsetDateTime liveTime) {
-            return new Departure(time, liveTime, line, headsign, platform);
+        Departure withLiveData(@Nullable OffsetDateTime liveTime, @Nullable String platformCode) {
+            return new Departure(time, liveTime, line, headsign, platform, platformCode);
         }
     }
 

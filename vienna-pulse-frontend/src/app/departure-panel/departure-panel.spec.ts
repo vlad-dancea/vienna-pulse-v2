@@ -32,6 +32,7 @@ function departure(line: DepartureLine, headsign: string | null, minute: number,
     line,
     headsign,
     platform: 'at:49:657:0:1',
+    platformCode: null,
   };
 }
 

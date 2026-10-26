@@ -165,7 +165,7 @@ class ImportJobTest {
                          "liveIn": null, "departures": [
                           {"plannedTime": "2026-10-20T08:04:00+02:00", "liveTime": null,
                            "headsign": "Wien Friedrich-Engels-Platz", "platform": "at:49:1198:0:2",
-                           "line": {"id": "22-2-j26-1", %s}}
+                           "platformCode": null, "line": {"id": "22-2-j26-1", %s}}
                         ]}
                         """.formatted(unwrapped(TRAM_2)), JsonCompareMode.STRICT);
     }

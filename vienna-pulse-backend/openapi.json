@@ -279,9 +279,12 @@
           },
           "platform" : {
             "type" : "string"
+          },
+          "platformCode" : {
+            "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "headsign", "line", "liveTime", "plannedTime", "platform" ]
+        "required" : [ "headsign", "line", "liveTime", "plannedTime", "platform", "platformCode" ]
       },
       "Departures" : {
         "type" : "object",
