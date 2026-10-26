@@ -10,6 +10,7 @@ const names = [
   'Zentralfriedhof 3.Tor',
   'Zentralfriedhof Halle 3/Gruppe 40',
   'Zentralfriedhof',
+  'Vösendorf Shopping City Süd',
 ];
 const stops = namedStops({
   type: 'FeatureCollection',
@@ -34,6 +35,9 @@ describe('findStops', () => {
     ['dobling', ['Döblinger Hauptstraße/Gatterburggasse']],
     ['strasse', ['Peter-Jordan-Straße']],
     ['Straße', ['Peter-Jordan-Straße']],
+    // Each word may spell its umlaut either way.
+    ['voesendorf shopping city süd', ['Vösendorf Shopping City Süd']],
+    ['vösendorf sued', ['Vösendorf Shopping City Süd']],
     // Each word of the query starts a word of the name, in any order and with any punctuation.
     ['oper karl', ['Oper/Karlsplatz']],
     ['3 zentral', ['Zentralfriedhof 3.Tor', 'Zentralfriedhof Halle 3/Gruppe 40']],
