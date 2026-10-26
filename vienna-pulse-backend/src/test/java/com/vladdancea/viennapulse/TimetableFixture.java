@@ -150,6 +150,12 @@ public class TimetableFixture {
         addTrip(id, headsign, direction, route, service, null, calls);
     }
 
+    /// Adds a trip like [#addTripTowards], along `shape`.
+    public void addTripTowards(
+            String id, String headsign, int direction, String route, String service, String shape, Call... calls) {
+        addTrip(id, headsign, direction, route, service, shape, calls);
+    }
+
     private void addTrip(
             String id,
             String headsign,

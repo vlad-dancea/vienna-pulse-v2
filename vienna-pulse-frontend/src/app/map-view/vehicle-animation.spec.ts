@@ -23,6 +23,7 @@ function vehicles(seconds: number, paths: Record<string, Path>): Vehicles {
         color: null,
         textColor: null,
         headsign: 'Zentrum',
+        delay: null,
         path,
       },
     })),

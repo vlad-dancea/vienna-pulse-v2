@@ -120,7 +120,7 @@ which days the timetable covers and where a service day's times start, are SQL f
 | --- | --- |
 | `/api/stops` | Every stop as a GeoJSON point with its name and the modes that serve it. The modes are null while an upgrade waits for its first classification. |
 | `/api/lines?date=YYYY-MM-DD` | The lines that run on the date, today in Vienna if left out, as GeoJSON paths along the shapes their trips follow, with the line's name, mode and colors. A date the timetable does not cover gets a 404. |
-| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, with the trip id as feature id and the line, its colors, the headsign and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
+| `/api/vehicles` | A GeoJSON point for every trip running at the start of the current five-second step, where its timetable puts it, or its [live delay](#vehicles-at-their-live-times) where the departure board's live times give one, with the trip id as feature id and the line, its colors, the headsign, the delay in seconds and the path it follows for the next 30 seconds as properties. The path is a list of `[longitude, latitude, seconds]` waypoints, and the collection's `time` is the step's start, which the seconds count from. |
 | `/api/stops/{id}/departures` | The next two departures of each line and headsign from any platform of the merged stop, soonest first, each with its planned time, its live time if there is one, its line, its headsign, its platform and the code signs show for that platform if the live data has one, and a `liveStatus` for the stop, with `liveIn`, the seconds until the next round, while it is `pending`. Times are in Vienna. An unknown stop gets a 404. |
 
 A vehicle moves along its shape at an even speed between two stops and waits at a stop between
@@ -262,6 +262,36 @@ GROUP BY line
 ORDER BY line;
 ```
 
+#### Vehicles at their live times
+
+The map's vehicles come from the timetable, and the live times move those of the trips they pair
+with. Such a trip runs as far behind its timetable as its live time is after its planned time in
+the timetable, from the last round that listed it, at the station it leaves first when that round
+listed it at several. It keeps that delay for the rest of the trip, also after it left the stations
+people opened, since Wiener Linien expect a late vehicle to stay late at its later stops too. The
+backend forgets a delay four hours after the last round that listed it, longer than the 70 minutes
+ahead that a round lists plus the longest trip of the timetable, 150 minutes, and shorter than the
+day until the trip runs again.
+
+Delays from 5 minutes early to 20 minutes late count. Among the 1,686 paired departures that
+production recorded by 2026-10-26, Wiener Linien expected none more than 185 seconds before they
+planned it, 95 in 100 at most 188 seconds late and a few up to 11 minutes late, but buses 78A
+planned that morning up to two and a quarter hours late. During a U3 disruption they paired trains
+with live times 47 minutes later and 10 minutes earlier. Their own planned times differ from the
+timetable's by up to two minutes, which the bounds allow for. A live time outside them sends its
+trip back to the timetable.
+
+A vehicle never jumps or turns back when its delay appears or changes. Maps move the vehicles along
+the paths of the last answer they have, so its delay starts changing only when those 30 seconds
+are over, 35 seconds after the round, and then by half a second each second until it is the
+trip's. Meanwhile the vehicle moves at half its timetable speed while it falls behind, or at one
+and a half times while it catches up, so a delay of two minutes takes four. The vehicles' `delay`
+is how far behind its timetable the vehicle runs at the start of its path, negative when ahead,
+and null for the vehicles that the timetable alone places. The map draws both the same.
+
+Working out the vehicles reads the delays that the rounds already have, so it opens no station,
+sends Wiener Linien nothing and still happens once per step for every map.
+
 `mise run dev` asks Wiener Linien too, within the same limits. The tests never do: they answer
 from [`MonitorServer`](vienna-pulse-backend/src/test/java/com/vladdancea/viennapulse/live/MonitorServer.java),
 which replays an answer Wiener Linien sent.
@@ -324,7 +354,8 @@ for it, along its route and at its timetable's pace, from the first answer on. E
 30 seconds and continues where the vehicles are, so they keep moving when one request fails or
 comes late. When the paths have run out, such as in a tab hidden for a while, the vehicles jump to
 where the next answer puts them. With reduced motion turned on, they jump to where they are with
-every answer instead. These are positions from the timetable, not live ones.
+every answer instead. The positions come from the timetable, set back or ahead by the live delay
+for the trips the departure board's rounds paired (see [Vehicles at their live times](#vehicles-at-their-live-times)).
 
 The All, U-Bahn, Tram and Bus controls filter routes, vehicles and stops. Interchanges remain
 visible for every mode that serves them. Stop modes cover the full imported timetable, while

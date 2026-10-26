@@ -541,6 +541,10 @@
           "color" : {
             "type" : [ "string", "null" ]
           },
+          "delay" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
           "headsign" : {
             "type" : [ "string", "null" ]
           },
@@ -578,7 +582,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "color", "headsign", "line", "longName", "name", "path", "textColor", "type" ]
+        "required" : [ "color", "delay", "headsign", "line", "longName", "name", "path", "textColor", "type" ]
       },
       "Vehicles" : {
         "type" : "object",
