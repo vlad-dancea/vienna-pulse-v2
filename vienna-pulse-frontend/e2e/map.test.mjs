@@ -333,3 +333,21 @@ test('opens a stop found by name with the keyboard alone and returns to the sear
   await expect(search).toHaveValue('stop');
   expect(errors).toEqual([]);
 });
+
+test('keeps the selected stop above the departure sheet on a short screen', async ({ page }) => {
+  // A phone held sideways, where the sheet covers the lower half and the list reaches into it.
+  await page.setViewportSize({ width: 568, height: 280 });
+  await page.goto(`${origin}/?stop=at:49:1`);
+  await expect(page.getByRole('heading', { name: 'U-Bahn stop' })).toBeFocused();
+  const search = page.getByRole('combobox', { name: 'Find a stop' });
+  await search.focus();
+  await page.keyboard.type('stop');
+  await page.keyboard.press('ArrowUp');
+  const selected = page.getByRole('option', { selected: true });
+  await expect(selected).toHaveText(/U-Bahn stop/);
+  const onTop = await selected.evaluate((option) => {
+    const box = option.getBoundingClientRect();
+    return option.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  });
+  expect(onTop).toBe(true);
+});
