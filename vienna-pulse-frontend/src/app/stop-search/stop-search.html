@@ -1,0 +1,72 @@
+<label for="stop-search" class="sr-only">Find a stop</label>
+<svg
+  aria-hidden="true"
+  viewBox="0 0 20 20"
+  class="pointer-events-none absolute top-3 left-3 size-5 text-slate-500"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+>
+  <circle cx="8.5" cy="8.5" r="5.5" />
+  <path d="m12.5 12.5 4.5 4.5" stroke-linecap="round" />
+</svg>
+<!-- Phones zoom into a field with text smaller than 16 px, and WCAG asks for 3:1 contrast at its edge. -->
+<input
+  #input
+  id="stop-search"
+  type="text"
+  role="combobox"
+  autocomplete="off"
+  spellcheck="false"
+  enterkeyhint="go"
+  placeholder="Find a stop"
+  aria-autocomplete="list"
+  aria-controls="stop-search-options"
+  class="h-11 w-full rounded-lg border border-slate-500 bg-white pr-3 pl-10 text-base placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+  [attr.aria-expanded]="expanded()"
+  [attr.aria-activedescendant]="activeId()"
+  [value]="query()"
+  (input)="type(input.value)"
+  (keydown)="press($event)"
+  (click)="opened.set(true)"
+  (blur)="opened.set(false)"
+/>
+<!-- Pressing inside the popup would move focus out of the field and close it before the click arrives. -->
+<div
+  #popup
+  id="stop-search-popup"
+  class="absolute inset-x-0 top-full z-10 mt-1 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+  [hidden]="!shown()"
+  (mousedown)="$event.preventDefault()"
+>
+  <ul id="stop-search-options" role="listbox" aria-label="Stops" [hidden]="!options().length">
+    @for (option of options(); track option.id) {
+      @let selected = option.id === activeId();
+      <!-- Forced colors drop the dark background, and draw the transparent outline in a system color instead. -->
+      <!-- Keys reach the options through the field and its aria-activedescendant, as the WAI-ARIA pattern has it. -->
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
+      <li
+        role="option"
+        class="cursor-pointer px-3 py-2 outline-transparent"
+        [id]="option.id"
+        [attr.aria-selected]="selected"
+        [class.bg-slate-900]="selected"
+        [class.outline-2]="selected"
+        [class.-outline-offset-2]="selected"
+        [class.text-white]="selected"
+        [class.hover:bg-slate-100]="!selected"
+        (click)="pick(option.stop.id)"
+      >
+        <span class="block text-sm font-medium">{{ option.stop.name }}</span>
+        <span class="block text-xs" [class.text-slate-300]="selected" [class.text-slate-600]="!selected">
+          {{ option.modes }}
+        </span>
+      </li>
+    }
+  </ul>
+  @if (note(); as note) {
+    <p class="px-3 py-2 text-sm text-slate-600">{{ note }}</p>
+  }
+</div>
+<!-- Screen readers announce changes inside a live region, so it stays while messages come and go. -->
+<div role="status" class="sr-only">{{ status() }}</div>

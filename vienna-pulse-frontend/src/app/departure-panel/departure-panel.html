@@ -3,7 +3,7 @@
   <button
     type="button"
     class="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-    (click)="closed.emit()"
+    (click)="closed.emit($event)"
   >
     <svg aria-hidden="true" viewBox="0 0 20 20" class="size-5" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M5 5l10 10M15 5L5 15" stroke-linecap="round" />

@@ -295,3 +295,88 @@ test("opens a clicked stop's departures, closes them on Escape, opens them from 
   await expect(panel.getByRole('listitem')).toHaveText(row);
   expect(errors).toEqual([]);
 });
+
+test('opens a stop found by name with the keyboard alone and returns to the search when it closes', async ({
+  page,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.goto(origin);
+  const search = page.getByRole('combobox', { name: 'Find a stop' });
+  await expect(search).toBeVisible();
+
+  // The search is the first thing Tab reaches.
+  await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  await page.keyboard.type('stop');
+  await expect(page.getByRole('option')).toHaveText([/^\s*Bus stop\s*Bus\s*$/, /Tram stop/, /U-Bahn stop/]);
+  await expect(page.getByRole('search').getByRole('status')).toHaveText('3 stops match.');
+  await expect(page.getByRole('option', { selected: true })).toHaveText(/Bus stop/);
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('option', { selected: true })).toHaveText(/U-Bahn stop/);
+  await expect(search).toHaveAttribute('aria-activedescendant', 'stop-search-at:49:1');
+
+  await page.keyboard.press('Enter');
+  const panel = page.getByRole('region', { name: 'U-Bahn stop' });
+  await expect(panel.getByRole('heading', { name: 'U-Bahn stop' })).toBeFocused();
+  await expect(panel.getByRole('listitem')).toHaveCount(1);
+  await expect(page).toHaveURL(`${origin}/?stop=at:49:1`);
+  await expect(page.getByRole('listbox')).toBeHidden();
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(page).toHaveURL(`${origin}/`);
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('stop');
+  expect(errors).toEqual([]);
+});
+
+/** Tells whether `locator`'s element is what a click at its center reaches, rather than something drawn above it. */
+function onTop(locator) {
+  return locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  });
+}
+
+test('keeps the list and the focused filter above the departure sheet on a short screen, and the sheet otherwise', async ({
+  page,
+}) => {
+  // A phone held sideways, where the sheet covers the lower half and the list and the filter buttons reach into it.
+  await page.setViewportSize({ width: 568, height: 280 });
+  await page.goto(`${origin}/?stop=at:49:1`);
+  const close = page.getByRole('region', { name: 'U-Bahn stop' }).getByRole('button', { name: 'Close' });
+  await expect(page.getByRole('heading', { name: 'U-Bahn stop' })).toBeFocused();
+  await page.getByRole('combobox', { name: 'Find a stop' }).focus();
+  await page.keyboard.type('stop');
+  await page.keyboard.press('ArrowUp');
+  const selected = page.getByRole('option', { selected: true });
+  await expect(selected).toHaveText(/U-Bahn stop/);
+  expect(await onTop(selected)).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toBeHidden();
+  expect(await onTop(close)).toBe(true);
+
+  await page.keyboard.press('Tab');
+  const all = page.getByRole('button', { name: 'All' });
+  await expect(all).toBeFocused();
+  expect(await onTop(all)).toBe(true);
+});
+
+test('marks the selected stop with an outline that forced colors keep', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await page.goto(origin);
+  await page.getByRole('combobox', { name: 'Find a stop' }).fill('stop');
+  const outline = (option) =>
+    option.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return style.outlineStyle === 'none' ? 'none' : `${style.outlineWidth} ${style.outlineColor}`;
+    });
+  // Forced colors replace the selected option's dark background with the page's own.
+  expect(await outline(page.getByRole('option', { selected: true }))).toBe('2px rgb(0, 0, 0)');
+  expect(await outline(page.getByRole('option', { selected: false }).first())).toBe('none');
+});

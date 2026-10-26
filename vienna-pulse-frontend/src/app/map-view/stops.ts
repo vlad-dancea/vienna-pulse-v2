@@ -69,25 +69,29 @@ export function stopAt(map: MapLibreMap, point: ScreenPoint): string | undefined
   return nearest?.id;
 }
 
+/** Where a rider opened a stop: from a link, by finding its name or by clicking it on the map. */
+export type OpenedFrom = 'link' | 'search' | 'map';
+
 /**
- * Moves the map so the stop at `coordinates` is clear of the departure panel and the Filters card: onto
- * the stop at once for a link, and smoothly only when one of them or the edge of the map hides it.
+ * Moves the map so the stop at `coordinates` is clear of the departure panel and the card with the search
+ * and the filters. The map shows a linked or found stop at street level, at once for a link because the
+ * page has just loaded, and moves to a clicked stop only when the panel, the card or the edge hides it.
  */
 export function showStop(
   map: MapLibreMap,
   coordinates: number[],
-  covering: { panel: HTMLElement; filters: HTMLElement },
-  linked: boolean,
+  covering: { panel: HTMLElement; card: HTMLElement },
+  openedFrom: OpenedFrom,
 ) {
   const container = map.getContainer().getBoundingClientRect();
   const panel = covering.panel.getBoundingClientRect();
-  const filters = covering.filters.getBoundingClientRect();
+  const card = covering.card.getBoundingClientRect();
   // The panel is a column on the right of wide screens and a sheet at the bottom of phones, so the map
-  // stays visible either left of it or above it, whichever is larger, and below the Filters card.
+  // stays visible either left of it or above it, whichever is larger, and below the card.
   const left = panel.left - container.left;
   const above = panel.top - container.top;
   const free = {
-    top: filters.bottom - container.top,
+    top: card.bottom - container.top,
     ...(left * container.height > above * container.width
       ? { right: left, bottom: container.height }
       : { right: container.width, bottom: above }),
@@ -98,8 +102,8 @@ export function showStop(
     free.right / 2 - container.width / 2,
     (free.top + free.bottom) / 2 - container.height / 2,
   ];
-  if (linked) {
-    map.easeTo({ center, offset, zoom: Math.max(map.getZoom(), 15), duration: 0 });
+  if (openedFrom !== 'map') {
+    map.easeTo({ center, offset, zoom: Math.max(map.getZoom(), 15), ...(openedFrom === 'link' && { duration: 0 }) });
     return;
   }
   const point = map.project(center);
@@ -113,7 +117,7 @@ export function showStop(
     x < container.right - margin &&
     y > container.top + margin &&
     y < container.bottom - margin;
-  if (!inside || covers(panel) || covers(filters)) {
+  if (!inside || covers(panel) || covers(card)) {
     map.easeTo({ center, offset });
   }
 }

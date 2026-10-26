@@ -19,6 +19,7 @@ import { Router } from '@angular/router';
 import { MapLibreMap, setWorkerUrl } from 'maplibre-gl';
 import type { ExpressionSpecification, FilterSpecification, GeoJSONSource } from 'maplibre-gl';
 import { DeparturePanel } from '../departure-panel/departure-panel';
+import { StopSearch } from '../stop-search/stop-search';
 import { NetworkStops } from '../timetable/network-stops';
 import { RunningLines } from '../timetable/running-lines';
 import { RunningVehicles } from '../timetable/running-vehicles';
@@ -26,6 +27,7 @@ import { addDistricts, stadtWienCredit } from './districts';
 import { lineLayers, lineNamesLayer, routeLayers } from './lines';
 import { lineProperty, stopProperty } from './properties';
 import { selectedStopLayer, showStop, stopAt, stopsLayer, withIds } from './stops';
+import type { OpenedFrom } from './stops';
 import { VehicleAnimation } from './vehicle-animation';
 import { vehiclesLayer } from './vehicles';
 
@@ -34,10 +36,10 @@ const noFeatures: FeatureCollection<never, never> = { type: 'FeatureCollection',
 
 /**
  * Displays Vienna's stops, today's scheduled routes and the running vehicles with transport-mode controls,
- * and the departures of the stop a rider clicks.
+ * and the departures of the stop a rider clicks or finds by name.
  */
 @Component({
-  imports: [DeparturePanel],
+  imports: [DeparturePanel, StopSearch],
   selector: 'app-map-view',
   templateUrl: './map-view.html',
   host: { class: 'relative block h-dvh' },
@@ -67,9 +69,22 @@ export class MapView {
 
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
-  private readonly filters = viewChild.required<ElementRef<HTMLElement>>('filters');
+  private readonly card = viewChild.required<ElementRef<HTMLElement>>('card');
+  private readonly search = viewChild.required(StopSearch);
   private readonly panel = viewChild<DeparturePanel, ElementRef<HTMLElement>>(DeparturePanel, { read: ElementRef });
+  private readonly departures = viewChild(DeparturePanel);
   private readonly map = signal<MapLibreMap | undefined>(undefined);
+  /** The map's attribution in the bottom right corner, which the search's list ends above. */
+  protected readonly mapControls = computed(
+    () => this.map()?.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-bottom-right') ?? undefined,
+  );
+  /**
+   * The last stop opened and where it was opened from, which decides how the map moves to it and where focus
+   * goes when it closes.
+   */
+  private opened: { stop?: string; from: OpenedFrom } = { from: 'link' };
+  /** Whether a click or tap closed the open stop, rather than a key. */
+  private closedByPointer = false;
   private readonly vehicleAnimation = signal<VehicleAnimation | undefined>(undefined);
   protected readonly styleFailed = signal(false);
   protected readonly stopRetryShown = computed(() => !!this.stops.stops.error() && !this.stops.latest());
@@ -82,8 +97,22 @@ export class MapView {
     { name: 'lines', shown: this.lineRetryShown, resource: this.lines.routes },
   ];
 
-  protected closeStop() {
+  protected closeStop(event: Event) {
+    // A click from a key, such as Enter on the close button, counts no clicks.
+    this.closedByPointer = event instanceof MouseEvent && event.detail > 0;
     void this.router.navigate([], { queryParams: {} });
+  }
+
+  protected openFound(id: string) {
+    this.opened = { stop: id, from: 'search' };
+    this.closedByPointer = false;
+    if (id !== this.stop()) {
+      void this.router.navigate([], { queryParams: { stop: id } });
+      return;
+    }
+    // The open stop stays the same, so neither the map nor the panel would move on their own.
+    this.showOpenStop();
+    this.departures()?.focus();
   }
 
   protected reload(resource: WritableResource<unknown>) {
@@ -140,27 +169,33 @@ export class MapView {
     });
 
     effect(() => {
-      // Closing removes the panel and the focus in it, so move focus to the map before Angular updates the view.
-      const panel = this.panel()?.nativeElement;
-      const active = document.activeElement;
-      if (!this.stop() && panel && (active === document.body || panel.contains(active))) {
-        this.map()?.getCanvas().focus();
+      // A stop the URL opens on its own, such as with the browser's back button, counts as linked.
+      const stop = this.stop();
+      if (stop && stop !== this.opened.stop) {
+        this.opened = { stop, from: 'link' };
       }
     });
 
-    // A link opens the map on its stop once the map and the stops have loaded. A stop opened later
-    // moves into view only when the panel or the edge of the map hides it.
-    let linked = true;
-    afterRenderEffect(() => {
-      const map = this.map();
-      const stop = this.selectedStop();
+    effect(() => {
+      // Closing removes the panel and the focus in it, so move focus back to where the stop was opened
+      // before Angular updates the view. Focusing the search field would open a phone's keyboard, so after
+      // a click or tap focus goes to the map instead.
       const panel = this.panel()?.nativeElement;
-      if (map && this.stops.latest()) {
+      const active = document.activeElement;
+      if (!this.stop() && panel && (active === document.body || panel.contains(active))) {
+        if (this.opened.from === 'search' && !this.closedByPointer) {
+          this.search().focus();
+        } else {
+          this.map()?.getCanvas().focus();
+        }
+      }
+    });
+
+    // The map moves to the open stop once the map and the stops have loaded.
+    afterRenderEffect(() => {
+      if (this.map() && this.selectedStop() && this.panel()) {
         untracked(() => {
-          if (stop && panel) {
-            showStop(map, stop.geometry.coordinates, { panel, filters: this.filters().nativeElement }, linked);
-          }
-          linked = false;
+          this.showOpenStop();
         });
       }
     });
@@ -227,6 +262,7 @@ export class MapView {
         map.on('click', (event) => {
           const stop = stopAt(map, event.point);
           if (stop) {
+            this.opened = { stop, from: 'map' };
             void this.router.navigate([], { queryParams: { stop } });
           }
         });
@@ -246,6 +282,15 @@ export class MapView {
         map.remove();
       });
     });
+  }
+
+  private showOpenStop() {
+    const map = this.map();
+    const stop = this.selectedStop();
+    const panel = this.panel()?.nativeElement;
+    if (map && stop && panel) {
+      showStop(map, stop.geometry.coordinates, { panel, card: this.card().nativeElement }, this.opened.from);
+    }
   }
 
   /** Draws the last features that loaded into a map source once the map has loaded. */
