@@ -159,7 +159,8 @@ describe('StopSearch', () => {
 
     await type('stephans');
     const none = 'No tram stop matches "stephans". Choose All to search every stop.';
-    expect(shown()).toEqual({ expanded: 'false', options: [], note: none, status: none });
+    // The popup is open with the message, and its listbox has no options.
+    expect(shown()).toEqual({ expanded: 'true', options: [], note: none, status: none });
     expect(await press('Enter')).toBe(true);
 
     await type('xyz ');

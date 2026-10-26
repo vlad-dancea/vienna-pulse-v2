@@ -75,8 +75,9 @@ export class StopSearch {
   protected readonly active = linkedSignal({ source: this.options, computation: () => 0 });
   /** Whether the popup is open, with the matches or a message saying why there are none. */
   protected readonly shown = computed(() => this.opened() && this.query().trim() !== '');
-  protected readonly expanded = computed(() => this.shown() && this.options().length > 0);
-  protected readonly activeId = computed(() => (this.expanded() ? this.options()[this.active()]?.id : undefined));
+  /** Whether the popup lists options, which the arrows and Enter act on. */
+  private readonly hasOptions = computed(() => this.shown() && this.options().length > 0);
+  protected readonly activeId = computed(() => (this.hasOptions() ? this.options()[this.active()]?.id : undefined));
   /** What the popup says below or instead of the options. */
   protected readonly note = computed(() => {
     const named = this.named();
@@ -137,14 +138,14 @@ export class StopSearch {
       const count = this.options().length;
       if (event.altKey) {
         this.opened.set(down);
-      } else if (!this.expanded()) {
+      } else if (!this.hasOptions()) {
         this.opened.set(true);
         this.active.set(down ? 0 : Math.max(count - 1, 0));
       } else {
         this.active.update((index) => (index + (down ? 1 : count - 1)) % count);
       }
     } else if (event.key === 'Enter') {
-      const option = this.expanded() ? this.options()[this.active()] : undefined;
+      const option = this.hasOptions() ? this.options()[this.active()] : undefined;
       if (option) {
         event.preventDefault();
         this.pick(option.stop.id);
