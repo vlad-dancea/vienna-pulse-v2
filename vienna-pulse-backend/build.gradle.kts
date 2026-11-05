@@ -36,7 +36,7 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")
     // The PostgreSQL driver is annotated with these but only ships them at runtime, and javac's
     // classfile lint fails the build when it cannot read them.
-    compileOnly("org.checkerframework:checker-qual:3.55.1")
+    compileOnly("org.checkerframework:checker-qual:4.4.0")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     errorprone("com.google.errorprone:error_prone_core:2.51.0")
