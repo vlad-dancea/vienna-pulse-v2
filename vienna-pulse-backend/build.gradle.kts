@@ -5,8 +5,8 @@ plugins {
     java
     id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
-    id("net.ltgt.errorprone") version "5.1.1"
-    id("com.diffplug.spotless") version "8.10.4"
+    id("net.ltgt.errorprone") version "5.2.0"
+    id("com.diffplug.spotless") version "8.11.0"
 }
 
 java {
@@ -39,14 +39,14 @@ dependencies {
     compileOnly("org.checkerframework:checker-qual:3.55.1")
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
-    errorprone("com.google.errorprone:error_prone_core:2.51.0")
+    errorprone("com.google.errorprone:error_prone_core:2.52.0")
     errorprone("com.uber.nullaway:nullaway:0.14.3")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
+    testImplementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.2.0")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -62,7 +62,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 spotless {
     java {
-        palantirJavaFormat("2.102.0")
+        palantirJavaFormat("2.103.0")
     }
 }
 
