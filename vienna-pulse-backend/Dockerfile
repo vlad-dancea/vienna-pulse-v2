@@ -2,7 +2,7 @@
 
 # Packages the boot jar that `./gradlew bootJar` built and CI tested. The image only runs it.
 # The JRE matches the JDK pinned in mise.toml, so production runs the build CI tested on.
-FROM eclipse-temurin:25.0.4.1_1-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS base
+FROM eclipse-temurin:25.0.5_8-jre-resolute@sha256:b6e00330337143a2c1a20f1c1c693d4b6ce9a3c30ade8b9d03fc68cc9e3871e7 AS base
 
 # Splits the jar into layers that change at different rates: a release that only changes our code
 # ships a small layer, and the libraries stay cached on the server.
