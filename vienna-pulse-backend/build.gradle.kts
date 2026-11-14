@@ -62,7 +62,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 spotless {
     java {
-        palantirJavaFormat("2.102.0")
+        palantirJavaFormat("2.103.0")
     }
 }
 
