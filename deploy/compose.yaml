@@ -50,7 +50,7 @@ services:
 
   postgres:
     # Same image as development and tests (vienna-pulse-backend/compose.yaml).
-    image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+    image: postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
     restart: unless-stopped
     # Sized for the 1.5 GB limit. effective_cache_size only informs the planner and counts the
     # file cache inside this container's limit. The import builds its indexes with one worker at
