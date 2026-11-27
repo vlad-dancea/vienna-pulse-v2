@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
 # Packages the boot jar that `./gradlew bootJar` built and CI tested. The image only runs it.
 # The JRE matches the JDK pinned in mise.toml, so production runs the build CI tested on.
-FROM eclipse-temurin:25.0.4.1_1-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS base
+FROM eclipse-temurin:25.0.5.1_2-jre-resolute@sha256:a0862ac8790c648f6b5db8a113b9990d24fbe8e65f3c4ba8d68b0302d270c1e6 AS base
 
 # Splits the jar into layers that change at different rates: a release that only changes our code
 # ships a small layer, and the libraries stay cached on the server.
